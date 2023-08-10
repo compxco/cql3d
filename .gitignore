@@ -1,0 +1,4 @@
+*_mpitmp.f
+*.o
+*.a
+xcql3d*

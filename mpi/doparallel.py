@@ -9,7 +9,7 @@
 ###########################################################################
 
 
-import string, sys
+import sys, string
 
 inf = []  ## input lines
 out = []  ## output lines
@@ -20,7 +20,7 @@ out = []  ## output lines
 
 pat = [] ## pattern for cleaning
 buf = [] ## buffer for continuation lines
-str = '' ## joined line
+j_line = '' ## joined line
 
 ## clean single line 
 def cleans(s):
@@ -46,7 +46,7 @@ def cleans(s):
         elif state==2:
             if c=="'":
                 state = 0
-    if string.strip(s)=='':
+    if s.strip=='':
         return ''
     if len(r)<6:
         r += ' '*6
@@ -55,7 +55,7 @@ def cleans(s):
 ## saving buffer data into out list (c - prefix)
 def printbuf(c=''):
     global buf, out
-    if c!='' and string.strip(buf[0][:6])!='':
+    if c!='' and buf[0][:6].strip()!='':
         ## it is labeled line and it should be commented, so we use new line
         ## with given label and CONTINUE instruction
         out.append(buf[0][:6]+'CONTINUE !***')
@@ -69,7 +69,7 @@ def printbuf(c=''):
 def procbuf():
     if buf==[]:
         return
-    s = string.join(string.split(str),'')
+    s = j_line.strip()
     for p in pat:
         if p in s:
             printbuf('CMPI :::')
@@ -78,11 +78,11 @@ def procbuf():
 
 ## main cleaning module
 def clean():
-    global buf, str, pat
+    global buf, j_line, pat
     ## reading patterns for cleaning
     P = open('mpi/patterns.mpi','r').readlines()
     for p in P:
-        pat.append(string.strip(p))
+        pat.append(p.strip())
     ## start processing
     buf = []
     for s in inf:
@@ -91,12 +91,12 @@ def clean():
             buf.append(s)
         elif ss[5]!=' ': ## continuation line
             buf.append(s)
-            str += ss[6:]
+            j_line += ss[6:]
             continue
         else: ## normal line
             procbuf()
             buf = [s]
-            str = ss
+            j_line = ss
     procbuf()
 
 ###########################################################################
@@ -111,7 +111,7 @@ def start(s, D):
         return False
     if len(s)>5 and s[5]!=' ':
         return False
-    c = string.strip(s[6:])
+    c = s[6:].strip()
     if len(c)==0:
         return False
     pos = 0
@@ -121,7 +121,7 @@ def start(s, D):
         pos += 1
         if pos==len(c):
             break
-    if string.lower(com) in D:
+    if com.lower() in D:
         return False
     return True
 
@@ -136,7 +136,7 @@ def block():
     ## checking that current file is in the list of blocked files
     check = False
     for l in open('mpi/block.mpi','r').readlines():
-        if string.strip(l)==sys.argv[1]:
+        if l.strip()==sys.argv[1]:
             check = True
             break
     if not check: ## current file shouldn't be blocked
@@ -144,7 +144,7 @@ def block():
     ## reading delcaration instructions for detecting inserting point
     D = open('mpi/dec.mpi','r').readlines()
     for i in range(len(D)):
-        D[i] = string.strip(D[i])
+        D[i] = D[i].strip()
     ## searching insertion point and inserting blocking instruction
     state = 0
     for i in range(len(out)):
@@ -165,7 +165,7 @@ def dompi():
     L = open(sys.argv[3],'r').readlines()
     for l in L:
         if l[0]=='C':
-            key = string.strip(l)
+            key = l.strip()
             ins[key] = []
         else:
             ins[key].append(l[:-1])
@@ -176,8 +176,8 @@ def dompi():
             inf.append('CMPI :::'+l)
             mode = ''
             continue
-        ll = string.strip(l)
-        if l[0:4]=='CMPI' and ins.has_key(ll):
+        ll = l.strip()
+        if l[0:4]=='CMPI' and ll in ins:
             inf.append('CMPI >>>')
             for i in ins[ll]:
                 inf.append(i)
@@ -195,10 +195,14 @@ def main():
     global inf, out
 
     ## reading input file into inf buffer
+    if "mpilib.f" in sys.argv[1]:
+        # Don't process this source file as its contents will be parsed
+        # into others
+        return
     f = open(sys.argv[1],'r')
     s = f.readline()
     while s!='':
-        inf.append(string.rstrip(s))
+        inf.append(s.rstrip())
         s = f.readline()
     f.close()
     
@@ -210,7 +214,7 @@ def main():
     ## writing result
     f = open(sys.argv[2],'w')
     for s in inf:
-        print >> f, s
+        f.write(s + "\r\n")
     f.close()
 
 ## do all

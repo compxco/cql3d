@@ -1836,6 +1836,7 @@ CMPIINSERT_ENDIF_RANK
 CMPIINSERT_INCLUDE
       include 'param.h'
       include 'comm.h'
+      external adcdo
       save dMpellet_sum
       real*8 ZDISTR(100) ! local, for subr. ADCDO()
 
