@@ -30,13 +30,13 @@ cbh960801      if (mod(jpxy,2).eq.0) jpxy=jpxy-1
         jminn=1
         jmaxxm1=jx-1
         iminn=1
-        imaxxm1=iy-1
+        imaxxm1=iy_(l_)-1   !YuP[2021-03-11] iy-->iy_(l_)
         goto 30
       elseif (target.eq."ionmesh") then
         jminn=1
         jmaxxm1=jlwr
         iminn=1
-        imaxxm1=iy-1
+        imaxxm1=iy_(l_)-1   !YuP[2021-03-11] iy-->iy_(l_)
         goto 30
       endif
       xll2=xll**2
@@ -95,11 +95,11 @@ c990131      thminn=amin1(thll,thlu,thul,thuu)
 c990131      thmaxx=amax1(thll,thlu,thul,thuu)
       thminn=min(thll,thlu,thul,thuu)
       thmaxx=max(thll,thlu,thul,thuu)
-      iminn=luf(thminn,y,iy)-1
+      iminn=luf(thminn,y,iy_(l_))-1  !YuP[2021-03-11] iy-->iy_(l_)
       jminn=luf(xminn,x,jx)-1
       if (iminn.eq.0) iminn=1
       if (jminn.eq.0) jminn=1
-      imaxxm1=luf(thmaxx,y,iy)-1
+      imaxxm1=luf(thmaxx,y,iy_(l_))-1 !YuP[2021-03-11] iy-->iy_(l_)
       if (icase.gt.1) then
         jmaxxm1=jx-1
       else
@@ -188,8 +188,8 @@ c990131          if (abs(cosse).gt.1.)  cosse=sign(1.,cosse)
           goto 120
  100      continue
           fpn(jp,ip)=0.
- 120    continue
- 130  continue
+ 120    continue ! jp=2,jpxy-1
+ 130  continue ! ip=1,ipxy-1
 
 c      do jp=1,jpxy
 c      do ip=1,ipxy

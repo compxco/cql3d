@@ -488,13 +488,13 @@ CMPIINSERT_BCAST_EFLUX_NPA
      +     MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiierr)
 
 CMPIINSERT_BCAST_FUS
-      call MPI_BCAST(fuspwrv(1,1),4*lrorsa,
+      call MPI_BCAST(fuspwrv(1,1),4*lrors,
      +     MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiierr)
-      call MPI_BCAST(fuspwrm(1,1),4*lrorsa,
+      call MPI_BCAST(fuspwrm(1,1),4*lrors,
      +     MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiierr)
-      call MPI_BCAST(sigf(1,1),4*lrorsa,
+      call MPI_BCAST(sigf(1,1),4*lrors,
      +     MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiierr)
-      call MPI_BCAST(sigm(1,1),4*lrorsa,
+      call MPI_BCAST(sigm(1,1),4*lrors,
      +     MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpiierr)
      
 CMPIINSERT_STARTTIME

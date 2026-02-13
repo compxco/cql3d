@@ -1,0 +1,24 @@
+
+cqlinput_help_local
+
+#Compiled objects
+*.o
+*.mod
+
+#Executables
+xcql3d*
+
+#Results of test runs
+00_Cql3d_Regression_Tests/test1/
+00_Cql3d_Regression_Tests/test2/
+00_Cql3d_Regression_Tests/test3/
+00_Cql3d_Regression_Tests/test4/
+00_Cql3d_Regression_Tests/test4.bak/
+00_Cql3d_Regression_Tests/test5/
+00_Cql3d_Regression_Tests/test6/
+00_Cql3d_Regression_Tests/test6.bak/
+00_Cql3d_Regression_Tests/test7/
+00_Cql3d_Regression_Tests/test_results_201026/
+00_Cql3d_Regression_Tests/test_results_201026.zip
+00_Cql3d_Regression_Tests/test_results_201026.zip.orig
+

@@ -7,14 +7,15 @@ c
 CMPIINSERT_INCLUDE
 
       REAL*4 RILIN
-      REAL*4 :: R40=0.
+      REAL*4 :: R40=0.,R41=1.,R4P1=0.1,R4P9=0.9
 
 c..................................................................
 c     This routine does some minor initialization for
 c     the "eq" module. Called after the namelist read.
 c..................................................................
 
-      if (lfield.gt.lfielda) lfield=lfielda
+      !YuP if (lfield.gt.lfielda) lfield=lfielda  !YuP[2021-04] lfielda is not used anymore
+      !Now all relevant arrays are pointers of size lfield
       nrc=(nnr-1)/2+1
       nzc=(nnz-1)/2+1
       zshift=0.0
@@ -25,6 +26,7 @@ CMPIINSERT_IF_RANK_NE_0_RETURN
 
       if (noplots.ne."enabled1") then
       CALL PGPAGE
+      CALL PGSVP(R4P1,R4P9,R4P1,R4P9) !(XLEFT,XRIGHT,YBOT,YTOP)!YuP[2021-01-18]
       RILIN=0.
       CALL PGMTXT('T',-RILIN,R40,R40,"PARAMETER VALUES")
       

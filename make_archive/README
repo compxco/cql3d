@@ -1,0 +1,7 @@
+.../cql3d/make_archive
+
+This directory contains makefiles used on various machines over decades.
+ls -lt|head ==> recent actively used makefile.
+
+Check also ./perlmutter if running at nersc.gov.
+

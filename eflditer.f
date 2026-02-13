@@ -48,7 +48,7 @@ c     This is parallel current at minimum B point on a flux surface.
 
       currtp(lr_)=0.0
       call bcast(tam3,zero,jx)
-      do 20 i=1,iy
+      do 20 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
          do 10 j=1,jx
             tam3(j)=tam3(j)+f(i,j,1,l_)*cynt2(i,l_)*coss(i,l_)
  10      continue
@@ -65,8 +65,8 @@ c     index for amin1(3.*clight,ucrit).
       call soucrit
       
       curra(1,l_)=0.0
-      if (jxcrit(1,lr_).ge.jx) go to 50
-      do j=jxcrit(1,lr_),jx
+      if (jxcrit(1,l_).ge.jx) go to 50
+      do j=jxcrit(1,l_),jx !YuP[2021-04] (k,lr_) --> (k,l_)
          curra(1,l_)=curra(1,l_)+currv(j,1,l_)*dx(j)
       enddo
  50   continue

@@ -1,8 +1,8 @@
 #~/cql3d/git/cql3d/00_Cql3d_Regression_Tests/tests
 
 #Adjust path to the cql3d executable.  For example:
-XCQL3D="../../xcql3d_gfortran64.1"
-
+#XCQL3D="../../xcql3d_gfortran64"
+XCQL3D="/home/bobh/cql3d/git/git_cql3d_230113.4/xcql3d_gfortran64"
 
 #test1: Runaway electron rates vs rho
 mkdir test1
@@ -64,3 +64,18 @@ cd test6/
 time $XCQL3D > log_test6   # 3.2s on compx2
 cd ..
 
+#test7 Three runs re Radial diffusion acting on ions in MST.  
+#      Diff and radial pinch terms in 2nd run, from results of first run.
+#      3rd run doubles the diffusion and pinch from the first two runs.
+#      Also, start the FP calculation from an externally provided distribution
+#      function in file "fpld_dsk".  See cqlinput_help.
+#      It may be necessary to change the XCQL3D= statement in test7_run3,
+#      if the used directory structure is different than in the git repo.
+#      Can verify the runs by comparing with log_w_transp_short* in ../.
+mkdir test7
+cp cqlinput_w_transp_short_drrdrout cqlinput_w_transp_short_drrdrin cqlinput_w_transp_short_drrdrin_2X test7_run3 eqdsk_MST fpld_dsk_MST.zip test7/
+cd test7
+ln -s eqdsk_MST eqdsk
+unzip fpld_dsk_MST.zip; ln -s fpld_dsk_MST fpld_dsk
+time ./test7_run3 > log_test7_run3
+cd ..

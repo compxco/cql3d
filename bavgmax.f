@@ -12,22 +12,30 @@ c.................................................................
       include 'comm.h'
 
       if (n .ge. 2) return
-      call bcast(psiiv(1,lr_),zero,iy)
-      call bcast(psiba(1,lr_),zero,iy)
-      call bcast(psisq(1,lr_),zero,iy)
-      call bcast(psiir(1,lr_),zero,iy)
-      call bcast(vderb(1,lr_),zero,iy)
-      call bcast(psicu(1,lr_),zero,iy)
-      call bcast(psiqu(1,lr_),zero,iy)
-      call bcast(sincosba(1,1,lr_),zero,iy*ngen)
+      call bcast(psiiv(1,lr_),zero,iymax) !YuP[2021-03-11] iy-->iymax
+      call bcast(psiba(1,lr_),zero,iymax)
+      call bcast(psisq(1,lr_),zero,iymax)
+      call bcast(psiir(1,lr_),zero,iymax)
+      call bcast(vderb(1,lr_),zero,iymax)
+      call bcast(psicu(1,lr_),zero,iymax)
+      call bcast(psiqu(1,lr_),zero,iymax)
+      call bcast(sincosba(1,1,lr_),zero,iymax*ngen)
 
       lrange=lz
-      if (numclas .eq. 1) lrange=lz/2+1 !!! YuP: needs to check ?
+      if (cqlpmod.eq."enabled" .and. numclas .eq. 1) lrange=lz/2+1 !!! YuP: needs to check ?
+      !YuP[2025-12-12] added cqlpmod.eq."enabled" in the above line
 
-
-      do 30 l=1,lrange  
+      !This subr. is only called when if l_=lmdpln_
+      !For CQLP, l_=lmdpln_=1
+      do 30 l=1,lrange  ! along pol.dir. (along field line)
+        if (cqlpmod.eq."enabled") then !YuP[2021-04-02] added
+             iiy=iy_(l) !CQLP: at given poloidal index
+        else !CQL3D
+             iiy=iy_(l_) !CQL3D: at given radial index
+        endif
         do 31 i=1,imax(l,lr_)
-          iii=iy+1-i
+          iii=iiy+1-i !YuP[2021-03-11] iy-->iy_(l_) 
+          ![For CQLP, this subr. is called with l_=1 only, i.e. at midplane]
 
           ! 1. All orbits that reach/pass a given poloidal node l:
           ! passing (i<itl), or trapped that could reach/pass this l;
@@ -104,13 +112,13 @@ c          psiir(iii,lr_)=psiir(i,lr_)    !-YuP Not used
 
  
       do 70 i=2,iyh
-        iii=iy+1-i
+        iii=iy_(l_)+1-i  !YuP[2021-03-11] iy-->iy_(l_)
         swwswwsw=psiiv(i,lr_)/sinn(i,l_)**2-1.
         batot(i,lr_)=tann(i,l_)**2*swwswwsw
         batot(iii,lr_)=batot(i,lr_)
  70   continue
       batot(1,lr_)=psiiv(1,lr_)
-      batot(iy,lr_)=batot(1,lr_)
+      batot(iy_(l_),lr_)=batot(1,lr_)  !YuP[2021-03-11] iy-->iy_(l_)
 
 c      do i=1,iy
 c         write(*,*)lr_,i,tau(i,lr_)

@@ -27,7 +27,7 @@ c     Call npa routines to calc and plot output....
       do 1 l=1,lrzmax
         tr1(l)=reden(kelec,l)
  1    continue
-      call tdnpa0(rrz,tr1(1),icall,iplotnbi)
+      call tdnpa0(rrz(0:lrzmax),tr1(1),icall,iplotnbi) !YuP[2021-11-03] added (0:lrz)
      
       return
       end

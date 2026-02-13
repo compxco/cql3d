@@ -13,7 +13,8 @@ c
       include 'comm.h'
 
 
-      if (kelecg .gt. 0) vfluxz(l_)=vflux(jx-1,1,l_)
+      if (kelecg.gt.0) vfluxz(l_)=vflux(jx-1,kelecg,l_) !YuP[2023-06-30] 1-->kelecg
+                         !YuP[2023]: kelecg is not always 1
       currmtz(l_)=currmt(l_)/3.e+9
       currmtpz(l_)=currmtp(l_)/3.e+9
 
@@ -30,6 +31,7 @@ c..................................................................
 cBH081202      psyncz(lr_)=entr(kelecg,11,l_)
       if (kelecg.ne.0) then
          psyncz(lr_)=entr(kelecg,11,l_)
+         !write(*,*)' tdtoarray: l_,psyncz(lr_)=',l_,psyncz(lr_)
       else
          psyncz(lr_)=zero
       endif

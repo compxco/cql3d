@@ -11,7 +11,9 @@ CMPIINSERT_INCLUDE
 
       character*8 pltvlfb
       character*8 pltovlp
-      real*4 RTAB1(iy),RTAB2(iy) ! local, for PGPLOT
+      real*4 RTAB1(iymax),RTAB2(iymax) ! local, for PGPLOT
+      !YuP[2021-03-11] Changed iy-->iymax in declarations
+      !(just in case if iy is changed by iy=iy_(l_) somewhere)
 
       REAL*4 :: R47=7.,R48=8.,R49=9.,R410=10.,R411=11.,R412=12.,R413=13.
       

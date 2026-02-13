@@ -79,13 +79,14 @@ cl    2. Compute the new parallel component of the electric field
 c.......................................................................
 
       call dcopy(ls+2,elparnw(0),1,elparol(0),1)
-      zsumrho=0.0
+      zsumrho=0.d0
       elparnw(1)=elpar0
       zel0cof=elparnw(1)/psipols(1)**2
       do 200 l=2,ls
         zsumrho=zsumrho+0.5*dszm5(l)*(z4pirho(l-1)/psis(l-1)+
      +    z4pirho(l)  /psis(l))
         elparnw(l)=psipols(l)**2/psis(l)*(zel0cof+zsumrho)
+        write(*,*)'wpelec: l, elparnw(l)=', l,elparnw(l)
  200  continue
 
       if (sbdry .eq. "periodic") then

@@ -1,4 +1,5 @@
 git/cql3d/00_Cql3d_Regression_Tests/README_cql3d_tests
+[Directory starts with 00_ to get it to front of listings.]
 
 Execute tests.sh with bash commands in ./tests.sh.
 Type ./tests.sh, or scrape each test sequence into the terminal.
@@ -90,8 +91,19 @@ This is a shortened run from the actual study cases, so full runs would
 use larger lrz,iy,jx,nstop,nplot,nplt3d.
 cpu=12.6sec.
 
+   The user could reverse the order of D and H and reset kfrsou, to 
+   demonstrate that the same power absorption if obtained on the respective
+   species.   Read cqlinput_help to see how the densities are set up
+   for this run, with H=2% of ne, and ion densities adjusted to obtain
+   the given Zeff profile.  See the log file for the resulting density
+   profiles (search "species no." several time).
+
 (Ref run in: D3D_ngen2_urf_NBI_H.short_rerun_201018)
 
+(genrayfw_18rays.nc is identical to the file in
+/home/bobh/cql3d/aorsa/D3D_test_case/Masanori_050822/GENRAY/multi_ray_new/116MHZ.0_multi_pass/080920_rerun.
+210926: Results closely reproduced using genray input file 
+genray.dat_multi_122080.03100_116MHz_18rays_080920.)
 
 See /home/bobh/cql3d/cql3d_cvs/code/cql3d_cswim_svn/00_cql3d_Regression_Tests_basic_w_older_runs/README
 
@@ -158,4 +170,25 @@ to the Kulrsud rate.
 
 test7
 =====
-Add TCV radial transport case.
+Three shortened runs re Radial diffusion acting on ions in MST.  
+Diff and radial pinch terms in 2nd run, from results of first run.
+3rd run doubles the diffusion and pinch from the first two runs.
+Also, start the FP calculation from an externally provided distribution
+function in file "fpld_dsk".  See cqlinput_help.
+It may be necessary to change the XCQL3D= statement in test7_run3,
+if the used directory structure is different than in the git repo.
+cpu: About 40s for the three runs.
+
+test8
+=====
+Add TCV radial transport case Harvey,Sauter et al.,  PRL(2002).
+Two cases, 8.1 solving by splitting, and 8.2 by fully implicit GMRES.
+/home/bobh/cql3d/tcv_000502
+/home/bobh/cql3d/TEST_CASES_CQL3D/cql3d_cvs_test/More_cql3d_tests2/test_TCV/test_it3drv_180919
+
+
+test9: Add genray cmod case for g1060728011.01100 (used in several genray
+test cases) and extensively modelled by Frank (2022) with TORLH.
+
+
+Add restart test: Cmod_short_AmpFar_restart_test.zip works OK

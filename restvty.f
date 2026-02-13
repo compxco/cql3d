@@ -37,12 +37,13 @@ c                    resist=(pol cross-section-area avg of E)/currpar
 c                    and currpar is sum of Hinton-Hazeltine neoclassical
 c                    current + runaway current.
 
-c     resistn=<E_parall*B>/<j_parall*B>/sptzr
+c     resistn=<E_parall*B>/<j_parall*B>
 c        
+c     rovsn=  <E_parall*B>/<j_parall*B>/sptzr
 c       
 c
 c     rovsloc is the local resistivity E_par/j_par(no flux averaged),
-c     meaningful in cqlpmod only
+c     meaningful in cqlpmod only (CQLP)
 c
 c     If efswtchn="neo_hh" and cqlpmod.ne."enabled":
 c                           resist= (area avg of E)/currpar
@@ -68,7 +69,7 @@ C%OS  old:   resist=elecfld(lr_)/(300.*curr(kelec,lr_))
      +           fpsi(lr_)  / bmod0(lr_) * onovrp(2,lr_)/ 
      +           psiavg(2,lr_)
               endif !YuP
-            else
+            else ! For CQLP, only at l_=1 (midplane):
                resist=elecfld(lr_) / 300. / currm(kelec,l_) * rmag * 
      +              bmod0(lr_) / fpsi(lr_)
             endif
@@ -94,7 +95,7 @@ C%OS  old:   resist=elecfld(lr_)/(300.*curr(kelec,lr_))
 
          endif
 
-         if (cqlpmod .eq. "enabled") then   !Local along fld line resist
+         if (cqlpmod.eq."enabled") then   !Local along fld line resist
 c%OS  if (mod(nummods,10).le.4 .or. n.ge.nontran) then
             resistlo=elecfld(lr_)/300.*rmag*fpsi(lr_)/bmidplne(lr_)/
      +           (psis(l_)*solrs(l_)**2) / currm(kelec,l_)
@@ -107,7 +108,7 @@ c%OS  endif
       endif !if (abs(currm(kelec,l_)) .gt. 1.e-10)
 
 
-      rovsloc(l_)=resistlo/(sptzr(l_)+em90)
+      rovsloc(l_)=resistlo/(sptzr(l_)+em90)  !CQLP only
 
 c..................................................................
 c     rovs(lr_)=computed resistivity / Spitzer resistivity 
@@ -117,7 +118,7 @@ c..................................................................
       if (l_ .eq. lmdpln_) then
          if (efswtchn.eq."neo_hh" .and. cqlpmod.ne."enabled") then
             rovs(lr_)=resist/(zreshin(lr_)*sptzr(lmdpln_)+em90)
-         else
+         else !(cqlpmod.eq."enabled") (at midplane only)
             rovs(lr_)=resist/(sptzr(lmdpln_)+em90)
          endif
          rovsn(lr_)=resistn/(sptzr(lmdpln_)+em90)
@@ -128,8 +129,13 @@ c..................................................................
 c     vparl=average parallel velocity of distribution
 c..................................................................
 
+         if(cqlpmod .ne. "enabled")then
          vparl=curr(kelec,lr_)/(charge*reden(kelec,lr_))
-         vpovth=vparl/vth(kelec,lr_)
+         vpovth=vparl/vth(kelec,lr_)    !CQL3D
+         else !(cqlpmod.eq."enabled") ! YuP[2021-02-26]
+         vparl=currm(kelec,l_)/(charge*denpar(kelec,ls_))
+         vpovth=vparl/vthpar(kelec,ls_) !CQLP
+         endif
 
 c..................................................................c
 c     eovedd is E-toroidal/E-Dreicer at the magnetic field

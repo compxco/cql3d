@@ -20,7 +20,9 @@
       ! To prevent this, I replaced f() by f_(), which is 
       ! the distr.func. at previous time step (i.e., the old f()). 
 c
-      subroutine fle_pol(setup,lp) !called by subr.pltprppr for each lr_
+      subroutine fle_pol(setup,lp) !called by subr.pltprppr 
+                ! for each lp=l_ (in CQLP run), or for lp=1 (CQL3D)
+                !See below: this subr. has loop in l=pol.angle.index
       implicit integer (i-n), real*8 (a-h,o-z)
       character*(*) setup
 c
@@ -28,7 +30,7 @@ c.......................................................................
 c  At each poloidal angle, specified by poloidal index lp:
 c  Computes a local reduced distribution function,  
 c  fl(0:jfl)=f(v_parallel), by binning line-averaged density in
-c  dz(lp,ll) due to each  equatorial plane velocity-space element 
+c  dz(lp,lr_) due to each  equatorial plane velocity-space element 
 c  into a parallel velocity  space grid xl(1:jfl).
 c  fl(1:jfl-1) are the relevant (non-zero) entries, each centered
 c    at normalized velocity xlm(1:jfl-1).  The xl(1:jfl) give bin bndries.
@@ -37,18 +39,23 @@ c  Presently set up only for single flux surface runs.
 c
 c  Normalization of the output distribution fl is such that it equals
 c  vnorm*f_cgs(v_parallel).
+c  [2022-03-19] Now fl(0:jfl,1:lrors) is computed&saved for each l_ 
 c.......................................................................
       save
       include 'param.h'
       include 'comm.h'
 
 c     Diagnostic array:
-c      dimension den_of_s(lza)  !Now comm.h:den_of_s2
+c      dimension den_of_s(lz)  !Now comm.h:den_of_s2
 
       character*8 ifirst
       data ifirst/"first"/
 
       if (lrz.gt.1) stop 'in fle_pol: only set up for lrz=1.'
+
+        !YuP[2021-04] I think, for CQLP, we should not do
+        ! bounce-averaging, so need to 
+        ! remove dtau/tau coeffs.
 
 c     At the first call, set up the mesh, binning and weighting factors.
 c     The mesh is the same for each poloidal angle, but the factors
@@ -58,13 +65,11 @@ c     vary with poloidal angle.
          ifirst="notfirst"
  
 c     initialize density diagnostic
-         do l=1,lza
-            den_of_s2(l)=0.0
-         enddo
+         den_of_s2(:)=0.0 ! for all pol.angle points
          ll=1 ! YuP[2019-09] Why ll=1 ? 
          !This subr.fle_pol is called by subr.pltprppr for each lr_,
          ! so I would use ll=lr_ here (or l_). [YuP]
-         ll=l_ !YuP[2020-01] No effect from this change
+         ll=l_ !YuP[2020-01] No effect from this change (but it matters for CQLP)
          denfl2(ll)=0.0
 
 c     Set up the mesh:
@@ -107,7 +112,7 @@ c     Set up the mesh:
            jj=jfl+1-j
            xl(jj)=-xl(j)
  203    continue
-      endif
+      endif ! xlfac
 
       do j=1,jfl-1
          xlm(j)=0.5*(xl(j)+xl(j+1))
@@ -125,28 +130,46 @@ c          contribute to parallel velocity bin jflbin(i,j,ll) with
 c          weight wtfl0(i,j,ll) and to bin jflbin(i,j,ll)-1 with
 c          weight wtflm(i,j,ll). 
 c         do 204 ll=1,lrz
-         ll=1 ! YuP[2019-09] Why ll=1 ? 
+         ll=1 ! YuP[2019-09] Why ll=1 ? (This subr is called for lrz=1)
          !This subr.fle_pol is called by subr.pltprppr for each lr_,
          ! so I would use ll=lr_ here (or l_). [YuP]
-         ll=l_ !YuP[2020-01] No effect from this change
+         ll=l_ !YuP[2020-01] No effect from this change (matters for CQLP)
 
          if (lrz.ne.1) stop 'lrz.ne.1 in fle_pol'
 
-         do 2041 l=1,lz
+         do 2041 l=1,lz 
+         !YuP[2021-03-08] Corrected ll:
+         if(cqlpmod.ne."enabled")then !YuP[2021-03-08] added if()
+           ll=1 !CQL3D case, and lr_=1 here (This subr is called for lrz=1)
+           !Also note: l_=lr_=1 in this case.
+         else !(cqlpmod.eq."enabled")  !YuP[2021-03-08] added for CQLP
+           ll=l !CQLP case (local point at field line)
+         endif
          do 205 j=1,jx
-         do 206 i=1,min(imax(l,ll)+1,iyh_(ll))
-            xll=x(j)*cosz(i,l,ll)
+         do 206 i=1,min(imax(l,lr_)+1,iyh_(ll))
+                !YuP[2021-02-26] Corrected imax(l,ll)->imax(l,lr_)
+                !This is important for CQLP (when lr_=1, but l_=1:ls)
+            xll=x(j)*cosz(i,l,lr_)
+                !YuP[2021-02-26] Corrected cosz(l,ll)->cosz(l,lr_)
+                !This is important for CQLP (when lr_=1, but l_=1:ls)
             jbin=luf(xll,xlm(1),jfl)
             wt=(xlm(jbin)-xll)/(xlm(jbin)-xlm(jbin-1))
-            wta=dtau(i,l,ll)*coss(i,ll)/dz(l,ll)*cynt2(i,ll)*cint2(j)
+            wta=dtau(i,l,lr_)*coss(i,ll)/dz(l,lr_)*cynt2(i,ll)*cint2(j)
+                !YuP[2021-02-26] Corrected dtau(l,ll)->dtau(l,lr_)
+                !This is important for CQLP (when lr_=1, but l_=1:ls)
+                !Also for dz()
+            !YuP: Probably for CQLP should use wta=cynt2(i,ll)*cint2(j) ?
             jflbin(i,j,l)=jbin
             wtfl0(i,j,l)=(1.-wt)*wta
-            wtflm(i,j,l)=wt*wta
+            wtflm(i,j,l)=wt*wta !YuP: note that wtfl0()+wtflm()=wta
+                          !YuP: No need to save both wtfl0() and wtflm()
  206     continue
  205     continue
 
          do 207 j=1,jx
-         do 208 i=1,min(imax(l,ll)+1,iyh_(ll))
+         do 208 i=1,min(imax(l,lr_)+1,iyh_(ll))
+                !YuP[2021-02-26] Corrected imax(l,ll)->imax(l,lr_)
+                !This is important for CQLP (when lr_=1, but l_=1:ls)
             ii=iy_(ll)+1-i
             jflbin(ii,j,l)=jfl-jflbin(i,j,l)+1
 c            wtfl0(ii,j,l)=wtfl0(i,j,l)
@@ -156,71 +179,94 @@ c            wtflm(ii,j,l)=wtflm(i,j,l)
  208     continue
  207     continue
 
- 2041    continue ! l=1,lz
+ 2041    continue ! l=1,lz   (or l=lp,lp for CQLP)
 c 204     continue
 
-      endif
+      endif ! ifirst.eq."first"
          go to 999
-      endif
+      endif ! setup.eq."setup"
 
 c  Form the parallel distribution function, for a given pol. angle lp
-c  and radial bin l_:
+c  and radial bin lr_:
 
-      call bcast(fl(0),zero,jfl+1)
+      call bcast(fl(0,l_),zero,jfl+1) ![2022-03-19] Now for each l_ 
       do j=1,jx
-         do i=1,min(imax(lp,ll)+1,iyh_(ll))
+         temc1=0.d0
+         temc2=0.d0
+         do i=1,min(imax(lp,lr_)+1,iyh_(l_)) !YuP[2021-03-08] iyh_(ll)-->iyh_(l_)
+                !YuP[2021-02-26] Corrected imax(l,ll)->imax(l,lr_)
+                !This is important for CQLP (when lr_=1, but l_=1:ls)
             itemc1(i)=jflbin(i,j,lp)
             itemc2(i)=itemc1(i)-1
 c            temc1(i)=wtfl0(i,j,lp)*f_(i,j,k,l_)
 c            temc2(i)=wtflm(i,j,lp)*f_(i,j,k,l_)
+            if(n.eq.0)then ! YuP[2021-03-10] added: f_ is not known at t=0; use f()
+            temc1(i)=wtfl0(i,j,lp)*f(i,j,1,l_)
+            temc2(i)=wtflm(i,j,lp)*f(i,j,1,l_)
+            else ! n>0
             temc1(i)=wtfl0(i,j,lp)*f_(i,j,1,l_)
             temc2(i)=wtflm(i,j,lp)*f_(i,j,1,l_)
+            endif
          enddo
-         do i=1,min(imax(lp,ll)+1,iyh_(ll))
-            ii=iy_(ll)+1-i
+         do i=1,min(imax(lp,lr_)+1,iyh_(l_)) !YuP[2021-03-08] iyh_(ll)-->iyh_(l_)
+                !YuP[2021-02-26] Corrected imax(l,ll)->imax(l,lr_)
+                !This is important for CQLP (when lr_=1, but l_=1:ls)
+            ii=iy_(l_)+1-i !YuP[2021-03-08] iy_(ll)-->iy_(l_)
             itemc1(ii)=jflbin(ii,j,lp)
             itemc2(ii)=itemc1(ii)-1
+            if(n.eq.0)then ! YuP[2021-03-10] added: f_ is not known at t=0; use f()
+            temc1(ii)=wtfl0(ii,j,lp)*f(ii,j,1,l_)
+            temc2(ii)=wtflm(ii,j,lp)*f(ii,j,1,l_)
+            else
             temc1(ii)=wtfl0(ii,j,lp)*f_(ii,j,1,l_)
             temc2(ii)=wtflm(ii,j,lp)*f_(ii,j,1,l_)
+            endif
          enddo
 
-         do i=1,min(imax(lp,ll)+1,iyh_(ll))
-            fl(itemc1(i))=fl(itemc1(i))+temc1(i)
-            fl(itemc2(i))=fl(itemc2(i))+temc2(i)
+         do i=1,min(imax(lp,lr_)+1,iyh_(l_)) !YuP[2021-03-08] iyh_(ll)-->iyh_(l_)
+                !YuP[2021-02-26] Corrected imax(l,ll)->imax(l,lr_)
+                !This is important for CQLP (when lr_=1, but l_=1:ls)
+            fl(itemc1(i),l_)=fl(itemc1(i),l_)+temc1(i) ![2022-03-19] Now for each l_
+            fl(itemc2(i),l_)=fl(itemc2(i),l_)+temc2(i) ![2022-03-19] Now for each l_
          enddo
-         do i=1,min(imax(lp,ll)+1,iyh_(ll))
-            ii=iy_(ll)+1-i
-            fl(itemc1(ii))=fl(itemc1(ii))+temc1(ii)
-            fl(itemc2(ii))=fl(itemc2(ii))+temc2(ii)
+         do i=1,min(imax(lp,lr_)+1,iyh_(l_)) !YuP[2021-03-08] iyh_(ll)-->iyh_(l_)
+                !YuP[2021-02-26] Corrected imax(l,ll)->imax(l,lr_)
+                !This is important for CQLP (when lr_=1, but l_=1:ls)
+            ii=iy_(l_)+1-i !YuP[2021-03-08] iy_(ll)-->iy_(l_)
+            fl(itemc1(ii),l_)=fl(itemc1(ii),l_)+temc1(ii) ![2022-03-19] Now for each l_
+            fl(itemc2(ii),l_)=fl(itemc2(ii),l_)+temc2(ii) ![2022-03-19] Now for each l_
          enddo
-      enddo
-
+      enddo ! j
+      
       do jf=0,jfl
-         fl(jf)=bbpsi(lp,lr_)*fl(jf)/dxl(jf)
+         fl(jf,l_)=bbpsi(lp,lr_)*fl(jf,l_)/dxl(jf) ![2022-03-19] Now for each l_
       enddo
-      fl(1)=fl(1)+fl(0)
-      fl(jfl-1)=fl(jfl-1)+fl(jfl)
-      fl(0)=0.0
-      fl(jfl)=0.0
+      fl(1,l_)=fl(1,l_)+fl(0,l_) ![2022-03-19] Now for each l_ 
+      fl(jfl-1,l_)=fl(jfl-1,l_)+fl(jfl,l_) ![2022-03-19] Now for each l_
+      fl(0,l_)=0.0 ![2022-03-19] Now for each l_ 
+      fl(jfl,l_)=0.0 ![2022-03-19] Now for each l_ 
 
 c  Set minimum fl = 1.e-100* (max. value)
       flmax=0.
       do jf=1,jfl-1
-c990131         flmax=amax1(flmax,fl(jf))
-         flmax=max(flmax,fl(jf))
+         flmax=max(flmax,fl(jf,l_)) ![2022-03-19] Now for each l_
       enddo
       flmin=em100*flmax
       do jf=1,jfl-1
-c990131         fl(jf)=amax1(flmin,fl(jf))
-         fl(jf)=max(flmin,fl(jf))
+         fl(jf,l_)=max(flmin,fl(jf,l_)) ![2022-03-19] Now for each l_
       enddo
 
 c     Diagnostic check of densities:
       do jf=1,jfl-1
-         den_of_s2(lp)=den_of_s2(lp)+dxl(jf)*fl(jf)
+         den_of_s2(lp)=den_of_s2(lp)+dxl(jf)*fl(jf,l_) ![2022-03-19] Now for each l_
       enddo
       denfl2(l_)=denfl2(l_)
-     1          +dz(lp,ll)/bbpsi(lp,ll)*den_of_s2(lp)/zmaxpsi(ll)
+     1          +dz(lp,lr_)/bbpsi(lp,lr_)*den_of_s2(lp)/zmaxpsi(lr_)
+                !YuP[2021-02-26] Corrected ll->lr_ in dz(),bbpsi,zmaxpsi
+                !This is important for CQLP (when lr_=1, but l_=1:ls)
+      write(*,'(a,3i3,2e12.3)')
+     + 'fle_pol: lz,lp,l_, den_of_s2(lp),denfl2(l_)=', 
+     +           lz,lp,l_, den_of_s2(lp),denfl2(l_)
 
  999  return
       end subroutine fle_pol
@@ -245,6 +291,7 @@ c  This calculation is set up for use with multiple flux surface runs.
 c
 c  Normalization of the output distribution fl is such that it equals
 c  vnorm*f_cgs(v_parallel).
+![2022-03-19] Now fl(0:jfl,1:lrors) is computed&saved for each l_ 
 c.......................................................................
       save
       include 'param.h'
@@ -325,6 +372,7 @@ c          weight wtflm(i,j,ll).
             jbin=luf(xll,xlm(1),jfl)
             wt=(xlm(jbin)-xll)/(xlm(jbin)-xlm(jbin-1))
             wta=vptb(i,ll)*cynt2(i,ll)*cint2(j)
+            !YuP[2021-02]: Should be using vptb(i,lrindx(ll))
             jflbin(i,j,ll)=jbin
             wtfl0(i,j,ll)=(1.-wt)*wta
             wtflm(i,j,ll)=wt*wta
@@ -352,7 +400,7 @@ c            wtflm(ii,j,ll)=wtflm(i,j,ll)
 
 c  Form the parallel distribution function, for a given radius l_:
 
-      call bcast(fl(0),zero,jfl+1)
+      call bcast(fl(0,l_),zero,jfl+1) ![2022-03-19] Now for each l_
       do j=1,jx
          do i=1,iy_(l_)
             itemc1(i)=jflbin(i,j,l_)
@@ -363,29 +411,27 @@ c            temc2(i)=wtflm(i,j,l_)*f_(i,j,k,l_)
             temc2(i)=wtflm(i,j,l_)*f_(i,j,1,l_)
          enddo
          do i=1,iy_(l_)
-            fl(itemc1(i))=fl(itemc1(i))+temc1(i)
-            fl(itemc2(i))=fl(itemc2(i))+temc2(i)
+            fl(itemc1(i),l_)=fl(itemc1(i),l_)+temc1(i) ![2022-03-19] Now for each l_
+            fl(itemc2(i),l_)=fl(itemc2(i),l_)+temc2(i) ![2022-03-19] Now for each l_
          enddo
       enddo
 
       do jf=0,jfl
-         fl(jf)=fl(jf)/(dxl(jf)*zmaxpsi(lr_))
+         fl(jf,l_)=fl(jf,l_)/(dxl(jf)*zmaxpsi(lr_)) ![2022-03-19] Now for each l_
       enddo
-      fl(1)=fl(1)+fl(0)
-      fl(jfl-1)=fl(jfl-1)+fl(jfl)
-      fl(0)=0.0
-      fl(jfl)=0.0
+      fl(1,l_)=fl(1,l_)+fl(0,l_) ![2022-03-19] Now for each l_
+      fl(jfl-1,l_)=fl(jfl-1,l_)+fl(jfl,l_) ![2022-03-19] Now for each l_
+      fl(0,l_)=0.0 ![2022-03-19] Now for each l_
+      fl(jfl,l_)=0.0 ![2022-03-19] Now for each l_
 
 c  Set minimum fl = 1.e-100* (max. value)
       flmax=0.
       do jf=1,jfl-1
-c990131         flmax=amax1(flmax,fl(jf))
-         flmax=max(flmax,fl(jf))
+         flmax=max(flmax,fl(jf,l_)) ![2022-03-19] Now for each l_
       enddo
       flmin=em100*flmax
       do jf=1,jfl-1
-c990131         fl(jf)=amax1(flmin,fl(jf))
-         fl(jf)=max(flmin,fl(jf))
+         fl(jf,l_)=max(flmin,fl(jf,l_)) ![2022-03-19] Now for each l_
       enddo
 
  999  return
@@ -399,13 +445,13 @@ c
 c.......................................................................
 c  At each poloidal angle, specified by poloidal index lp:
 c  Computes a local reduced distribution function,  
-c  fl(0:jfl)=<f(u)>, where <> is a pitch angle average.
-c  The fl are computed centered on the velocity grid
+c  fl1(0:jfl)=<f(u)>, where <> is a pitch angle average.
+c  The fl1 are computed centered on the velocity grid
 c  xl(1:jfl)=x(2:jx-1).  Thus the xl(1:jfl) give bin bndries.
-c  fl(1:jfl-1) are the relevant (non-zero) entries, each centered
+c  fl1(1:jfl-1) are the relevant (non-zero) entries, each centered
 c    at normalized velocity xlm(1:jfl-1).  
 c
-c  Normalization of the output distribution fl is such that it equals
+c  Normalization of the output distribution fl1 is such that it equals
 c  vnorm*f_cgs(v_parallel).
 c.......................................................................
       save
@@ -413,7 +459,7 @@ c.......................................................................
       include 'comm.h'
 
 c     Diagnostic array:
-c      dimension den_of_s(lza)  !  !Now comm.h:den_of_s1
+c      dimension den_of_s(lz)  !  !Now comm.h:den_of_s1
 
       character*8 ifirst
       data ifirst/"first"/
@@ -448,30 +494,9 @@ c  and radial bin l_:
 c  We assume that lp starts at 1 on each flux surface l_, and initialize
 c  a density diagnostic (for use with debugger) to zero.
       if (lp.eq.1) then
-         do l=1,lza
-            den_of_s1(l)=0.0
-         enddo
+         den_of_s1(:)=0.0 ! for all 1:lz
          denfl1(l_)=0.0
       endif
-
-c     (Temporarily) gave up on the following commented out approach.
-c     One thing to watch out for is missing density when preloading
-c       at i=1. (BobH 970721)
-c        call bcast(fl(0),zero,jfl+1)
-c  c      iii=min(imax(lp,lr_)+1,iyh_(l_))
-c  c     Here we relie on that yz=pi/2, exactly, beyond the trapping
-c  c     boundary in the equatorial plane.  This give d(yz)=0 at these i.
-c  c     Also relie here on xl=x mesh, using cint2 and dx
-c
-c        do jf=1,jfl
-c           do i=2,iy_(l_)
-c              fl(jf)=fl(jf)+
-c       1           twopi*cint2(jf)/dx(jf)*(yz(i,lp,lr_)-yz(i-1,lp,lr_))*
-c       2           0.25*(sinz(i,jf,lr_)+sinz(i-1,jf,lr_))*
-c       3           (f(i,jf,1,l_)+f(i-1,jf,1,l_))
-c           enddo
-c        enddo
-
 
       call bcast(fl1(0),zero,jfl+1)
       call bcast(fl2(0),zero,jfl+1)

@@ -1,0 +1,9 @@
+00_Cql3d_Regression_Tests/test1/test1.2
+
+260212
+======
+Rerun with version='git_cql3d_251215.0' code.
+Used xcql3d_gfortran64_debug_BOUNDS-CHECK
+==> Results close to prior 2023 version results in ../test1.1,
+    except cpu times about 2X.
+

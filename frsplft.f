@@ -14,8 +14,14 @@ c..................................................................
       dimension work(nwka),oldx(*),oldf(*),ynewx(*),ynewf(*),i1p(2),
      1  secondd(lrza),itab(3),tab(3)
 
-      i1p(1)=4
+      i1p(1)=4 !=4 means cubic spline; requires at least 4 points
       i1p(2)=4
+        if(lrz.lt.4)then !YuP[2021-11-17] added check/stop for coeff1
+          STOP ' frsplft: subr.coeff1(lrz,...) requires lrz>3'
+          !Actually, it could work for lrz=3; 
+          !Use i1p()=2 (first derivative is given),
+          !Need values of 1st derivatives at rho=0 and rho=1.
+        endif
       call coeff1(lrz,oldx,oldf,secondd,i1p,1,work)
       itab(1)=1
       itab(2)=0

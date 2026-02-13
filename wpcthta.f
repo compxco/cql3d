@@ -19,7 +19,7 @@ c.......................................................................
           ztra=-0.5*x(j)*vnorm*(psisp(l_)+psisp(l_+1))
      /      /(psis(l_)+psis(l_+1))
         endif
-        do 110 i=1,iy
+        do 110 i=1,iy_(l_)  !YuP[2021-03-12] iy-->iy_(l_)
           cthta(i,j)=ztra*sinn(i,l_)*dyi(i,l_)
  110    continue
  100  continue

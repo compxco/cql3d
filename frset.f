@@ -1,6 +1,6 @@
 c
 c
-      subroutine frset(lrz,noplots,nmlstout)
+      subroutine frset(lrz,noplots,nmlstout,ngen,kfrsou)
       implicit integer (i-n), real*8 (a-h,o-z)
       include 'param.h'
       include 'frcomm.h'
@@ -9,13 +9,17 @@ CMPIINSERT_INCLUDE
 
       character*1024 t_
       character*8 noplots,nmlstout
+      REAL*4 :: R40=0.,R45=5.
 
       REAL*4 RILIN
-      REAL*4 :: R40=0.
+      
+      integer kfrsou(kb)
 
 c..................................................................
 c     frset initializes non-namelist variables.
 cBH081020c     Also, resets namelist variable nprim=1, if not =1.
+cBH170807:  nprim can be greater than 1, for beams with
+cBH170807:  different species.
 c..................................................................
 
 
@@ -25,7 +29,7 @@ c     Jump out if lrz=1
 c..................................................................
 
       if (lrz.eq.1) then
-         ranseed=7**7
+         ranseed=dble(7**7) !YuP[2021-01-10] Added dble
          read(2,frsetup)
          if (nmlstout.eq."enabled") write(6,frsetup)
          dummy=RANDOM_my(ranseed)
@@ -68,20 +72,64 @@ cBH081020         write(*,210)
 cBH081020      endif
 cBH081020 210  format('WARNING: Resetting nprim=1. Check FREYA if want nprim>1')
 
+cBH171014  Check nprim=ngen.  ALSO, should have nimp.ne.0 if impurities
+cBH171014  (non gen species ions contributing to charage balance)
+cBH171014  are in the plasma.  ADD LATER.
+!YuP[2023] Actually, it is not always nprim=ngen.
+!Example:   { D_gen(k=1),       T_gen(k=2),       e_gen(k=3);  some Maxw species}
+!Set kfrsou={ kfrsou(beam#1)=1, kfrsou(beam#2)=2, kfrsou(3:kb)=0 }
+!In the above, nbeams=2 (D+T beams), (nbeams must be set in cqlinput).
+!The scan below will give nprim=2 ("Two primary ionic species"),
+!even when nprim is set to 1 in cqlinput (by mistake).
+
+      if (nprim.gt.ngen) then !YuP[2023-01-09] added this basic check
+CMPIINSERT_IF_RANK_EQ_0
+      WRITE(*,*)'frset: Check nprim in cqlinput. Should not exceed ngen'
+CMPIINSERT_ENDIF_RANK
+      STOP 'nprim>ngen  Check cqlinput'
+      endif
+
+!YuP[2023]      if (nprim.ne.ngen) then
+!         write(*,*)
+!         write(*,*) 'Resetting nprim=ngen.  Should correct cqlinput.'
+!         write(*,*)
+         !YuP[2022-06-30] Added a scan over gen.species, to determine nprim
+         do k=1,ngen
+         do ib=1,nbeams !nbeams is from cqlinput
+           if(kfrsou(ib).eq.k)then
+              nprim=max(nprim,k)
+           endif
+         enddo
+         enddo
+CMPIINSERT_IF_RANK_EQ_0
+         WRITE(*,*)'frset: Number of primary ionic species nprim=',nprim
+CMPIINSERT_ENDIF_RANK
+!YuP[2023]      endif
 
 c     Check nbeams not too large.
       if (nbeams .gt. kb) then
+CMPIINSERT_IF_RANK_EQ_0
          WRITE(*,*)
          WRITE(*,*)'Namelist nbeams.gt.kb:  increase parameter kb'
-         stop
-         write(*,*)
+CMPIINSERT_ENDIF_RANK
+         stop 'frset: increase kb in param.h'
       endif
 
       if (multiply.ne."disabled".and.multiplyn.eq.0) then
          WRITE(*,214)
  214     format(//,'Must set multiplyn, if multiply.ne.disabled',//)
-         stop 'Must set multiplyn'
+         stop 'frset: Must set multiplyn'
       endif
+      
+      if((ne_tk.ne.0) .and. (ksge.le.2))then !YuP[2023-01-24] added check/stop
+CMPIINSERT_IF_RANK_EQ_0
+        WRITE(*,*)
+        WRITE(*,*)
+     &  'frset: For ne_tk>0 (tor.rotation) increase ksge to 20 or more'
+CMPIINSERT_ENDIF_RANK
+        stop 'frset: ksge is too low'
+      endif
+      
 c
 c     ION PARAMETERS
 c--------------------------------------------------------------------
@@ -114,7 +162,8 @@ c..................................................................
 c     Call subroutine linked to CQL3D common blocks for more initializat
 c..................................................................
 
-      call frinitz(nprim,nimp,nion,ibion,namep,namei,atw,fd,smooth)
+      call frinitz(nprim,nimp,nion,ibion,namep,namei,atw,fd,smooth,
+     1             nbeams)
 
 
 c..................................................................
@@ -134,6 +183,8 @@ c     Reset npart, for nubeam list case
 CMPIINSERT_IF_RANK_EQ_0
       ! make plots on mpirank.eq.0 only
       if (noplots .ne. "enabled1") then
+      !YuP[2021-01-10] No need to call PGPAGE. 
+      !Continue on same page as "PARAMETER VALUES"
       write(t_,1000)
  1000 format("FR (freya beam deposition) model parameters:")
       RILIN=11.

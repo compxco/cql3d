@@ -11,7 +11,7 @@ c     kopt = 1: Read namelists from text file distrfunc (should be first
 c               call, to place file pointer at beginning of f). 
 c               Only called if nlrestrt="enabled", otherwise distrfunc
 c               not needed.
-c          = 2: Read f (and elecfld if ampfmod=enabled)
+c          = 2: Read f (and elecfld if ampfmod=enabled, or efswtch.eq."method6")
 c          = 3: Read zeff, if nlrestrt=ncdfdist and iprozeff=curr_fit
 c.......................................................................
 
@@ -268,7 +268,9 @@ CMPIINSERT_ENDIF_RANK
          enddo
 
 c-----elecfld, restore if ampfmod=enabled
-         if (ampfmod.eq."enabled") then
+         if (ampfmod.eq."enabled" .or. (efswtch.eq."method6")) then
+            !YuP[2023-02-02] Added "method6" - it also needs elecfld() 
+            !from the end of previous run.
             istatus= NF_INQ_DIMID(ncid,'tdim',tdim)
             istatus= NF_INQ_DIMID(ncid,'r00dim',r00dim)
             istatus= NF_INQ_DIM(ncid,tdim,name,tdim_rstrt)
@@ -357,7 +359,8 @@ c-----for netcdfshort multiple time f, but not much need.]
          endif
          wkpack=zero
          if (.NOT.ALLOCATED(temp_rstrt)) then !allocate working array for pack21
-           allocate(temp_rstrt(0:iy+1,0:jx+1),STAT=istat)
+           allocate(temp_rstrt(0:iymax+1,0:jx+1),STAT=istat)  
+           !YuP[2021-03-12] iy-->iymax
            if(istat.ne.0)
      .        call allocate_error("temp_rstrt, sub tdreadf",0,istat)
          endif

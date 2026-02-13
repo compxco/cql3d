@@ -17,6 +17,9 @@ CMPIINSERT_INCLUDE
       dimension ztr(lrza)   !For tdoutput-like printout
       dimension rban_vth(lrzmax) ! for print-out
       character*8 ztext
+      
+      real*8 l_autocorr,lambda_mfp !local, for Drr from NIMROD coupling
+
 
       if (nbctime.gt.0) then
         if (tmdmeth.eq."method1") then
@@ -51,6 +54,26 @@ c     Densities of Charge states of impurity !YuP[2021-01-22]
       !Update  dens_imp(0:nstates,1:lrz) 
       ! from dens_imp_t(0:nstates,1:njene,1:nbctime)
       if (read_data.eq.'nimrod') then
+
+         !YuP[2021-08-20] First, form ryain array from t-dependent ryain_t
+         if (itme.eq.0) then
+             do l=1,njene
+                tmpt(l)=ryain_t(l,1)
+             enddo
+         elseif (itme.lt.nbctime) then
+             do l=1,njene
+                tmpt(l)= ryain_t(l,itme)
+     +                  +(ryain_t(l,itme1)-ryain_t(l,itme))
+     +            /(bctime(itme1)-bctime(itme))*(timet-bctime(itme))
+             enddo
+         else
+             do l=1,njene
+                tmpt(l)= ryain_t(l,nbctime)
+             enddo
+         endif
+         ryain(1:njene)=tmpt(1:njene) !Case read_data: ryain is formed at each t
+         !This array is further used for spline of different *_t arrays.
+      
          !Note: In case read_data='nimrod', nbctime>0 is enforced in ainsetva
          do kstate=0,nstates ! including neutral state (0)
            if (itme.eq.0) then
@@ -74,6 +97,99 @@ c     Densities of Charge states of impurity !YuP[2021-01-22]
               dens_imp(kstate,ll)=tr(ll) ! dens_imp is updated
            enddo ! ll
          enddo ! kstate
+         
+         if(transp.eq."enabled")then !could add this condition later.
+         if(n.gt.0)then ! skip it at n=0 (x(j) not defined yet)
+            ![2021-08] Added, For NIMROD coupling, using data on dB/B. 
+            !See subr.read_data_files: dbb2in_t(njene,nbctime)==(dB/B)^2
+            !Below, Drr is formed at given time step, based on
+            ![REFS]: Rechester, Rosenbluth, Phys.Rev.Lett. 40,40 (1978);
+            !A pitch-angle dependence is added as in 
+            !Harvey, McCoy, Hsu, Mirin, PRL 47, p.102 (1981).
+            !First, interpolate in time and map from njene grid to lrz grid
+            if (itme.eq.0) then
+              do l=1,njene
+                tmpt(l)= dbb2in_t(l,1)
+              enddo
+            elseif (itme.lt.nbctime) then
+              do l=1,njene
+                tmpt(l)= dbb2in_t(l,itme)
+     +                 +(dbb2in_t(l,itme1)-dbb2in_t(l,itme))
+     +               /(bctime(itme1)-bctime(itme))*(timet-bctime(itme))
+              enddo
+            else
+              do l=1,njene
+                tmpt(l)= dbb2in_t(l,nbctime)
+              enddo
+            endif
+            call tdinterp("zero","linear",ryain,tmpt,njene,rya(1),
+     +                    tr(1),lrzmax) !-> get tr(ll)
+            !Now form Drr, based on subr. tdtrvshape,
+            !but here it is re-arranged and simplified
+            !to have a complete expression
+            !for d_rr array at given time step, 
+            !for the case of dB/B type of radial diffusion.
+            k=kelecg ! Valid for electrons only
+            do ll=1,lrz
+              dbb2(ll)=tr(ll) !(dB/B)^2 is updated, at given time step
+              l_autocorr=pi*qsafety(ll)*rmag !"Lc" or "L_A" in the above REFS
+              !write(*,*)'ll,pi,qsafety(ll),rmag',ll,pi,qsafety(ll),rmag
+              !Note: qsafety is found from eqdsk data [qar() array]
+              !--For test only, find Drr at v=Vthermal :
+                drr_max=0.d0 !for print only
+                j_thermal=1 ! to initialize
+                do j=jx,1,-1 ! scan backward
+                 if(vth(k,ll) .le. x(j)*vnorm)then
+                   j_thermal=j !such j that v(j_thermal) is just below vth()
+                 endif
+                enddo
+              !--For test only/done.
+              do j=1,jx
+                vel=x(j)*vnorm/gamma(j) !velocity (not momentum/mass)
+                coll=coll_freq(vel,k,ll) !nu_ei !Uses temp(),reden(),zeff()
+                !Could move this whole section on Drr further down, 
+                !after updating temp(),reden(),zeff() profiles,
+                !but it is not very essential (just for the low-Vpar correction).
+                gamm=gamma(j)**difus_vshape(4) ! [2022-01-06] added here,
+                ! for 1/gamma^difus_vshape(4)  dependence 
+                !(to account for finite orbital effects) .
+                !Default value is difus_vshape(4)=0.0 which means gamm=1.
+              do i= 1,itl_(ll)+1 !1,iytr(ll)
+                vpar= abs(vel*coss(i,ll)) !Is using idx() correct here?
+                lambda_mfp= max(em100,vpar/coll) !Mean-free-path for electrons
+                coll_cutoff= (1.d0 + l_autocorr/lambda_mfp)
+                if(j.eq.j_thermal)then !test/print
+                 drr_max= max( drr_max, 
+     &                  drr_scale*l_autocorr*vpar*dbb2(ll)/coll_cutoff )
+                endif !test/print/done
+                d_rr(i,j,k,ll)= drr_scale*
+     &                                  l_autocorr*vpar*dbb2(ll)/
+     &                                  (coll_cutoff*gamm) !== Drr
+                !Note that at lambda_mfp >> l_autocorr, we get
+                ! Drr= pi*qs*R*|Vpar|*(dB/B)^2
+              enddo !i
+              do i= itu_(ll)-1,iy_(ll) !iytr(ll)
+                vpar= abs(vel*coss(i,ll)) !Is using idx() correct here?
+                lambda_mfp= max(em100,vpar/coll) !Mean-free-path for electrons
+                coll_cutoff= (1.d0 + l_autocorr/lambda_mfp)
+                if(j.eq.j_thermal)then !test/print
+                 drr_max= max( drr_max, 
+     &                  drr_scale*l_autocorr*vpar*dbb2(ll)/coll_cutoff )
+                endif !test/print/done
+                d_rr(i,j,k,ll)= drr_scale*
+     &                                  l_autocorr*vpar*dbb2(ll)/
+     &                                  (coll_cutoff*gamm) !== Drr
+                !Note that at lambda_mfp >> l_autocorr, we get
+                ! Drr= pi*qs*R*|Vpar|*(dB/B)^2
+              enddo !i              
+              enddo !j  
+              write(*,'(a,3i5,1p4e10.3)')
+     &        'n,ll,iytr(ll),dbb2,l_autocorr,lambda_mfp, Drr_max(j_th)',
+     &         n,ll,iytr(ll),dbb2(ll),l_autocorr,lambda_mfp, drr_max
+            enddo ! ll
+         endif !n>0
+         endif !transp
+         
       endif ! read_data.eq.'nimrod'
 
 
@@ -355,9 +471,11 @@ CMPIINSERT_ENDIF_RANK
            endif
          enddo
 CMPIINSERT_IF_RANK_EQ_0
+         if(l.eq.1 .or. l.eq.lrzmax)then
          WRITE(*,'(a,3i4,3f16.11)') 
      +   "profiles: k,lr, j_thermal, x(j_thermal), vth/vnorm, temp =",
      +         k, l, j_thermal, x(j_thermal), vth(k,l)/vnorm, temp(k,l)
+         endif
          if(j_thermal.lt.3)then
            WRITE(*,'(a)')" WARNING(profiles.f): V-grid is too coarse."
            WRITE(*,'(a)')" Thermal part of distrib. is covered by only"
@@ -401,9 +519,12 @@ c     Densities and Zeff  (cf. subroutine tdxinitl)
       if (nbctime.gt.0 .and. iprone.eq."prbola-t") then
 
       do 11 k=1,ntotal
-         
+                    
          if (iprozeff.ne."disabled" .and. 
-     +           (k.ne.kelecg .and. k.ne.kelecm)) go to 11
+     +           (k.ne.kelecg .and. k.ne.kelecm)) go to 11 !Ionic species:
+                                            !Adjust to get Zeff(rho,time) 
+             
+         !For e_g and e_M continue, to follow the values from input list:    
          
          if((imp_depos_method.ne.'disabled') .and.
      &      (k.eq.kelecg.or.k.eq.kelecm)           )then
@@ -446,6 +567,7 @@ c     Densities and Zeff  (cf. subroutine tdxinitl)
                   reden(k,0)=redenc(nbctime,k)
                   reden(k,1)=redenb(nbctime,k)
                endif
+               !write(*,*)'profiles-2: k,reden(k,0)=',k,reden(k,0)
 
             elseif (tmdmeth.eq."method2") then
 
@@ -700,9 +822,6 @@ c     Finish up with zeff and ions if iprozeff.ne."disabled"
 !CMPIINSERT_ENDIF_RANK  
             endif ! currxjtot.ne.zero
            endif ! totcrt(1).ne.zero
-!             write(*,*)'---profiles: n,n_(lrors),
-!     &       renorm',n,n_(lrors),renorm,currxjtot
-             !pause
            ! The question now is - How to deal with densities?
            ! Presently, it is setup to keep n_e unchanged,
            ! and adjust the ion densities (example: reduce D+ density,
@@ -887,16 +1006,20 @@ c     in order of the indexes.
       endif  ! on iprozeff.ne."disabled", begin at l 470
       
 
-c     Renormalize densities using enescal
-      do k=1,ntotal
-         do l=0,lrzmax
-            reden(k,l)=enescal*reden(k,l) !ions are needed for next section
-            !For case of imp_depos_method.ne.'disabled',
-            ! the impurities (dens_imp(kstate,l))
-            ! are in cm-3 already, so the reden(kion,*) 
-            ! should also be in cm-3
-         enddo
-      enddo
+c     Renormalize densities using enescal 
+![2022-03-10] moved this rescaling to tdxinitl, 
+! to be applied to redenc(nbctimea,ntotala),redenb(nbctimea,ntotala)
+! enein_t(njenea,ntotala,nbctimea)
+!      do k=1,ntotal
+!         do l=0,lrzmax
+!            reden(k,l)=enescal*reden(k,l) !ions are needed for next section
+!            !For case of imp_depos_method.ne.'disabled',
+!            ! the impurities (dens_imp(kstate,l))
+!            ! are in cm-3 already, so the reden(kion,*) 
+!            ! should also be in cm-3
+!         enddo
+!      enddo
+![2022-03-10]
       
       if((imp_depos_method.ne.'disabled').and.(kelec.ne.0))then
         !YuP[2020-06-24] Changed (gamafac.eq."hesslow") to (imp_depos_method.ne.'disabled')
@@ -1012,7 +1135,7 @@ cBH191002      if (ampfmod.eq.'enabled' .and. n.ge.nonampf) then
          ! when n+1=nstop=nonampf
       else
       
-      if (efswtch.eq."method1"  .or. efswtch.eq."method6") then
+      if (efswtch.eq."method1") then
       
          if (nbctime.gt.0 .and. iproelec.eq."prbola-t") then
             
@@ -1074,9 +1197,10 @@ cBH191002      if (ampfmod.eq.'enabled' .and. n.ge.nonampf) then
      +                    /(bctime(itme1)-bctime(itme))
      +                    *(timet-bctime(itme))
                   enddo
+       write(*,*)'profiles: n,nch,timet,E',n,nch(1),timet,tmpt(1)
                else
                   do l=1,njene
-                     tmpt(l)=elecin_t(l,nbctime)
+                     tmpt(l)=elecin_t(l,nbctime) ! V/cm
                   enddo
                endif
                call tdinterp("zero","linear",ryain,tmpt,njene,rya(1),
@@ -1090,6 +1214,57 @@ c              needed, e.g., for ampfsoln
             endif  !On tmdmeth
             elecfldc=tmpt(1)
             elecfldb=tmpt(njene)
+            if (read_data.eq.'nimrod'.and.(n.gt.0)) then !YuP[2021-02-12]
+               ! In case of read_data='nimrod', 
+               ! E_estimate field is formed from
+               ! J_data and estimate of Spitzer resistivity 
+               ! with neoclass. correction, "eta" here: 
+               ! E_estimate == elecin_t()= eta*J_data
+               ! However, if RE current appears, 
+               ! we need to adjust this estimate, 
+               ! assuming J_data - J_RE = E/eta
+               ! or E = eta*J_data - eta*J_RE, so 
+               ! E= elecin_t - eta*J_RE
+               ! In mixed V/cm and cgs units:
+               ! E[V/cm] = elecfld[V/cm] - eta[cgs]*curra[cgs]*300
+               ! where 300 is to convert statVolt/cm to V/cm
+               fr1=1.0 !0.95 !Test: fraction of J_RE to be subtracted
+               do ll=1,lrzmax
+               !To be subtracted:
+               ! Either fr1*(curra(1,ll)/sig_starnue0(ll))
+               ! or 90-95% of E (to leave 10-5%, otherwise E can become 0),
+               !whichever is smaller by magnitude. 
+!               dee= min( fr1*(curra(1,ll)/sig_starnue0(ll))*300.,
+!     &                   elecfld(ll)*0.95 )
+               !----------------------------------------------------------
+               !See subr. read_data_files() --
+               ![2022-01-06]Better use collisional limit (as in NIMROD):
+               !e_sptzr= curr_data*(eta_sptzr*pressau2) ! V/m, A/m^2
+               !In this case - in profiles.f, 
+               ! change curra(1,ll)/sig_starnue0(ll)
+               !     to curra(1,ll)/sig_starnue(ll)
+               bscur= bscurm(ll,1,2)+bscurm(ll,2,1) !e_gen+i_maxw [A/cm^2]
+               bscur= bscur*3.e9 ! to statA/cm^2
+               dee= min( fr1*300.*(curra(1,ll)+bscur)/sig_starnue(ll),
+     &                   elecfld(ll)*0.95 )
+               !----------------------------------------------------------
+                  if(dee.gt.0.d0)then !Only apply to reduce
+                  elecfld(ll)= elecfld(ll)-dee
+                  endif
+                  !Note: sig_starnue0(ll) and sig_starnue(ll) 
+                  ! [conductivity in cgs units, 
+                  !  zero-collis. and collisional limits]
+                  !are evaluated in tddiag at each time step.
+               !ATTENTION: If we change sig_starnue0 to sig_starnue here
+               !(i.e. to finite collisionality), we also need to change
+               ! e_sptzr= curr_data*(eta_sptzr*pressau1)  to 
+               ! e_sptzr= curr_data*(eta_sptzr*pressau2)
+               ! in subr.read_data_files()
+               enddo ! ll
+               elecfld(0)= elecfld(1)
+               elecfldc= elecfld(1)
+               elecfldb= elecfld(lrzmax)
+            endif ! read_data.eq.'nimrod' ![2021-02-12]
 
          endif  !On iproelec.eq.spline-t
 
@@ -1138,7 +1313,7 @@ c100126  Scale elecfld
             if (tmdmeth.eq."method1") then
               if (itme.eq.0) then
                   do l=1,njene
-                     tmpt(l)=xjin_t(l,1)
+                     tmpt(l)=xjin_t(l,1) ! A/cm^2
                   enddo
               elseif (itme.lt.nbctime) then
                   do l=1,njene

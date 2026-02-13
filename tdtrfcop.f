@@ -29,7 +29,7 @@ c..............................................................
         else if (kopt .eq. 3) then
           call dcopy(iyjx2*ngen,f_(0,0,1,l_),1,f(0,0,1,l_),1)
         endif
-      else
+      else ! (cqlpmod.eq."enabled")
         if (kopt .eq. 1) then
           call dcopy(iyjx2*ngen,f(0,0,1,l_),1,f_(0,0,1,l_),1)
           call dcopy(iyjx2*ngen,fnp1(0,0,1,l_),1,f(0,0,1,l_),1)

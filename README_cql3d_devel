@@ -728,3 +728,9 @@ not done at this time).
 tdrmshst.f  has been giving wrong area/vol flux surface increments in some
 test cases resulting in incorrect total current (e.g., in 
 eoved_.16_multi-flux-surface0.1.ps), and this was fixed.
+
+
+260212
+======
+A record of code changes is now primarily kept a_change.h
+

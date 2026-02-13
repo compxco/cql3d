@@ -33,7 +33,16 @@ c..................................................................
       if (ifag.eq.0) then
         call bcast(so,zero,iyjx2)
       else
-        call dcopy(iyjx2,source(0,0,k,indxlr_),1,so,1)
+        !call dcopy(iyjx2,source(0,0,k,indxlr_),1,so,1) !before[2022-02-11]
+        if (l_ .eq. lmdpln_) then !after[2022-02-11]
+         call dcopy(iyjx2,source(0,0,k,l_),1,so,1) !after[2022-02-11]
+          !For CQLP, source is set at l_=1 only
+        else
+         so=0.d0
+        endif
+        !for CQL3D, source() is copied to so() at every l_=lr_,
+        !for CQLP, source() is copied to so() only at l_=lmdpln_=1
+        !  (1st point along field line), and set to 0.0 at other l_
       endif
       xrf=0.
 
@@ -104,7 +113,7 @@ c%OS  if (cqlpmod.eq."enabled" .and. transp.eq."enabled" .and.
 c%OS  +                                             n.ge.nontran+1)  then
 c%OS  call wpcthta
 c%OS  else
-      call bcast(cthta,zero,iyjx)
+      call bcast(cthta,zero,iymax*jx) !YuP[2021-03-11] iy-->iymax
 c%OS  endif
 
       return

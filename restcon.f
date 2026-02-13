@@ -23,13 +23,18 @@ c..................................................................
       u=0.
       uu=0.
       ilzhfs=lz
-      if (numclas .eq. 1) ilzhfs=lz/2+1
+      if (cqlpmod.eq."enabled" .and. numclas .eq. 1) ilzhfs=lz/2+1
+      !YuP[2025-12-12] added cqlpmod.eq."enabled" in the above line
       do 10 l=1,ilzhfs
         uu=uu+dz(l,lr_)*bbpsi(l,lr_)**2
  10   u=u+dz(l,lr_)*bbpsi(l,lr_)
       qz=.75*u/pi
       qqg=.75*uu/pi
       do 11 i=1,itl-2
+!      if(l_.eq.15)then
+!      write(*,*)'i, tau,psiiv=',
+!     & i,tau(i,lr_), psiiv(i,lr_)
+!      endif
         qx=coss(i,l_)*sinn(i,l_)**2*cynt2(i,l_)
         s=s+qx/(tau(i,lr_)*(psiiv(i,lr_)-sinn(i,l_)**2))
         ssg=ssg+qx/(tau(i,lr_)*(1.-psiba(i,lr_)*sinn(i,l_)**2))

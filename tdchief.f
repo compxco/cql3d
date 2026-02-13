@@ -76,7 +76,7 @@ c.................................................................
 
 
 c..................................................................
-c     If namelist variable lrzmax.le.1, then run the 2D code and
+c     If namelist variable lrzmax.eq.1, then run the 2D code and
 c     dispense with the "td" module. (Runs thru achief1 and achiefn
 c     to a normal exit in ntloop).
 c..................................................................
@@ -86,7 +86,9 @@ c-BH:  errors can arise when only only one value of a mesh
 c-BH:  is called  for.  For example, tdrmshst fails.
 c-BH:  However, additional functionality, such as sigmamod plotting
 c-BH:  depdends on lrzmax.ge.4 (BH120308: check this).
-      if (lrzmax.le.1) then
+
+      if (lrzmax.eq.1 .and.(cqlpmod.ne."enabled") ) then
+         !YuP[2021-02-26] added (cqlpmod.ne."enabled")
          nefiter=1              ! counts iterations; elecfld iterations for
                                 ! one flux surface are not functional; 
                             ! set nefiter to 1 for logic control in impavnc0
@@ -98,10 +100,10 @@ c-BH:  depdends on lrzmax.ge.4 (BH120308: check this).
 
 c..................................................................
 c     call routine which controls array initialization
-c     (and sets n=0, n_(1:lrorsa)=0 though call aindflt1).
+c     (and sets n=0, n_(1:lrors)=0 though call aindflt1).
 c..................................................................
 
-      call tdinitl !-> call ainitial             
+      call tdinitl !-> call ainitial !-> finit,losscone,sourcee,frnfreya,...
          ! tdinitl-> eqcoord-> eqfndpsi-> eqorbit-> trace flux surf.
          ! solr(l,lr_), solz(l,lr_) are R,Z coords. of flux surface      
       dtr0=dtr
@@ -158,20 +160,26 @@ c     if at beginning of a beam pulse, and have time-dep background.
 c     Set ibeampon= beam pulse on-indicator (used in coefstup)
 c         ibeamponp= indicates freya calc carried out for given pulse.
 c.......................................................................
-
-      if ((n+1).eq.nonvphi .or. (n+1).eq.noffvphi) then
-        write(*,*)'tdchief/nonvphi: call frnfreya, n=',n,'time=',timet
+      if (frmodp.eq."enabled") then !YuP[2025-12-12] added if
+!YuP[2022-11-17]      if ((n+1).eq.nonvphi .or. (n+1).eq.noffvphi) then
+      if ((n+1).ge.nonvphi .and. (n+1).lt.noffvphi) then
+        !Update NBI deposition (==> update ion source)
+CMPIINSERT_IF_RANK_EQ_0      
+        WRITE(*,*)'tdchief/nonvphi: call frnfreya, n=',n,'time=',timet
+CMPIINSERT_ENDIF_RANK
         call frnfreya(frmodp,fr_gyrop,beamplsep,beamponp,beampoffp,
-     .                hibrzp,mfm1p,noplots)
+     .                nbeamsp,hibrzp,mfm1p,noplots,kfrsou,src_nbi_ep)
       endif
+      endif !(frmodp.eq."enabled") !YuP[2025-12-12] added if
       
 
-      k=kfrsou  !Only set up for one modulated beam species.
+cBH171014: Could make this function of beam number.
+      k=kfrsou(1)  !Only set up for one modulated beam species.
       if(k.gt.0)then
       do is=1,nso
         if ((n+1).ge.nonso(k,is) .and. (n+1).lt.noffso(k,is)) then
 c          Check and apply criteria for square wave pulsed beam:
-           if (beamplsep.ne.'disabled' .and. k.eq.kfrsou) then
+           if (beamplsep.ne.'disabled' .and. k.eq.kfrsou(1)) then
 c             Set flag and time indicating time beam first starts
               if (iflag1.eq.0) then
                  iflag1=1
@@ -190,7 +198,8 @@ c           Determine if in an on-period of the beam pulse cycle
                  if (ibeamponp.eq.0.and.nbctime.ne.0) then
                  write(*,*)'tdchief/nbctime:frnfreya,n=',n,'time=',timet
                    call frnfreya(frmodp,fr_gyrop,beamplsep,beamponp,
-     +                   beampoffp,hibrzp,mfm1p,noplots)
+     +                 beampoffp,nbeamsp,hibrzp,mfm1p,noplots,kfrsou(1)
+     &                 ,src_nbi_ep)
                    ibeamponp=1
                  endif
               else
@@ -326,16 +335,20 @@ c.......................................................................
             call tdnflxs(ll) 
             call achiefn(kopt) ! achiefn(2) here (cqlpmod="enabled")
          enddo
-         call efld_cd(dz(1:lrors,lr_),lrors,vnorm, 
-     &       flux1(0:lrors+1),flux2(0:lrors+1),elparnw(0:lrors+1),flux0)
-         !In sub.efld_cd: dz, flux1, flux2, elparnw are dimensioned as (0:lrors+1).
-         !Here, dz(lza,lrzmax) starts with index (1,1),
-         !but flux1(0:lsa1),flux2(0:lsa1),elparnw(0:lsa1) start with index 0.
+         call efld_cd(dsz(1:ls),ls,vnorm, 
+     &       flux1(0:ls+1),flux2(0:ls+1),elparnw(0:ls+1),flux0)
+         !YuP[2021-02-26] Changed lrors-->ls, for appropriate meaning
+         ! as ls= FPE grid in case of CQLP 
+         !In sub.efld_cd: dz, flux1, flux2, elparnw are dimensioned as (0:ls+1).
+         !Here, dz(lz,lrzmax) starts with index (1,1),
+         !but flux1(0:ls+1),flux2(0:ls+1),elparnw(0:ls+1) start with index 0.
          !YuP[2019-05-30] corrected sub.efld_cd
          ! so that dz argument starts with index 1, i.e. dz(1:ls) [dz(1:lrors)]
          ! Note that in sub.efld_cd the loop is over kk=1,ls [kk=1,lrors]
          ! so that indexes 0 and ls+1 are not used.
-         ! Bob, please check !
+         !However, the correct way is to use sz(l)=z(lsindx(l),lr_)
+         !and dsz(l)=0.5*(sz(l+1)-sz(l-1)) which are over FPE grid,
+         !so, changed dz()-->dsz(1:ls) ![2021-03-18]
       endif
 
 c.......................................................................
@@ -343,9 +356,14 @@ c     MAIN VEL TIME STEP: loop over each radial position sequentially
 c.......................................................................
 
       ilend=lrors
-      if (transp.eq."enabled" .and. cqlpmod.eq."enabled" .and.
+      
+      if(cqlpmod.eq."enabled")then ! CQLP only
+      if (transp.eq."enabled" .and.
      +  mod(nummods,10).ge.5 .and. sbdry.ne."periodic"
-     +  .and. lmidvel.ne.0) ilend=lrors-1
+     +  .and. lmidvel.ne.0) then
+        ilend=lrors-1
+      endif
+      endif
 
       if (nstop.eq.0) go to 2
 
@@ -405,8 +423,8 @@ c        Find dtr for this time-step
          enddo
          !Copy current distribution f into f_ (later f is restored from f_)
          ! f_(0:iy+1,0:jx+1,kelec,:)=f(0:iy+1,0:jx+1,kelec,:) !amp-far
-         call dcopy(iyjx2*lrors,f(0:iy+1,0:jx+1,1:1,1:lrors),1,
-     &                         f_(0:iy+1,0:jx+1,1:1,1:lrors),1) !ampfmod=enabled
+         call dcopy(iyjx2*lrors,f(0:iymax+1,0:jx+1,1:1,1:lrors),1,
+     &                         f_(0:iymax+1,0:jx+1,1:1,1:lrors),1) !ampfmod=enabled
          ! For amp-far - one species (kelecg)
          ! f() will store fg,fh, then f() is restored from f_() [impavnc0,Line~2590]
 c        Bring background profiles up to time step n
@@ -502,8 +520,8 @@ CMPIINSERT_SEND_RECV_AMPF
 CMPIINSERT_BARRIER
             !Restore distribution f from f_ (done on all cores):
             !f(0:iy+1,0:jx+1,kelec,:)=f_(0:iy+1,0:jx+1,kelec,:) !amp-far: restore
-            call dcopy(iyjx2*lrors,f_(0:iy+1,0:jx+1,1:1,1:lrors),1,
-     &                              f(0:iy+1,0:jx+1,1:1,1:lrors),1) !ampfmod=enabled
+            call dcopy(iyjx2*lrors,f_(0:iymax+1,0:jx+1,1:1,1:lrors),1,
+     &                              f(0:iymax+1,0:jx+1,1:1,1:lrors),1) !ampfmod=enabled
             
 ! broadcast fh and fg for iyjx2*1*lrz index range:
 CMPIINSERT_BCAST_DISTRIBUTION_AMPF
@@ -584,8 +602,9 @@ c     Copy current distribution f(old,prev.step) into f_
       ! f_(0:iy+1,0:jx+1,1:ngen,1:lrors)=f(0:iy+1,0:jx+1,1:ngen,1:lrors)
       !This also gives overflow: f_=f 
       ! But using dcopy() is ok (with range specified, or not specified - same)
-      call dcopy(iyjx2*ngen*lrors,f(0:iy+1,0:jx+1,1:ngen,1:lrors),1,
-     &                           f_(0:iy+1,0:jx+1,1:ngen,1:lrors),1)
+      !write(*,*)'tdchief-597 sum(f_),sum(f)=',sum(f_),sum(f)
+      call dcopy(iyjx2*ngen*lrors,f(0:iymax+1,0:jx+1,1:ngen,1:lrors),1,
+     &                           f_(0:iymax+1,0:jx+1,1:ngen,1:lrors),1)
             !write(*,*)'tdchief-522 after f_ to f', sum(f_),sum(f)
 
       if (transp.eq."enabled" .and. n.ne.0 .and. adimeth.ne."enabled"
@@ -701,7 +720,60 @@ CMPIINSERT_SEND_RECV
 c     It will send or recv data, but only in case of
 c     soln_method='direct' (for now)
 
- 1    continue ! End loop over radius:  New f is obtained for each ll
+ 1    continue ! End loop over radius (or point along fld line, for CQLP):
+               !  New f is obtained for each l_
+               
+!      if(n.eq.1)then
+!         open(unit=17,file="pitch_i.txt",status="replace")
+!            write(17,'(10ES12.5E2)') (y(i,1),i=1,iymax) !for l_=1 only
+!         close(17)
+!         open(unit=18,file="u_j.txt",status="replace")
+!            write(18,'(10ES12.5E2)') (vnorm*x(j),j=1,jx)
+!         close(18)
+!         open(unit=19,file="f_ij.txt",status="replace")
+!         do j=1,jx
+!            write(19,'(10ES12.5E2)') (f(i,j,1,1)/vnorm**3, i=1,iy)
+!         enddo
+!         close(19)
+!
+!         open(unit=17,file="pitch_long_i.txt",status="replace")
+!            write(17,'(10ES16.9E2)') (y(i,1),i=1,iymax) !for l_=1 only
+!         close(17)
+!         open(unit=17,file="dpitch_long_i.txt",status="replace")
+!            write(17,'(10ES16.9E2)') (dy(i,1),i=1,iymax)
+!         close(17)
+!
+!         m=0
+!         write(*,*)' m, 0.5*(2*m+1)*sum(dcofleg(:,m))=',
+!     &               m,0.5*(2*m+1)*sum(dcofleg(:,1,m,1))
+!         m=1
+!         write(*,*)' m, 0.5*(2*m+1)*sum(dcofleg(:,m))=',
+!     &               m,0.5*(2*m+1)*sum(dcofleg(:,1,m,1))
+!         open(unit=17,file="P1_i.txt",status="replace")
+!            write(17,'(10ES16.9E2)') (dcofleg(i,1,m,1),i=1,iymax) !for l_=1 only
+!         close(17)
+!         m=2
+!         write(*,*)' m, 0.5*(2*m+1)*sum(dcofleg(:,m))=',
+!     &               m,0.5*(2*m+1)*sum(dcofleg(:,1,m,1))
+!         open(unit=17,file="P2_i.txt",status="replace")
+!            write(17,'(10ES16.9E2)') (dcofleg(i,1,m,1),i=1,iymax) !for l_=1 only
+!         close(17)
+!         m=3
+!         write(*,*)' m, 0.5*(2*m+1)*sum(dcofleg(:,m))=',
+!     &               m,0.5*(2*m+1)*sum(dcofleg(:,1,m,1))
+!         open(unit=17,file="P3_i.txt",status="replace")
+!            write(17,'(10ES16.9E2)') (dcofleg(i,1,m,1),i=1,iymax) !for l_=1 only
+!         close(17)
+!         m=4
+!         write(*,*)' m, 0.5*(2*m+1)*sum(dcofleg(:,m))=',
+!     &               m,0.5*(2*m+1)*sum(dcofleg(:,1,m,1))
+!         open(unit=17,file="P4_i.txt",status="replace")
+!            write(17,'(10ES16.9E2)') (dcofleg(i,1,m,1),i=1,iymax) !for l_=1 only
+!         close(17)
+!         pause
+!      endif
+!
+               
 !      write(*,*)'tdchief aft.achiefn: MIN,MAX,SUM of f:',
 !     & n,MINVAL(f),MAXVAL(f),SUM(f) 
 !      Checked: sum(da),etc, are same in run2(restart) and run3(no restart)
@@ -715,6 +787,7 @@ CMPIINSERT_IF_RANK_EQ_0
 CMPIINSERT_ENDIF_RANK
 
       !YuP[2020-02-11] call profiles  !YuP: moved this further, after call_diaggnde
+      
       write(*,*)'=====> tdchief[828] after FPE soln, aft.profiles. n=',n
       write(*,*)' '
 CMPIINSERT_BARRIER
@@ -737,11 +810,11 @@ CMPIINSERT_BCAST_SORPW_NBI
              call dcopy(iyjx2,f(0,0,k,l_),1,fxsp(0,0,k,l_),1)
              s=0.
              t=0.
-             do 2100 i=1,iy
+             do 2100 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
                s=s+vptb(i,lr_)*cynt2(i,l_)
                t=t+vptb(i,lr_)*cynt2(i,l_)*f(i,1,k,l_)
  2100        continue
-             do 2200 i=1,iy
+             do 2200 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
                f(i,1,k,l_)=t/s
  2200        continue
            endif
@@ -788,7 +861,7 @@ c..................................................................
             call tdnflxs(ll)
 c            call dcopy(iyjx2,f_(0:iy+1,0:jx+1,kelec,l_),1, 
 c     &                        f(0:iy+1,0:jx+1,kelec,l_),1)
-            f(0:iy+1,0:jx+1,kelec,l_)=f_(0:iy+1,0:jx+1,kelec,l_)
+            f(0:iymax+1,0:jx+1,kelec,l_)=f_(0:iymax+1,0:jx+1,kelec,l_)
             !YuP[2019-05-30] Corrected species index '1'-->'kelec'
          enddo ! ll
          nefiter=nefiter+1 ! counts iterations
@@ -814,7 +887,7 @@ c     Accumulate favg time average, if tavg.ne."disabled"
            sumdtr=sumdtr+dtr   !Accumulate dtr, for denom in time-avg
            do ll=1,ilend
            do k=1,ngen   
-               do i=0,iy
+               do i=0,iy_(ll) ! !YuP[2021-03-11] iy-->iy_(ll)
                   do j=0,jx
                     favg(i,j,k,ll)=favg(i,j,k,ll)+dtr*f(i,j,k,ll)
                   enddo
@@ -839,7 +912,7 @@ CMPIINSERT_IF_RANK_EQ_0
 CMPIINSERT_ENDIF_RANK
              do ll=1,ilend
              do k=1,ngen   
-               do i=0,iy
+               do i=0,iy_(ll) ! !YuP[2021-03-11] iy-->iy_(ll)
                do j=0,jx
                   favg(i,j,k,ll)=f(i,j,k,ll)
                enddo
@@ -849,7 +922,7 @@ CMPIINSERT_ENDIF_RANK
            else  ! sumdtr>0
              do ll=1,ilend
              do k=1,ngen   
-               do i=0,iy
+               do i=0,iy_(ll) ! !YuP[2021-03-11] iy-->iy_(ll)
                do j=0,jx
                   favg(i,j,k,ll)=favg(i,j,k,ll)/sumdtr
                enddo
@@ -860,8 +933,8 @@ CMPIINSERT_ENDIF_RANK
          endif  ! On n.eq.nstop
       endif  ! On tavg
       
-
-      do ll=1,ilend  ! perform diagnostics.
+      
+      do ll=1,ilend  ! perform diagnostics [Power transfer diagnostics].
         call tdnflxs(ll) ! determine l_,lr_, etc.
         call cfpgamma ! Re-calc. Coul.Log for the new distr.func.
         do k=1,ngen  ! Compute density gains and losses, and powers.
@@ -881,11 +954,19 @@ CMPIINSERT_ENDIF_RANK
         if (n .ge. nstop) call dskout(ll)
         if (n .ge. nstop) call dsk_gr
       enddo ! ll
+      !write(*,*)'tdchief-935 sum(f_),sum(f)=',sum(f_),sum(f)
       !YuP[2020-02-11] Moved the updating of profiles here,  
       ! after rescaling of f(), and after call_diaggnde :
       ! Need to know the values of currtp() [calc-ed in diaggnde]
       ! for some options in subr.profiles [curr_fit]
-      call profiles  !Brings namelist specified profiles up to time n
+      !call profiles !YuP[2021-08-04] Moved even more further down,
+      !after "do 30" loop.
+      !Reason: When transp='enabled', the call to diaggnde is done further,
+      !around line 1045. The update of time-dependent profiles should be done
+      !after diaggnde. Simple test: one run with transp=disabled,
+      !another - with transp=enabled, but setting d_rr-->0.
+      !The results should be same (at least to a good accuracy). 
+      
       
 CMPIINSERT_BARRIER
       
@@ -893,7 +974,7 @@ c......................................................................
 c     Integrate power densities over plasma volume
 c......................................................................
 
-        call diagentr_vol
+      call diagentr_vol ! For CQL3D only (not for CQLP)
         
       call cpu_time(t_after_diag2) !-.-.-.-.-.-.-.-.-.-.-.-.-.
 
@@ -901,46 +982,47 @@ c......................................................................
 
       if (ilend .eq. lrors-1) n_(lrors)=n_(lrors-1)
 
+
+!YuP[2021-03-22] Not certain if the radial (or parallel) transport
+!(about 50 lines below) should be here or few lines higher, i.e.
+!in front of diagnostics part [in front of diagimpd->diagentr].
+!Probably better here, otherwise f(l_) at given l_ is modified,
+!and there is no corresponding power transfer diagnostics  
+!occuring from spatial transport. 
 c.......................................................................
 c     Time advance spatial transport equation [except if transport
 c     with soln_method=it3drv, not applicable since done in impavnc0].
 c.......................................................................
-
       if (soln_method.ne.'it3drv') then
-      if (transp .eq. "enabled" .and. n.ge.nontran .and. n.le.nofftran)
-     +   then
-
-        if (cqlpmod .ne. "enabled") then
-c......................................................................
-c     The radial transport (tdtr...) routines follow. Store the results
-c     of the velocity space split in fvn. Then call the transport
-c     subroutine, tdtransp.
-c......................................................................
+      if(transp.eq."enabled" .and. n.ge.nontran .and. n.le.nofftran)then
+        if (cqlpmod .ne. "enabled") then ! CQL3D:
+          ! The radial transport (tdtr...) routines follow. Store the results
+          ! of the velocity space split in fvn. Then call the transport
+          ! subroutine, tdtransp.
           call tdtransp
           call tdtrsavf
-
-        else  ! i.e., cqlpmod.eq.enabled
-
-c.......................................................................
-c     Parallel transport.
-c     First compute E_n+1/2 from Poisson and modify velsou accordingly
-c.......................................................................
+        else  ! (cqlpmod.eq."enabled")  CQLP:
+          ! Parallel transport.
+          !First compute E_n+1/2 from Poisson and modify velsou accordingly
           call wpelecf(2)
-c%OS  call wptrans
-c%OS  call wpsavf
-c%OS  
-          dtreff=dtreff/noffso(1,1)
-          do 200 in=1,noffso(1,1)
-            if (meshy .eq. "fixed_mu") call wptramu
-            if (meshy .ne. "fixed_mu") call wptrafx
+          !BH,YuP[2021-03-08] Presumably the usage of noffso(1,1) here
+          ! is accidental.  Renaming it into n_sub_wp,
+          ! meaning: number of smaller sub-steps withing dtreff,
+          ! for shortening of parallel-transport time step:
+          n_sub_wp=1 !Can make it into namelist if needed.
+          dtreff=dtreff/n_sub_wp !YuP/was: dtreff/noffso(1,1)
+          do in=1,n_sub_wp !YuP/was: 1,noffso(1,1)
+            if (meshy.eq."fixed_mu") call wptramu
+            if (meshy.ne."fixed_mu") call wptrafx
             call wpsavf
- 200      continue
-          dtreff=noffso(1,1)*dtreff
-c%OS  
+          enddo
+          !write(*,*)'tdchief-986 sum(f_),sum(f)=',sum(f_),sum(f)
+          !Restore the time step:
+          dtreff=dtreff*n_sub_wp !YuP/was: noffso(1,1)*dtreff
         endif ! on cqlpmod
-
       endif  ! on transp, etc.
       endif  ! on soln_method.ne.it3drv
+
 
 c.......................................................................
 c     Plot flag and plot time set:
@@ -959,7 +1041,6 @@ c.......................................................................
 c.......................................................................
 c     Diagnostics (if transp=enabled)
 c.......................................................................
-
       do 30 ll=1,lrors
 c......................................................................
 c     determine local variables depending on flux surface (l_, iy,..)
@@ -968,34 +1049,35 @@ c......................................................................
                 
         if (transp.eq."enabled") then
           call diaggnde
-
 c..................................................
 c     Compute plasma resistivity for electron runs.
 c..................................................
           call restvty
-
 c..................................................
 c     Compute various diagnostics...
 c..................................................
           call diag
-
 c..................................................
 c     Obtain data for time dependent plots
 c..................................................
           call ntdstore
-
 c..................................................
 c     plotting logic for 3-D code...
 c       (iplot set in subroutine achiefn)
 c..................................................
           if ((n.ge.nstop .or. iplot.ne.0 .or. iplt3d.ne.0).and.
      +        n.ge.nontran .and. n.le.nofftran) then
-            call tdtrfcop(1)
+     
+            if(soln_method.ne.'it3drv') then !YuP[2024-07-25] added if()
+            call tdtrfcop(1) !copy frn-->f, and call diaggnde
             call diaggnde
+            !If soln_method='it3drv', frn (and fvn) is not used,
+            !and then gn becomes 0.0 in diaggnde.
+            !Once gn=0.0, the "stop" is triggered at this mpi core
             if (l_ .eq. lmdpln_) then
-              if (ioutput(1).ge.1) then !YuP[2020] Useful diagnostic printout
-              write(*,*)'tdchief before xlndnr: n,l_',n,l_
-              endif
+              !if (ioutput(1).ge.1) then !YuP[2020] Useful diagnostic printout
+              !write(*,*)'tdchief before xlndnr: n,l_',n,l_
+              !endif
               do 25 k=1,ngen
                 xlndnr(k,lr_)=xlndn(k,lr_)
                 energyr(k,lr_)=energy(k,lr_)
@@ -1004,12 +1086,12 @@ c..................................................
             endif
             if ((adimeth.eq."enabled" .or. cqlpmod.ne."enabled") .and.
      +        n.ge.nontran .and. n.le.nofftran) then
-              call tdtrfcop(2)
+              call tdtrfcop(2) !copy fvn-->f, and call diaggnde
               call diaggnde
               if (l_ .eq. lmdpln_) then
-              if (ioutput(1).ge.1) then !YuP[2020] Useful diagnostic printout
-              write(*,*)'tdchief before xlndnv: n,l_',n,l_
-              endif
+              !if (ioutput(1).ge.1) then !YuP[2020] Useful diagnostic printout
+              !write(*,*)'tdchief before xlndnv: n,l_',n,l_
+              !endif
                 do 26 k=1,ngen
                   xlndnv(k,lr_)=xlndn(k,lr_)
                   energyv(k,lr_)=energy(k,lr_)
@@ -1017,8 +1099,9 @@ c..................................................
  26             continue
               endif
             endif
-            call tdtrfcop(3)  !Copies all ngen species
+            call tdtrfcop(3)  !Restore f() [Copies all ngen species]
             call diaggnde     !Loops over all species
+            endif !(soln_method.ne.'it3drv') !YuP[2024-07-25] added if()
 c$$$  Commenting following, in favor of dimensioning pwrrfs with l_,
 c$$$    to save results calculated in impavnc0 ==> diagimpd ==> diagentr.
 c$$$    BH090806
@@ -1029,27 +1112,39 @@ c$$$            enddo
      +          (iplot.ne.0 .or. n.ge.nstop) ) then
                 !YuP[2017-11-27] Added n.ge.nstop, similar to achiefn
 c$$$            if ( iplot.ne.0) then
-              call pltmain
+              call pltmain ! and only when transp.eq."enabled" here
             endif
-          endif
+          endif ! n.ge.nstop ...
 c.......................................................................
 c     write some radially dependent netcdf output, similar to pltmain.
 c.......................................................................
-
           call netcdfmain
-
         endif !End of transp="enabled" if-block
-
 c......................................................................
 c     Store updated information.
 c......................................................................
         call tdtoaray
  30   continue !  ll=1,lrors
+CMPIINSERT_BARRIER
+ 
+ 
+!YuP[2023-05-17]commented  call profiles  !YuP[2021-08-04] Moved here from line 954.
+                     !Brings namelist specified profiles up to time n
+!YuP[2023-05-17] why commented:                     
+! This call redefines reden() for k=kelecg and kelecm 
+! [in case of imp_ne_method.eq.'ni_list']  as
+!   reden= dens_ion_main*Zmain + SUM(dens_imp(kstate)*Zimp(kstate))
+! So, this reden now has no relationship 
+! to the distribution function f().
+! By design, it could be used further for rescaling f() 
+! but only if lbdry()= scale, consscal or conscalm
+! (through calling subr.diagscal).
+! In case of lbdry=conserv, the distribution is NOT rescaled,
+! and plots show the redefined reden() which is not based on f().
 
 c.......................................................................
 cl    Compute flux surface average current and resistivity for CQLP case
 c.......................................................................
-
       if (transp.eq."enabled" .and. cqlpmod.eq."enabled") call wpavg
 
 c......................................................................
@@ -1096,6 +1191,7 @@ CMPIINSERT_ENDIF_RANK
             if (iplt3d.ne.0 .or. n.eq.nstop .and. noplots.ne.'enabled1')
      +           iplotsxr='yes'
             call tdsxray(icall,iplotsxr) !Soft Xray diagnostic
+            !if(n.eq.nstop)WRITE(*,*)'tdchief/aft. tdsxray rank=',mpirank
             call tdnflxs(ilold)
          endif
       endif
@@ -1135,10 +1231,16 @@ C%OS      if (eqmod.eq."enabled".and.n.ge.nstop) call tdplteq
 c.......................................................................
 c     write radial information
 c.......................................................................
-
+      write(*,*)'tdchief/before tdoutput: iplt3d,n=',iplt3d,n
       if (iplt3d.ne.0 .or. n.eq.nstop) then
         call tdoutput(2)
       endif
+
+      ! f(R,Z,u,theta):  ![2023-09-26] Copied from CQL3D-FOW version
+      if (f4d_out.ne."disabled" .and. n.eq.nstop) call f4dwrite ![2023-09-26]
+
+      ! f(pol.angle, vpar, mu) at fixed rho==f3d_rho :
+      if (f3d_out.ne."disabled" .and. n.eq.nstop) call f3dwrite ![2023-09-26]
 
 c.......................................................................
 c     write netCDF output file, if netcdfnm.ne."disabled"

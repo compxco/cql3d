@@ -24,7 +24,7 @@ c..................................................................
      +  enescal,enloss,epsthet,
      1  enmin,enmax,ennb,ennin,ennl,ennscal,enmin_npa,enmax_npa,
      1  eseswtch,xsink,esink,ephicc,esfac,eoved,
-     1  fds,fds_npa,fmass,f4d_out,
+     1  fds,fds_npa,fmass,f4d_out,f3d_out,f3d_format,
      1  tavg,tavg1,tavg2,
      1  gsla,gslb,gamaset,gamafac,gamegy,
      1  iactst,ineg,idskf,idskrf,ichkpnt,implct,
@@ -46,6 +46,7 @@ c..................................................................
      1  npaproc,npa_process,
      1  nr_delta,nz_delta,nt_delta,
      1  nr_f4d,nz_f4d,nv_f4d,nt_f4d,
+     1  npol_f3d, nvpar_f3d, nmu_f3d, f3d_rho,
      1  npwr,negy,ntorloss,njene,njte,njti,
      1  nstop,nondtr1,nplot,nsave,ncoef,nchec,ncont,nrstrt,nstps,nfpld,
      1  noncntrl,nonel,noffel,nonvphi,noffvphi,nonavgf,nofavgf,
@@ -83,7 +84,9 @@ c..................................................................
      1  efiter,efflag,curr_edge,efrelax,efrelax1,efrelax_exp,currerr,
      1  bctime,nbctime,
      &  read_data, read_data_filenames, !BH,YuP[2021-01-21] namelist variables to read data files
+     &  read_data_filenames_prefix, read_data_filenames_suffix, !YuP[2021-04-06]
      &  temp_min_data, ![keV] Lower limit, to adjust Te and Ti data
+     &  elecfld_data, ![2022-07] 'jspitzer' or 'readdata'
      1  zmax,
      1  fow,outorb,nmu,npfi,nsteps_orb,nptsorb,i_orb_width,
      
@@ -117,9 +120,11 @@ c..................................................................
      1  difus_type,difusr,difus_rshape,difus_vshape,difin,
      1  difus_io,difus_io_file,
      1  difus_io_drrscale,difus_io_drscale,difus_io_t,
+     &  drr_scale, !YuP[2021-08]
      1  pinch,
      1  relaxden,relaxtsp,
-     1  transp,adimeth,nonadi,
+     1  transp,pltdrr,adimeth,nonadi,
+!!!already in /setup/     1  nonavgf,nofavgf, !YuP[2021-03] added this to /trsetup/
      1  nontran,nofftran,nonelpr,noffelpr,ndifus_io_t
 
 

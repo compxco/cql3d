@@ -31,7 +31,7 @@ c     tam13 will contain parallel current - at midplane. (with Leg. coeff.)
 c..................................................................
 
       ilegen=1
-      if (cqlpmod .eq. "enabled") ilegen=l_
+      if (cqlpmod.eq."enabled") ilegen=l_
 
       currmt(l_)=0.
       currmtp(l_)=0.
@@ -62,7 +62,7 @@ c     m=1 contribution
 
 c     Compute other terms integrating explicitly over theta
         if (l_ .eq. lmdpln_) then
-          do 20 i=1,iy
+          do 20 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
             do 21 j=1,jx
 c     include vptb=|cos(th0)| * tau
               tam2(j)=tam2(j)+f(i,j,k,l_)*cynt2(i,l_)*
@@ -179,7 +179,7 @@ c     This assures the midplane density of reden for f
 c..................................................................
 
           zfact=hni*zmaxpsi(lr_)*reden(k,lr_)
-          if (cqlpmod .eq. "enabled") zfact=gni*denpar(k,ls_)
+          if (cqlpmod.eq."enabled") zfact=gni*denpar(k,ls_)
 cBH070414  if (.not. nlrestrt) call dscal(iyjx2,zfact,f(0,0,k,l_),1)
           if (nlrestrt.eq."disabled") 
      1         call dscal(iyjx2,zfact,f(0,0,k,l_),1)
@@ -214,7 +214,7 @@ c..................................................................
 
 
           faccur=reden(k,lr_)*hni*zmaxpsi(lr_)*vnorm*bnumb(k)*charge
-          if (cqlpmod .eq. "enabled") faccur=denpar(k,ls_)*vnorm*
+          if (cqlpmod.eq."enabled") faccur=denpar(k,ls_)*vnorm*
      *      bnumb(k)*charge*gni
           currm(k,l_)=faccur*cn
 
@@ -231,16 +231,23 @@ c..................................................................
 
           psifct=psiovr(lr_)/onovrp(1,lr_)
           if (l_ .eq. lmdpln_) curr(k,lr_)=currm(k,l_)*psifct
-          fgni=faccur*psifct/3.e+9
-          if (cqlpmod .eq. "enabled") fgni=faccur/3.e+9
+          fgni=faccur*psifct  !/3.e+9 YuP[2021-03-23] removed 1/3.e9
+          !Why is currv converted to A/cm2 here, at n=0, but not at n>0?
+          !Leaving this conversion to pltendn and pltends,
+          !where currv is plotted 
+          if (cqlpmod.eq."enabled") fgni=faccur !/3.e+9 YuP[2021-03-23]
           call dscal(jx,fgni,currv(1,k,l_),1)
           call dscal(jx,fgni,currvs(1,k),1)
+          !YuP[2021-03-23] :
+          !Note that currvs() does not have l_ index, 
+          !so it should be recomputed for each given l_, from currv(),
+          !in pltendn and pltends (the only two places where it is used)
 
 c..................................................................
 c     Standard, non-initialization time step logic follows..
 c..................................................................
 
-        else
+        else ! n>0
           faccur=one_*vnorm*bnumb(k)*charge
           psifct=psiovr(lr_)/onovrp(1,lr_)
 
@@ -256,13 +263,19 @@ c     currtp(lr_) adds in general electron contribution to currt(l_).
 c     currmtp(l_) adds in general local in s electron contribution to currm
 c..................................................................
 
-          facpsi=faccur*psifct
-          call dscal(jx,facpsi,currv(1,k,l_),1)
-          call dscal(jx,facpsi,currvs(1,k),1)
+          fgni=faccur*psifct  !Here: n>0
+          if (cqlpmod.eq."enabled") fgni=faccur
+          !YuP[2021-03-23] Corrected fgni factor for CQLP [i.e., no psifct]
+          call dscal(jx,fgni,currv(1,k,l_),1)
+          call dscal(jx,fgni,currvs(1,k),1)
           currm(k,l_)=faccur*cn
           currmtp(l_)=currmtp(l_)+currm(k,l_)
+          if(cqlpmod.eq."enabled")then !YuP[2021-03-03] Added if()
+          !YuP: denpar and enrgypa are only applicable for CQLP
           denpar(k,ls_)=one_*gn
-          if (sbdry.eq."periodic" .and. transp.eq."enabled") then
+          if (sbdry.eq."periodic")then !YuP/was .and. transp.eq."enabled") then
+            !YuP: For sbdry="periodic", we could always set this
+            !(i.e., transp or no transp, should not matter):
             if (ls_ .eq. 1) then
               denpar(k,lsmax+1)=denpar(k,1)
               enrgypa(k,lsmax+1)=enrgypa(k,1)
@@ -271,6 +284,7 @@ c..................................................................
               enrgypa(k,0)=enrgypa(k,lsmax)
             endif
           endif
+          endif !cqlpmod.eq."enabled"
           if (l_ .eq. lmdpln_) then
             curr(k,lr_)=currm(k,l_)*psifct
             currtp(lr_)=currtp(lr_)+curr(k,lr_)
@@ -347,30 +361,28 @@ c......................................................................
 c     Compute Z-effective
 c......................................................................
 
-      zeff(lr_)=0.
+      if(cqlpmod.ne."enabled")then !YuP[2021-02]
+       zeff(lr_)=0.
+       zeff4(lr_)=0.d0 !Yup[2014-05-27] Initialize to 0.
+      else ! (cqlpmod.eq."enabled")
+       zeff(ls_)=0.
+       zeff4(ls_)=0.d0 
+      endif 
       zeff1=0.
       xq=0.
-c$$$        if (izeff.eq."ion") then
-c$$$          k1=ngen+1
-c$$$        else
-c$$$          k1=1
-c$$$        endif
-c$$$        do 80 k=k1,ntotal
-c$$$          if (k.eq.kelecg .or. k.eq.kelecm) goto 80
-c$$$cBobH990128          if (k.eq.izeff) goto 80
-c$$$          xq=xq+1
-c$$$          zeff(lr_)=zeff(lr_)+bnumb(k)**2*reden(k,lr_)
-c$$$          zeff4(lr_)=bnumb(k)**4*reden(k,lr_)+zeff4(lr_)
-c$$$          zeff1=zeff1+bnumb(k)*reden(k,lr_)
-c$$$ 80     continue
-
       if (izeff.eq."backgrnd") then
         do 80 k=1,ntotal
            if (k.eq.kelecg .or. k.eq.kelecm) goto 80
            xq=xq+1
-           zeff(lr_)=zeff(lr_)+bnumb(k)**2*reden(k,lr_)
-           zeff4(lr_)=bnumb(k)**4*reden(k,lr_)+zeff4(lr_)
-           zeff1=zeff1+bnumb(k)*reden(k,lr_)
+           if(cqlpmod.ne."enabled")then !YuP[2021-02]
+            zeff(lr_)=zeff(lr_)+bnumb(k)**2*reden(k,lr_)
+            zeff4(lr_)=bnumb(k)**4*reden(k,lr_)+zeff4(lr_)
+            zeff1=zeff1+bnumb(k)*reden(k,lr_)
+           else ! (cqlpmod.eq."enabled")
+            zeff(ls_)=zeff(ls_)+bnumb(k)**2*denpar(k,ls_)
+            zeff4(ls_)=bnumb(k)**4*denpar(k,ls_)+zeff4(ls_)
+            zeff1=zeff1+bnumb(k)*denpar(k,ls_)
+           endif
  80     continue
         !YuP[2020-06-22] if(gamafac.eq."hesslow".and.(kelec.ne.0))then
         if(nstates.gt.0)then !YuP[2020-06-22] Changed the above logic to this.
@@ -392,17 +404,28 @@ c$$$ 80     continue
          do kk=1,nionm
             k=kionm(kk)
             xq=xq+1
-            zeff(lr_)=zeff(lr_)+bnumb(k)**2*reden(k,lr_)
-            zeff4(lr_)=bnumb(k)**4*reden(k,lr_)+zeff4(lr_)
-            zeff1=zeff1+bnumb(k)*reden(k,lr_)
+            if(cqlpmod.ne."enabled")then !YuP[2021-02]
+             zeff(lr_)=zeff(lr_)+bnumb(k)**2*reden(k,lr_)
+             zeff4(lr_)=bnumb(k)**4*reden(k,lr_)+zeff4(lr_)
+             zeff1=zeff1+bnumb(k)*reden(k,lr_)
+            else ! (cqlpmod.eq."enabled")
+             zeff(ls_)=zeff(ls_)+bnumb(k)**2*denpar(k,ls_)
+             zeff4(ls_)=bnumb(k)**4*denpar(k,ls_)+zeff4(ls_)
+             zeff1=zeff1+bnumb(k)*denpar(k,ls_)
+            endif
          enddo
          
       else
          stop 'diaggnde2: Problem with izeff specification'
       endif
       
-      zeff4(lr_)=zeff4(lr_)/xq
-      zeff(lr_)=zeff(lr_)/zeff1
+      if(cqlpmod.ne."enabled")then !YuP[2021-02]
+       zeff4(lr_)=zeff4(lr_)/xq
+       zeff(lr_)=zeff(lr_)/zeff1
+      else ! (cqlpmod.eq."enabled")
+       zeff4(ls_)=zeff4(ls_)/xq
+       zeff(ls_)=zeff(ls_)/zeff1
+      endif
 
 c.......................................................................
 c     end of strictly radial dependent variables
@@ -418,7 +441,11 @@ c     was computed above.
 c.......................................................................
 
       if (kelecg.eq.0.and. eleccomp.eq."enabled") then
-        factor=diagcfac(eps(lr_),zeff(lr_))
+        if(cqlpmod.ne."enabled")then !YuP[2021-02]
+          factor=diagcfac(eps(lr_),zeff(lr_))
+        else ! (cqlpmod.eq."enabled") 
+          factor=diagcfac(eps(lr_),zeff(ls_))
+        endif
         if (l_ .eq. lmdpln_) currtp(lr_)=currt(lr_)*factor
         currmtp(l_)=currmt(l_)*factor
       endif

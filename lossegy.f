@@ -36,7 +36,7 @@ c     off the grid.
 
       do 200 k=1,ngen
 
-         call bcast(egylosa(0,0,k,indxlr_),zero,(iy+2)*(jx+2))
+         call bcast(egylosa(0,0,k,indxlr_),zero,(iymax+2)*(jx+2)) !iy-->iymax
 
 c     Phenomenological:
 
@@ -55,11 +55,11 @@ c..................................................................
             vel=x(j)*vnorm
             coefnt1=coefnt*xsq(j)*x(j)/gamma(j)**gamegy(k)
             if(vel.le.vth(k,lr_))  then
-               do 110  i=1,iy
+               do 110  i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
                   egylosa(i,j,k,indxlr_)=vptb(i,lr_)*coefnt1
  110           continue
             else
-               do 120  i=1,iy
+               do 120  i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
                   egylosa(i,j,k,indxlr_)=
      +                 vptb(i,lr_)*coefnt1*(vel/vth(k,lr_))**
      +                 (paregy(k)+peregy(k)+pegy(k))*sincosba(i,k,lr_)
@@ -100,7 +100,7 @@ c     Bremsstrahlung:
                   endif
                   betau3=reden(kkk,lr_)*sigmarad*clite2*gamma(j)*
      &                 xsq(j)/vnorm
-                  do i=1,iy
+                  do i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
                      egylosa(i,j,k,indxlr_)=egylosa(i,j,k,indxlr_)+
      &                    vptb(i,lr_)*betau3
                   enddo ! i
@@ -156,7 +156,7 @@ c     Bremsstrahlung:
                   endif
                   betau3=dens_kstate*sigmarad*clite2*gamma(j)*
      &                 xsq(j)/vnorm
-                  do i=1,iy
+                  do i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
                      egylosa(i,j,k,indxlr_)=egylosa(i,j,k,indxlr_)+
      &                    vptb(i,lr_)*betau3 !contribution is added
                   enddo ! i

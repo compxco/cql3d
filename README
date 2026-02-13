@@ -274,3 +274,23 @@ git commit
 git push
 
 
+Jan/2026
+========
+
+cql3dui-python_cql3d_interface.txt is a helpful python interface
+aimed at helping the user setup namelist files for code runs.
+Constructed by Poulos.
+
+See a_change.h for code updates, by date.  There have been many.
+One significant addition is simultaneous solution with the Ampere-Faraday
+equations.
+
+Reran 00_Cql3d_Regression_Tests/test1.2 ==> Essentially unchanged from test1.1.
+
+Brought git repository up-to-date, with git_cql3d_251215.0 version.
+
+cql3d gives extensive .ps output (using the libpgplot software).
+Python scripts (*.py) for matplotlib plotting from the .nc cql3d output file
+are also in the distribution, some of the python2 variety.
+plot_CQL3D_nc_python3_161025_Matt.py uses more recent python3.
+

@@ -35,7 +35,7 @@ c..................................................................
  550    format(1x,"Species ",i2," Distribution Function Contour Plot")
         CALL PGPAGE
         itype=1 ! means: plots are made for distr.func f
-        call pltcont(k,2,t_,itype) ! for f()
+        call pltcont(k,1,t_,itype) !for f()  pltcase=1 means log10 scale
         write(t_,560)
  560    format("Contour values:")
         RILIN=10.
@@ -58,7 +58,7 @@ c..................................................................
         ! Additionally, plot f(n+1)-f(n)
         if (pltd.eq."df" .or. pltd.eq."df_color")then
         
-        do 20 i=1,iy
+        do 20 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
           do 21 j=1,jx
             temp1(i,j)=f(i,j,k,l_)-f_(i,j,k,l_)
  21       continue

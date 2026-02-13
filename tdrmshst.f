@@ -113,13 +113,13 @@ c     LCFS at ez=0.
           ! because of jump in rpmconz(l).
           ! Not really a bug; it depends how you define 
           ! the bin around last FP'ed surface.
- 16     continue
+ 16     continue ! l=1,lrzmax
         equilpsi(0)=psimag
         do 60 l=1,lrzmax
           worka(l)=-psivalm(l)
  60     continue
         i1p(1)=4
-        i1p(2)=4
+        i1p(2)=4 !=4 means cubic spline; needs at least 4 points
         itab(1)=1
         itab(2)=0
         itab(3)=0
@@ -134,22 +134,30 @@ c     (should not run with lrzmax=2, as cubic spline not defined)
           d2areamd(1)=0.0
           d2areamd(lrzmax)=(areamid(lrzmax) - areamid(lrzmax-1)) /
      /      (worka(lrzmax)   - worka(lrzmax-1))
+          call coeff1(lrzmax,worka(1),volmid(1),d2volmid,i1p,1,workk)
+          call terp1(lrzmax,worka(1),volmid(1),d2volmid,-psilim,1,tab,
+     +    itab)
+          volmid(lrzmax)=tab(1)
+          call coeff1(lrzmax,worka(1),areamid(1),d2areamd,i1p,1,workk)
+          call terp1(lrzmax,worka(1),areamid(1),d2areamd,-psilim,1,tab,
+     +    itab)
+          areamid(lrzmax)=tab(1)
+          psivalm(lrzmax)=psilim
+        endif ! YuP[2021-02-26] Moved this if , to include few lines above,
+              ! Which are only for the case of lrzmax=3
+              
+        if(cqlpmod.ne."enabled")then
+          if(lrz.lt.3)then !YuP[2021-11-17] added check/stop for coeff1
+            STOP ' tdrmshst: subr.coeff1(lrz,...) requires lrz>2'
+          endif
         endif
-c
-        call coeff1(lrzmax,worka(1),volmid(1),d2volmid,i1p,1,workk)
-        call terp1(lrzmax,worka(1),volmid(1),d2volmid,-psilim,1,tab,
-     +    itab)
-        volmid(lrzmax)=tab(1)
-        call coeff1(lrzmax,worka(1),areamid(1),d2areamd,i1p,1,workk)
-        call terp1(lrzmax,worka(1),areamid(1),d2areamd,-psilim,1,tab,
-     +    itab)
-        areamid(lrzmax)=tab(1)
-        psivalm(lrzmax)=psilim
-        do 15 ll=1,lrzmax
+        do ll=1,lrzmax 
+          ! Valid even for lrzmax=1. Note that areamid(0)=0., volmid(0)=0.
           darea(ll)=(areamid(ll)-areamid(ll-1)) !here: for eqmod.eq."enabled"
           dvol(ll)=(volmid(ll)-volmid(ll-1))
- 15     continue
-       ! write(*,*)'tdrmshst: sum(darea)=',sum(darea)
+        enddo
+        write(*,*)'tdrmshst: sum(darea)=',sum(darea)
+        write(*,*)'tdrmshst: sum(dvol)= ',sum(dvol)
 
 c..................................................................
 c     Set up spline arrays for R(ll) and dpsidr(ll) (both at mag axis)
@@ -159,21 +167,26 @@ c     d2bmdpl is set for use with freya.  The values of bmdplne
 c     (from the center of the l-th volume)
 c     are here attributed to values of psi at the outside of the
 c     l-th volume.  (not sure about accuracy here. BobH, 950221).
-
-        call coeff1(lrzmax,worka(1),bmdplne,d2bmdpl,i1p,1,workk)
-
-        !YuP160304 call coeff1(lrzmax,rz(1),equilpsi(1),d2equ,i1p,1,workk)
-        tr(0:lrzmax)= psimag-equilpsi(0:lrzmax)
-        !pol.flux, in ascending order needed for coeff1
-        call coeff1(lrzmax,rya(1),tr(1),d2equ,i1p,1,workk)
-        itab(1)=0
-        itab(2)=1
-        itab(3)=0
-        do 50 l=1,lrzmax
-          !YuP160304 call terp1(lrzmax,rz(1),equilpsi(1),d2equ,rz(l),1,tab,itab)
-          call terp1(lrzmax,rya(1),tr(1),d2equ,rya(l),1,tab,itab)
-          dpsidrho(l)=-tab(2) ! '-' because we used ascending psi function
- 50     continue
+        !YuP[2021-02] coeff1() below does not work for lrzmax=1 .
+        !Maybe simply set dpsidrho(l)= (equilpsi(1)-psimag)/rya(1) ?
+        if(lrzmax.eq.1)then ! !YuP[2021-02-26] added lrzmax=1 case
+          dpsidrho(1)= (equilpsi(1)-psimag)/rya(1)
+          write(*,*)'tdrmshst: rya(1),dpsidrho(1)=',rya(1),dpsidrho(1)
+        else ! lrzmax>1
+          call coeff1(lrzmax,worka(1),bmdplne,d2bmdpl,i1p,1,workk)
+          !YuP160304 call coeff1(lrzmax,rz(1),equilpsi(1),d2equ,i1p,1,workk)
+          tr(0:lrzmax)= psimag-equilpsi(0:lrzmax)
+          !pol.flux, in ascending order needed for coeff1
+          call coeff1(lrzmax,rya(1),tr(1),d2equ,i1p,1,workk)
+          itab(1)=0
+          itab(2)=1
+          itab(3)=0
+          do l=1,lrzmax
+           !YuP160304 call terp1(lrzmax,rz(1),equilpsi(1),d2equ,rz(l),1,tab,itab)
+           call terp1(lrzmax,rya(1),tr(1),d2equ,rya(l),1,tab,itab)
+           dpsidrho(l)=-tab(2) ! '-' because we used ascending psi function
+          enddo
+        endif ! lrzmax
 
 c.......................................................................
 c     Determine the del(psi) array
@@ -198,15 +211,24 @@ CMPIINSERT_IF_RANK_EQ_0
      +            sum(dvol),sum(darea)
       WRITE(*,*)'----------------------------------------------------'
 CMPIINSERT_ENDIF_RANK
+
+      !YuP[2021-02-26] The following part for h_r() does not work 
+      !in case of lrzmax=1.  Skip it in such a case.
+      if(lrzmax.gt.1)then !YuP[2021-02-26] added condition
 c.......................................................................
 c     Compute H*rho=dV/drho/(4*pi**2*R_0) (used for transport)
 c.......................................................................
-
-      i1p(1)=4
+      i1p(1)=4 !=4 means cubic spline; needs at least 4 points
       i1p(2)=4
       itab(1)=0
       itab(2)=1
       itab(3)=0
+        if(lrz.lt.4)then !YuP[2021-11-17] added check/stop for coeff1
+          STOP ' tdrmshst: subr.coeff1(lrz,...) requires lrz>3'
+          !Actually, it could work for lrz=3; 
+          !Use i1p()=2 (first derivative is given),
+          !Need values of 1st derivatives at rho=0 and rho=1.
+        endif
       call coeff1(lrzmax,rz(1),volcon(1),d2volcon,i1p,1,workk)
       do 70 l=0,lrzmax-1
         drp5(l)=rz(l+1)-rz(l)
@@ -217,7 +239,8 @@ c.......................................................................
       call terp1(lrzmax,rz(1),volcon(1),d2volcon(1),radmin,1,tab,itab)
 C%OS  h_r(lrzmax)=tab(2)
       h_r(lrzmax)=tab(2)/(4.*pi**2*radmaj)
-
+      endif ! (lrzmax.gt.1)
+      
 c.......................................................................
 c     If efswtch="method5",
 c     determine target parallel current (A/cm**2) from eqdsk, 

@@ -103,12 +103,16 @@ c     NOTE: fh is alternatively allocated (differently) in wpalloc.f
 c           when cqlpmod.eq.enabled.
 c           fh and fg are allocated here for Kupfer functions.
 c           Only needed for electrons.
-      allocate(fh(0:iy+1,0:jx+1,1,1:lrz),STAT=istat)
-      if(istat.ne.0) STOP 'ampfalloc: fh alloc problem'
+      if(.NOT.ASSOCIATED(fh)) then ! fh is used in CQLP and A-F
+        allocate(fh(0:iy+1,0:jx+1,1,1:lrz),STAT=istat)
+        if(istat.ne.0) STOP 'ampfalloc: fh alloc problem'
+      endif
       call bcast(fh,zero,SIZE(fh))
 
-      allocate(fg(0:iy+1,0:jx+1,1,1:lrz),STAT=istat)
-      if(istat.ne.0) STOP 'ampfalloc: fg alloc problem'
+      if(.NOT.ASSOCIATED(fg)) then ! fg is used in CQLP and A-F
+        allocate(fg(0:iy+1,0:jx+1,1,1:lrz),STAT=istat)
+        if(istat.ne.0) STOP 'ampfalloc: fg alloc problem'
+      endif
       call bcast(fg,zero,SIZE(fg))
 
       allocate(ampfln(1:lrz),STAT=istat)

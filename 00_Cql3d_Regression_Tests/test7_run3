@@ -1,0 +1,27 @@
+
+#Jan 7, 2018    BH
+#This script run a series of test cases of the new 
+#difus_io_drrscale and difus_io_drscale time-dependent
+#radial diffusion scale factors.
+#These short tests has nstop=3, rather than usual nstop~135.
+#(Part of 8 runs series from /home/bobh/cql3d/mst/171031_anderson/FI_runaway.5.tests.0/210720_rerun)
+
+#XCQL3D='/home/bobh/cql3d/git/cql3d/xcql3d_gfortran64.1'
+
+
+#Base case creating drrdrout.nc, including radial pinch term.
+cp cqlinput_w_transp_short_drrdrout cqlinput
+$XCQL3D |tee log_w_transp_short_drrdrout
+
+#Reading in drrdrout.nc, and checking get approximately same results as
+#previous run.  It need not be exactly the same, as the pinch term is
+#recalculated at each time step (after the first), and the drrdrout.nc
+#file contains the pinch term at only the final time step.
+cp cqlinput_w_transp_short_drrdrin cqlinput
+$XCQL3D |tee log_w_transp_short_drrdrin
+
+#Double the diffusion and pinch using the difus_io_drrscale() and
+#difus_io_drscale() factors, and check if results have changed.
+cp cqlinput_w_transp_short_drrdrin_2X cqlinput
+$XCQL3D |tee log_w_transp_short_drrdrin_2X
+# ==> Central energy reduced ~20%, and profile flattened (Fr 51 of .ps file).

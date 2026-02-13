@@ -8,7 +8,7 @@ c
 
       character*8 elecset
 
-      real*8 elecfld_t0(lrza),sigma_t0(lrza) !YuP[2020-04-13] To save values at t=0 
+      real*8 elecfld_t0(lrza),sigma_t0(lrza),curr_t0(lrza) !YuP[2020-04-13] To save values at t=0 
 c..................................................................
 c     CQL3D mode:
 c     At the n.ge.0 time-step:
@@ -31,14 +31,13 @@ c.......................................................................
 
       if (n .eq. 0) then
         if (cqlpmod .ne. "enabled") then
-c     
 c     formula should be 0.5064*N(Z)*me/taueeh/ne/e**2, with N(Z=1)=1
 c     Thus one should use game(e,e) as in taueeh, but as it is not
 c     clear which to use we take the average between game(e,e) and game(e,i)
           sptzr(l_)=0.5064*4.*sqrt(2.*pi)/3.*charge**2
      *      *0.5*(gama(kelec,kelec)+gama(kelec,kionn))
      *      *sqrt(fmass(kelec))/(energy(kelec,lr_)/1.5*ergtkev)**1.5
-        else
+        else ! (cqlpmod.eq."enabled")
           sptzr(l_)=0.5064*4.*sqrt(2.*pi)/3.*charge**2
      *      *0.5*(gama(kelec,kelec)+gama(kelec,kionn))
      *      *sqrt(fmass(kelec))/(enrgypa(kelec,ls_)/1.5*ergtkev)**1.5
@@ -47,7 +46,7 @@ c     divide by ne*Zeff = ni*Zeff**2
 c     Hinton-Hazeltine p.270 and 297 (same as ONETWO 4.2-20, 4.2-30)
           taueeh(ls_)=vthpar(kelec,ls_)**3*fmass(kelec)**2
      1      /(4.*sqrt(2.*pi)*denpar(kelec,ls_)*charge**4*
-     1      gama(kelec,kelec))*3./zeff(lr_)
+     1      gama(kelec,kelec))*3./zeff(ls_)
           starnue(ls_)=rgeom(lr_)*bmod0(lr_)/bthr0(lr_)/
      1      vthpar(kelec,ls_)/taueeh(ls_)/eps(lr_)**1.5
         endif
@@ -77,10 +76,15 @@ c     But, T==temp(k,lr) can be changed in profiles.f,
 c     in case of iprote (or iproti) equal to "prbola-t" or "spline-t"
 c..................................................................
 
-      do 10 k=1,ngen
+      if (cqlpmod .ne. "enabled") then
+        do k=1,ngen
          vth(k,lr_)=(temp(k,lr_)*ergtkev/fmass(k))**.5
- 10   continue
-
+        enddo
+      else ! (cqlpmod.eq."enabled") ![2021-02-26]added
+        do k=1,ngen
+         vthpar(k,ls_)=(temppar(k,ls_)*ergtkev/fmass(k))**.5
+        enddo
+      endif
 c..................................................................
 c     tauee(lr_) is the electron-electron slowing down time at midplane
 c     tauee = 0.532/nu^{ee}_s, where nu^{ee}_s is the low velocity
@@ -91,28 +95,36 @@ c     taueeh = (3*sqrt(pi/2)/Zeff)*tauee.
 c     Note taueeh = taue(NRL p.33)=2.9E-06*...
 c..................................................................
 
-      tauee(lr_)=vth(kelec,lr_)**3*fmass(kelec)**2
-     1  /(4.*pi*reden(kelec,lr_)*charge**4*
-     1  gama(kelec,kelec))
+      if (cqlpmod .ne. "enabled") then
+        tauee(lr_)=vth(kelec,lr_)**3*fmass(kelec)**2
+     1  /(4.*pi*reden(kelec,lr_)*charge**4*gama(kelec,kelec))
 c     Hinton-Hazeltine definition, Eq.(5.4), for e-i collisions.
 c     1./taueeh = 4/3 sqrt(2*pi) ne*zeff*charge**4*gamma/(sqrt(me)*Te**1.5)
 c     Thus: taueeh=3 sqrt(pi/2) / Zeff * tauee
 c     Note: taueeh and nuestar same as ONETWO 4.2-20 and 4.2-30
 c     (Eq. 4.2-28 and 4.2-39, in GA-A16178, Pfeiffer, Davidson, Miller, Waltz)
-      if (cqlpmod .ne. "enabled") then
         taueeh(lr_)=tauee(lr_)*3.*sqrt(pi/2.)/zeff(lr_)
         starnue(lr_)=rgeom(lr_)*bmod0(lr_)/bthr0(lr_)/
      1    vth(kelec,lr_)/taueeh(lr_)/eps(lr_)**1.5
-c     
 c     formula should be 0.5064*N(Z)*me/taueeh/ne/e**2, with N(Z=1)=1
 c     Thus one should use game(e,e) as in taueeh, but as it is not
 c     clear which to use we take the average between game(e,e) and game(e,i)
-c     This expression for sptzr is given by Eq. 4.2-77 if ONETWO manual,
+c     This expression for sptzr is given by Eq. 4.2-77 in ONETWO manual,
 c     GA-A16178, the same as Eq. 5.66 of Hinton-Hazeltine, Rev. Mod. Phys.
           sptzr(l_)=zeff(lr_)*(0.29+0.46/(1.08+zeff(lr_)))
      *      *4.*sqrt(2.*pi)/3.*charge**2
      *      *0.5*(gama(kelec,kelec)+gama(kelec,kionn))
      *      *sqrt(fmass(kelec))/(temp(kelec,lr_)*ergtkev)**1.5
+      else ! (cqlpmod.eq."enabled") ![2021-02-26]added
+        tauee(ls_)=vthpar(kelec,ls_)**3*fmass(kelec)**2
+     1  /(4.*pi*denpar(kelec,ls_)*charge**4*gama(kelec,kelec))
+        taueeh(ls_)=tauee(ls_)*3.*sqrt(pi/2.)/zeff(ls_)
+        starnue(ls_)=rgeom(lr_)*bmod0(lr_)/bthr0(lr_)/
+     1    vthpar(kelec,ls_)/taueeh(ls_)/eps(lr_)**1.5
+          sptzr(l_)=zeff(ls_)*(0.29+0.46/(1.08+zeff(ls_)))
+     *      *4.*sqrt(2.*pi)/3.*charge**2
+     *      *0.5*(gama(kelec,kelec)+gama(kelec,kionn))
+     *      *sqrt(fmass(kelec))/(temppar(kelec,ls_)*ergtkev)**1.5
       endif
 
  2    continue ! Not used
@@ -122,8 +134,13 @@ c     elecr is the Dreicer electric field (as in Kulsrud et al.),
 c     converted to volts/cm.
 c..................................................................
 
-      elecr(lr_)=300.*fmass(kelec)*vth(kelec,lr_)/(2.*charge*tauee(lr_))
-
+      if (cqlpmod .ne. "enabled") then
+       elecr(lr_)=300.*fmass(kelec)*vth(kelec,lr_)
+     &           /(2.*charge*tauee(lr_))
+      else ! (cqlpmod.eq."enabled") ![2021-02-26]added
+       elecr(ls_)=300.*fmass(kelec)*vthpar(kelec,ls_)
+     &           /(2.*charge*tauee(ls_))
+      endif
 c..................................................................
 c     rovsf and rovscf are two small-epsilon approximations to
 c     rovs(lr_) (see below)
@@ -352,28 +369,46 @@ c          target currxj (convert to volts/cm from cgs)
             
       elseif (efswtch.eq."method6") then !YuP[2020-04-13] Added method6
             ! At t=0, save the value of elecfld and conductivity.
-            ! At later time step, use spitzer+neoclassical conductivity
-            ! to evolve electric field so that 
-            !  E(t) = E(t=0)* sigma(t=0)/sigma(t)
-            !  [it is aimed to yield j(t)=const, if no j_RE]
-            !For this method6, need to have iproelec.eq.'parabola' or 'spline'
-            !but iproelec.eq."prbola-t" will work, too:
-            !subr.profiles will setup elecfld(lr) at t=0, 
-            !then, whatever is set at t>0 [in subr.profiles], will not be used;
-            !it will be overwritten by lines below.
+            ! At later time steps, use spitzer-neoclassical conductivity
+            ! to evolve electric field so that (updated [2022-03-11])
+            !  E(t)= [E(t=0)*sigma(t=0)+J_bs(0) - J_RE(t)-J_bs(t)]/sigma(t)
+            !Aimed to yield J(t)=const, where J= Jcode+E*dsigma+J_bs
+            !For method6, need to have iproelec.eq.'parabola' or 'spline'
             call restcon
             call resthks(l_,lr_,lmdpln_,
      +           zreshin(lr_),zreskim(lr_),zressau1,zressau2)
             !YuP[2020-04-02] Version with zressau1
             !Based on Sauter, Angioni and Lin-Liu, Phys.Plasmas 6, 1834 (1999) :
-            sigma=1.d0/(zressau1*sptzr(l_)) ! sigma (starnue=0) [cgs]
-            ! Consider this option:
-            !sigma=1.d0/(zressau2*sptzr(l_)) ! sigma (starnue>0) [cgs]
+            !sigma=1.d0/(zressau1*sptzr(l_)) ! sigma (starnue=0) [cgs]
+            ! Consider this option, for fully-collisional sigma:
+            sigma=1.d0/(zressau2*sptzr(l_)) ! sigma (starnue>0) [cgs]
             if (n.eq.0) then
               elecfld_t0(lr_)= elecfld(lr_) ! Save, at t=0 
               sigma_t0(lr_)= sigma ! Save , at t=0
+              !Assume J_RE(t=0)=0, but add a model-fit BS current:
+              bscur= bscurm(lr_,1,2)+bscurm(lr_,2,1) !e_gen+i_maxw [A/cm^2]
+              bscur= bscur*3.e9 ! to statA/cm^2
+              curr_t0(lr_)= elecfld_t0(lr_)*sigma_t0(lr_)/300. +bscur ![cgs]
+     +                     +curra(1,lr_) !YuP[2023-02-08] Added j_RE at t=0
             else ! n>0
-              elecfld(lr_)= elecfld_t0(lr_)*sigma_t0(lr_)/sigma
+              ! Note: In mixed V/cm and cgs units,
+              ! E[V/cm] = eta[cgs]*curra[cgs]*300
+              ! where 300 is to convert statVolt/cm to V/cm
+              bscur= bscurm(lr_,1,2)+bscurm(lr_,2,1) !e_gen+i_maxw [A/cm^2]
+              bscur= bscur*3.e9 ! to statA/cm^2
+              fr1=1.0 !0.95! fraction of J_RE+J_bs to be subtracted
+              djra= fr1*(curra(1,lr_)+bscur)
+              sign_e= sign(one,elecfld_t0(lr_))
+              if(sign_e.ge.0.d0)then !case E(t=0)>0
+                djra=max(djra,0.d0) !Apply it only when it is positive.
+                djra=min(djra,0.98*curr_t0(lr_)) !Not to exceed 0.98*curr_t0
+              else !case E(t=0)<0 (and so is curr_t0)
+                djra=min(djra,0.d0) !Apply it only when it is negative.
+                djra=max(djra,0.98*curr_t0(lr_)) !Not to exceed 0.98*|curr_t0|
+              endif
+              elecfld(lr_)= 300.*(curr_t0(lr_)-djra)/sigma
+              !updated [2022-03-11] - Now includes J_RE and J_bs,
+              !and sigma is collisional
             endif ! n
 
          

@@ -19,6 +19,7 @@ c     PGPLOT REAL*4 Variables:
 
       REAL*4 :: R40=0.,R4P2=.2,R4P65=.65,R4P95=.95,R4MP2=-0.2
       REAL*4 :: R4P3=.3,R4P5=.5,R4P6=.6,R4P8=.8,R4P9=.9
+      REAL*4 :: R41=1.,R42=2.,R43=3.,R44=4.,R45=5.,R46=6.,R41P8=1.8
 
       dimension wk_nch(nonch)
       real*8 wkd(jx) 
@@ -135,7 +136,11 @@ C        CALL PGSLS(1)     ! Reset line style back to full.
 10166   format("(efswtchn=neo_hh)")
 
 
-        fnu0=2.0/tauee(lr_) !YuP[2020-01]Added here, for printout in plots
+        if(cqlpmod.ne."enabled")then !YuP[2021-03-30] CQL3D/CQLP treatment
+          fnu0=2.0/tauee(lr_) !for printout in plots
+        else !cqlpmod.eq."enabled"
+          fnu0=2.0/tauee(ls_) !for printout in plots
+        endif
         if (entr(k,3,l_).ge. 1.e-20 .and. kelecg.ne.0) then
           if (lrzmax.gt.1.and.n.gt.0) then
             areaovol=darea(lr_)/dvol(lr_)
@@ -147,7 +152,7 @@ C        CALL PGSLS(1)     ! Reset line style back to full.
             endif
           endif
           cdeffncy=curr(k,lr_)/entr(k,3,l_)/3.e9*areaovol
-          fnu0=2.0/tauee(lr_)
+          !fnu0=2.0/tauee(lr_)
           xj=curr(k,lr_)/reden(k,lr_)/charge/vth(kelec,lr_)
           xp=entr(k,3,l_)/reden(k,lr_)/vth(kelec,lr_)**2/fmass(k)/fnu0
      +      *1.e+7
@@ -254,7 +259,7 @@ c       'x', 'u/c', or 'energy', up to maximum pltlimm.
            enddo
         endif
 
-        CALL PGPAGE
+        CALL PGPAGE  !----- J(v) and CumIntegral[J(v)dv]
 
         call aminmx(currv(1,k,l_),1,jxq,1,fnmin,fnmax,kmin,kmax)
         if (abs(fnmin-fnmax).lt.fnmax*dgts) fnmax=fnmin+.001*abs(fnmin)
@@ -265,8 +270,8 @@ c       Convert from statAmps/cm**2 to Amps/cm**2, dividing by 3.e9
            RJXA1(J)=RBOUND(tam1(j))
            RJXA2(J)=RBOUND(currv(j,k,l_))/3.e9
         ENDDO
-        RPG1=RBOUND(fnmin)/3.e9
-        RPG2=RBOUND(fnmax)/3.e9
+        RPG1=RBOUND(fnmin)/3.e9 
+        RPG2=RBOUND(fnmax)/3.e9 
         IF ( RPG2-RPG1 .le. 1.e-16 ) THEN
            RPG2= RPG1+1.e-16
         ENDIF
@@ -275,25 +280,41 @@ c       Convert from statAmps/cm**2 to Amps/cm**2, dividing by 3.e9
         CALL PGLINE(jxq,RJXA1,RJXA2)
         CALL PGLAB(tx_,'Par Curr Den: j(u/unorm)',' ')
 
+        !YuP[2021-03-23] Added cumulative integration here, locally.
+        !Note that currvs() does not have l_ index, 
+        !so it should be recomputed for each given l_, from currv() :
+        currvs(1,k)=dx(1)*currv(1,k,l_)
+        do j=2,jx
+           currvs(j,k)=currvs(j-1,k)+currv(j,k,l_)*dx(j)
+        enddo
         call aminmx(currvs(1,k),1,jxq,1,fnmin,fnmax,kmin,kmax)
         if (abs(fnmin-fnmax).lt.fnmax*dgts) fnmax=fnmin+.001*abs(fnmin)
         CALL PGSVP(R4P2,R4P8,R4P2,R4P5)
 c       Convert from statAmps/cm**2 to Amps/cm**2, dividing by 3.e9
         DO J=1,JXQ
            RJXA1(J)=RBOUND(tam1(j))
-           RJXA2(J)=RBOUND(currvs(j,k))/3.e9
+           RJXA2(J)=RBOUND(currvs(j,k))/3.e9 
         ENDDO
-        RPG1=RBOUND(fnmin)/3.e9
-        RPG2=RBOUND(fnmax)/3.e9
+        RPG1=RBOUND(fnmin)/3.e9 
+        RPG2=RBOUND(fnmax)/3.e9 
         CALL PGSWIN(RJXA1(1),RJXA1(JXQ),RPG1,RPG2)
         CALL PGBOX('BCNST',R40,0,'BCNST',R40,0)
         CALL PGLINE(jxq,RJXA1,RJXA2)
         CALL PGLAB(tx_,'Int_0,u[j(u/unorm)]',' ')
 
-        write(t_,10183) k,currvs(jx,k)/3.e9
-10183   format("Species:",i2,"  Current =",e10.4," Amps/cm\u2\d")
+        write(t_,10183) k,currvs(jx,k)/3.e9 
+10183   format("Species:",i2,"  Current=",1pe11.4," Amps/cm\u2\d")
         RILIN=5.
         CALL PGMTXT('B',RILIN,R40,R40,t_)
+        
+        if(cqlpmod.eq."enabled")then !YuP[2021-03-03] added for CQLP:
+        write(t_,10032) l_,sz(l_)
+10032   format("Index along B, l=",i4, 4x,  
+     &       "Parallel position s=",1pe14.6,"cm")
+        RILIN=RILIN+1.
+        CALL PGMTXT('B',RILIN,R40,R40,t_)
+        endif
+
 
 
 c       if (pltlim.eq.'u/c') then
@@ -356,7 +377,7 @@ c...
 
         RILIN=6.
         CALL PGMTXT('B',RILIN,R40,R40,t_)
-10193   format("Species:",i2,"  Power =",e10.4," Watts/cc")
+10193   format("Species:",i2,"  Power =",1pe11.4," Watts/cc")
 
        if (pltlim.eq.'u/c') then
           write(t_,10184) 

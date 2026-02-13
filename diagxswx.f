@@ -45,7 +45,7 @@ c..................................................................
 c     Collect contributions from various pieces of the Krook operator.
 c..................................................................
 
-      do 220 i=1,iy
+      do 220 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
         call bcast(tam8,zero,jx)
         do 210 j=1,jx
           tam5(j)=tam5(j)+vptb(i,lr_)*dtr*gon(i,j)*
@@ -73,21 +73,28 @@ c     radius x(j) in a tauee(lr_) time. Also determine the density loss
 c     due to particles leaving the domain at the high velocity end.
 c..................................................................
 
-      do 310 i=1,iy
+      do 310 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
         sgain(4,k)=sgain(4,k)+one_*gfu(i,jx,k)*cynt2(i,l_)*dtr
         do 311 j=1,jx
           vflux(j,k,l_)=vflux(j,k,l_)+one_*gfu(i,j,k)*cynt2(i,l_)
  311    continue
  310  continue
-      do 320 j=1,jx
+ 
+      if(cqlpmod.ne."enabled")then !YuP[2021-03-30] CQL3D/CQLP treatment
+        do j=1,jx
         vflux(j,k,l_)=vflux(j,k,l_)/xlndn(k,lr_)*tauee(lr_)
- 320  continue
+        enddo
+      else !cqlpmod.eq."enabled"
+        do j=1,jx
+        vflux(j,k,l_)=vflux(j,k,l_)/xlndn(k,lr_)*tauee(ls_)
+        enddo
+      endif
 
 c..................................................................
 c     Particle source term.
 c..................................................................
 
-      sgain(3,k)=xlncur(k,lr_)*dtr*0.5
+      sgain(3,k)=xlncur(k,l_)*dtr*0.5 !YuP[2022-02-11] now l_ (was lr_)
 
 c..................................................................
 c     if ineg  .eq. "enabled" set negative values of f to zero.
@@ -117,7 +124,7 @@ c..................................................................
       if (ineg .eq. "disabled") go to 400
 
       do 410 j=1,jx
-        do 411 i=1,iy
+        do 411 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
           if(temp2(i,j) .lt. 0.) then
             temp1(i,j)=zero
             temp4(i,j)=-temp2(i,j)

@@ -13,8 +13,8 @@ c..................................................................
       include 'param.h'
       include 'comm.h'
 
-      call bcast(cex(1,1,l_),zero,iyjx)
-      call bcast(cet(1,1,l_),zero,iyjx)
+      call bcast(cex(1,1,l_),zero,iymax*jx) !YuP[2021-03-11] iy-->iymax
+      call bcast(cet(1,1,l_),zero,iymax*jx)
 c     Division by 300. below is conversion to cgs: 300 volts/statvolt.
 C%OS  coefld=-radmaj*fpsi(lr_)*onovrp(2,lr_)*flxavgd(lr_)
       if (cqlpmod .ne. "enabled") then
@@ -27,7 +27,7 @@ cBH000926 Adding option for specification electric field parallel to B.
          endif
       endif
 C%OS  if (cqlpmod .eq. "enabled") coefld=-radmaj*fpsi(lr_)/solrs(l_)**2
-      if (cqlpmod .eq. "enabled") then
+      if (cqlpmod.eq."enabled") then
         if (mod(nummods,10).le.4 .or. transp.ne."enabled" .or. 
      +    lmidvel.eq.0) then
           coefld=-rmag*fpsi(lr_)/solrs(l_)**2
@@ -47,7 +47,7 @@ c%OS
       if (cqlpmod.eq."enabled" .and. symtrap.ne."enabled") iend=iyh
 
       do 40 i=1,iend
-        ii=iy+1-i
+        ii=iy_(l_)+1-i !YuP[2021-03-11] iy-->iy_(l_)
         do 50 j=1,jx
           cex(i,j,l_)=coefld*coss(i,l_)*xsq(j)
           cex(ii,j,l_)=-cex(i,j,l_)

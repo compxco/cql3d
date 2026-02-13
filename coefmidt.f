@@ -12,12 +12,12 @@ c..................................................................
       include 'param.h'
       include 'comm.h'
 
-      dimension c(0:iy,jx) 
+      dimension c(0:iymax,jx) !YuP[2021-03-12] iy-->iymax 
 
 c.......................................................................
 
       do 2 j=1,jx
-        do 21 i=1,iy-1
+        do 21 i=1,iy_(l_)-1  !YuP[2021-03-11] iy-->iy_(l_) here and below
           temp1(i,j)=(c(i+1,j)+c(i,j))*.5
  21     continue
  2    continue
@@ -27,14 +27,14 @@ c     set coefficients to zero near pi and 0 to force zero flux there.
 c..................................................................
 
       do 3 j=1,jx
-        temp1(iy,j)=zero !YuP[] was 0.
+        temp1(iy_(l_),j)=zero !YuP[] was 0.
 c        c(0,j)=0.    Changed 8/19/94
         temp1(0,j)=zero !YuP[] was 0.
 c$$$c***************************************TRY 090826
 c$$$c Object is to ensure no flux at theta=0 by
 c$$$c setting flux at both -dy/2 and +dy/2 =0, and similarly
 c$$$c around theta=pi.
-c$$$        temp1(iy-1,j)=0.
+c$$$        temp1(iy_(l_)-1,j)=0.
 c$$$        temp1(1,j)=0.
 c$$$c ==> Unexpected result, of irregularity at theta=0,pi
 c$$$c***************************************TRY 090826
@@ -60,7 +60,7 @@ c     set flux=0. at v=0.
 c..................................................................
 
 c**Changed 8/19/94, for consistency (bh):      do 6 i=1,iy
-      do 6 i=0,iy
+      do 6 i=0,iy_(l_)
         temp1(i,1)=zero !YuP[] was 0.
         do 61 j=1,jx
           c(i,j)=temp1(i,j)

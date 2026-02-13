@@ -76,12 +76,14 @@ c..................................................................
       else
          ilzhfs=lz
       endif
-      if (numclas .eq. 1) ilzhfs=lz/2+1
+      if (cqlpmod.eq."enabled" .and. numclas .eq. 1) ilzhfs=lz/2+1
+      !YuP[2025-12-12] added cqlpmod.eq."enabled" in the above line     
       tbnd(l_)=tbnd(1)
 
       if (meshy.ne."free") then
 
-        call tdtry     !i.e., meshy fixed_y or fixed_mu
+        call tdtry !meshy "fixed_y" or "fixed_mu" (cqlpmod=enabled or disabled)
+        !OUT: iyh_(l_)  iy_(l_)  itl_(l_)  itu_(l_)  iyjx_(l_)   y(i,l_)
 
       else if (cqlpmod .ne. "enabled") then  !meshy.eq."free"
 
@@ -179,9 +181,9 @@ CDIR$ IVDEP
  621    continue
         itu=iy+1-itl
 
-      else  !on meshy.ne."free",etc
+      else  !on meshy.ne."free",etc ! (cqlpmod.eq."enabled")
 c.......................................................................
-c     y mesh for CQLP case
+c     y mesh for CQLP case, for meshy="free"
 c.......................................................................
 
         zdy=pi/(iy-1)
@@ -196,17 +198,26 @@ c.......................................................................
  652    itl=i-1
         itu=iy+1-itl
 c     tbnd set to offset from thb
-        tbnd(l_)=thb(l_)-y(itl,l_)
+        tbnd(l_)=thb(l_)-y(itl,l_) 
+        !default: tbnd(1)=.002, tbnd(2:lrorsa)=0.
 
       endif  !On meshy.ne."free",etc
+      !write(*,*)'micxinit: l_,itl,itu=',l_,itl,itu
 
-      iy_(l_)=iy
-      iyh_(l_)=iyh
-      iyjx_(l_)=iy*jx
-      itl_(l_)=itl
-      itu_(l_)=itu
-      y(1,l_)=0.d0
-      y(iy,l_)=pi
+      if (meshy.eq."free") then !YuP[2021-03-04] Added if().
+       ! For meshy="fixed_mu" or "fixed_y",
+       ! the following values are set inside subr. tdtry,
+       ! and they can be quite different from these values:
+       ! (example: iy_() can be smaller than iy for "fixed_mu")
+       iy_(l_)=iy
+       iyh_(l_)=iyh
+       iyjx_(l_)=iy*jx
+       itl_(l_)=itl
+       itu_(l_)=itu
+       y(1,l_)=0.d0
+       y(iy,l_)=pi
+      endif
+    
       if(symtrap.eq."enabled") then
          !Number of indep theta pts, for symmetric trapped region
          inew_(l_)=iy_(l_)/2+itl_(l_)-1   
@@ -215,7 +226,9 @@ c     tbnd set to offset from thb
       endif
       inewjx_(l_)=inew_(l_)*jx         !Number eqns for l_
 
-      if (itl.eq.iyh) then
+      if(cqlpmod.ne."enabled")then !YuP[2021-03-04] Added if(). 
+      !No problem for CQLP, so - do not print this warning.
+      if (itl_(l_).eq.iyh_(l_)) then
 CMPIINSERT_IF_RANK_EQ_0
          WRITE(*,*)
          WRITE(*,*)'***************************************************'
@@ -225,6 +238,7 @@ CMPIINSERT_IF_RANK_EQ_0
          WRITE(*,*)'***************************************************'
          WRITE(*,*)
 CMPIINSERT_ENDIF_RANK   
+      endif
       endif
 
 
@@ -275,21 +289,86 @@ c..................................................................
  203    continue
       endif
       
+      
+![2022-03-19] Set up mesh for parallel momentum/mass.
+!     This is only needed for plots of F_par (reduced distr func)
+!     as a function of x_par; see subr.pltprppr.
+!     This setup of xl() and xlm() arrays is done in fle_*** subroutines,
+!     it is reproduced below.
+!     Why we need it here - because not always subr.pltprppr is called at n=0,
+!     but the 'xl'=xlm array is saved at n=0 only. 
+      jflh=(jfl+1)/2 !jfl is set in namelist, then adjusted to odd value
+      if(xlfac.ge.0.)then !xlfac can be 1(uniform), <1, >1, etc
+        xl(1)=-xmax !xmax=1. by default
+        xl(jflh)=0.
+        xl(jfl)=xmax
+        hx=xmax/(jfl-jflh)
+        hxfg=xlfac*hx
+        xl(jflh+1)=hxfg
+        xl(jflh-1)=-hxfg
+        call micgetr(jflh,xmax,hxfg,ram,ksingul)
+        if (ksingul .eq. 1) call diagwrng(8)
+        do j=jflh+2,jfl-1
+          xl(j)=xl(j-1)+ram*(xl(j-1)-xl(j-2))
+          jj=jfl+1-j
+          xl(jj)=-xl(j)
+        enddo
+      else !xlfac
+        jflwr=xlpctlwr*jflh !xlpctlwr=.1 by default
+        if(jflwr .lt. 3) jflwr=3
+        hx=xlwr/(jflwr-1) !xlwr=1./43. by default
+        xl(jflh)=0.
+        do j=jflh+1,jflh-1+jflwr
+          xl(j)=hx*(j-jflh)
+        enddo
+        jmdl1=xlpctmdl*jflh !xlpctmdl=.4 by default
+        jmdl=jmdl1+jflwr
+        hm=(xlmdl-xllwr)/jmdl1 ! xlmdl=.25,xllwr=1./43. by default
+        do j=jflh+jflwr,jflh-1+jmdl
+          xl(j)=xl(j-1)+hm
+        enddo
+        hu=(xmax-xlmdl)/(jflh-jmdl)
+        do j=jflh+jmdl,jfl
+          xl(j)=xl(j-1)+hu
+        enddo
+        do j=jflh+1,jfl
+           jj=jfl+1-j
+           xl(jj)=-xl(j)
+        enddo
+      endif ! xlfac
+      do j=1,jfl-1
+         xlm(j)=0.5*(xl(j)+xl(j+1)) !This is used for plots Fpar(xlm)
+         dxl(j)=xl(j+1)-xl(j)
+      enddo
+      xlm(0)=xl(1)-0.5*dxl(1)
+      xlm(jfl)=xl(jfl)+0.5*dxl(jfl-1)
+      dxl(0)=dxl(1)
+      dxl(jfl)=dxl(jfl-1)
+![2022-03-19] Done Set up mesh for parallel momentum/mass.
+      
+            
       !YuP [02-25-2016]
       !Check that there are sufficient number of v-grid points  
       !over thermal part of the distribution (at least 3 points).
       ! If not, print warning.
       do k=1,ngen
        do j=jx,1,-1 ! scan backward
-          if(vth(k,lr_) .le. x(j)*vnorm)then
+          if(cqlpmod .ne. "enabled")then
+           vth_l= vth(k,lr_)
+           ll=lr_
+          else !(cqlpmod.eq."enabled") ! YuP[2021-02-26]
+           vth_l= vthpar(k,ls_)
+           ll=ls_
+          endif
+          if(vth_l .le. x(j)*vnorm)then
             j_thermal=j !it is such j that v(j_thermal) is just below vth()
           endif
        enddo
 CMPIINSERT_IF_RANK_EQ_0
       WRITE(*,'(a)')"=================================================="
       WRITE(*,'(a,3i4,2f13.8)') 
-     + "micxinit: k,lr, j_thermal, x(j_thermal), vth/vnorm =",
-     +  k, lr_, j_thermal, x(j_thermal), vth(k,lr_)/vnorm
+     + "micxinit: k,ll, j_thermal, x(j_thermal), vth/vnorm =",
+     +  k, ll, j_thermal, x(j_thermal), vth_l/vnorm
       if(j_thermal.lt.3)then
       WRITE(*,'(a)')"  WARNING(micxinit): V-grid is too coarse."
       WRITE(*,'(a)')"  Thermal part of distribution is covered by only"
@@ -316,10 +395,13 @@ c.......................................................................
  310  continue
       dz(1,lr_)=(z(2,lr_)-z(1,lr_))*.5
       dz(lz,lr_)=(z(lz,lr_)-z(lz-1,lr_))*.5
-      if (sbdry.eq."periodic" .and. cqlpmod.eq."enabled" .and.
-     +  transp.eq."enabled") then
+      if(cqlpmod.eq."enabled")then ! For CQLP only
+      if (sbdry.eq."periodic")then !YuP/was: .and. transp.eq."enabled") then
+        !YuP: For sbdry="periodic", we could always set this
+        !(i.e., transp or no transp, should not matter):
         dz(1,lr_)=2.*dz(1,lr_)
         dz(lz,lr_)=dz(lz,lr_)+0.5*(z(2,lr_)-z(1,lr_))
+      endif
       endif
 
 c.......................................................................
@@ -404,6 +486,11 @@ c..................................................................
 c.......................................................................
 cl    3.3 Define theta integration coefficients dy** and their inverses.
 c.......................................................................
+      iyh=iyh_(l_) !YuP[2021-03-04] iyh-->iyh_(l_)
+      !For meshy="fixed_mu", iy_(l_) can be smaller than iy at some l_.
+      !But don't use iy=iy_(l_) here! It will overwrite iy,
+      !which is the namelist value, and iy is used to set dimensions
+      !of many arrays.
       do 330 i=1,iyh
         dyp5(i,l_)=y(i+1,l_)-y(i,l_)
         ii=i+1
@@ -412,24 +499,24 @@ c.......................................................................
       dym5(iyh,l_)=y(iyh,l_)-y(iyh-1,l_)
       dym5(1,l_)=0.
       dyp5(0,l_)=0.
-      dyp5(iy,l_)=0.
+      dyp5(iy_(l_),l_)=0.
       do 331 i=1,iyh
         eyp5(i,l_)=1./dyp5(i,l_)
         ii=i+1
         eym5(ii,l_)=1./dym5(ii,l_)
  331  continue
-      do 332 i=iyh+1,iy-1
-        dyp5(i,l_)=dyp5(iy-i,l_)
-        eyp5(i,l_)=eyp5(iy-i,l_)
-        dym5(i,l_)=dym5(iy-i+2,l_)
-        eym5(i,l_)=eym5(iy-i+2,l_)
+      do 332 i=iyh+1,iy_(l_)-1  !YuP[2021-03-04] iy-->iy_(l_)
+        dyp5(i,l_)=dyp5(iy_(l_)-i,l_)
+        eyp5(i,l_)=eyp5(iy_(l_)-i,l_)
+        dym5(i,l_)=dym5(iy_(l_)-i+2,l_)
+        eym5(i,l_)=eym5(iy_(l_)-i+2,l_)
  332  continue
-      dym5(iy,l_)=y(iy,l_)-y(iy-1,l_)
-      eym5(iy,l_)=1./dym5(iy,l_)
+      dym5(iy_(l_),l_)=y(iy_(l_),l_)-y(iy_(l_)-1,l_)
+      eym5(iy_(l_),l_)=1./dym5(iy_(l_),l_)
       eyp5(0,l_)=0.
-      eyp5(iy,l_)=0.
+      eyp5(iy_(l_),l_)=0.
       eym5(1,l_)=0.
-      do 333 i=1,iy
+      do 333 i=1,iy_(l_)
         dy(i,l_)=.5*(dym5(i,l_)+dyp5(i,l_)) !end points are 1/2 of other dy
         dyi(i,l_)=one/dy(i,l_)
 c..................................................................
@@ -440,9 +527,9 @@ c..................................................................
         tann(i,l_)=sinn(i,l_)/coss(i,l_)
  333  continue
       coss(1,l_) = 1.d0
-      coss(iy,l_)=-1.d0  ! YuP: Why needed?
+      coss(iy_(l_),l_)=-1.d0  ! YuP: Why needed?
 
-      do 334 i=1,iy-1
+      do 334 i=1,iy_(l_)-1
         ymid(i,l_)=y(i,l_)+dyp5(i,l_)*.5
  334  continue
 cYuP      ymid(1,l_)=y(1,l_)    ! YuP 120627 commented out
@@ -452,18 +539,18 @@ c similar to internal points.
 c With ymid(1,l_)=y(1,l_)=0  as was defined above,
 c the luf function can never return the value of i=1;
 c it can only be 2 or larger.
-      ymid(iy,l_)=y(iy,l_) !could be y(iy,#)+dym5(i,#)/2 (not important)
+      ymid(iy_(l_),l_)=y(iy_(l_),l_) !could be y(iy,#)+dym5(i,#)/2 (not important)
       
 c..................................................................
 c     determine additional arrays used for integration over theta.
 c..................................................................
-      do 337 i=1,iy-1
+      do 337 i=1,iy_(l_)-1
         cynt2(i,l_)=dy(i,l_)*twopi*sinn(i,l_)
  337  continue
       cynt2(1,l_)=0.25*pi*y(2,l_)**2
-      cynt2(iy,l_)=cynt2(1,l_)
+      cynt2(iy_(l_),l_)=cynt2(1,l_)
       twoint(l_)=0.
-      do 338 i=1,iy
+      do 338 i=1,iy_(l_)
         twoint(l_)=twoint(l_)+cynt2(i,l_)
  338  continue
 

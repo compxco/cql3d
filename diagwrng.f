@@ -82,7 +82,7 @@ cBH080118        i=getpid(0)
 c        i=dropfile(ichkpnt)
       endif
       
-      WRITE(*,*) 'diagwrng: kerr' 
+      WRITE(*,*) 'diagwrng: kerr=',kerr 
       
 CMPIINSERT_ENDIF_RANK
 

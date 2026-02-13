@@ -30,7 +30,7 @@ c     vlhmod and vlfmod are only set up for nrf=1
         if (k .eq. kk) then
           do krf=1,mrfn
           do 2 j=1,jx
-            do 3 i=1,iy
+            do 3 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
               dbb(i,j)=dbb(i,j)+cqlb(i,j,indxlr_,krf)
               dff(i,j)=dff(i,j)+cqlf(i,j,indxlr_,krf)
               db(i,j)=  db(i,j)+cqlb(i,j,indxlr_,krf)
@@ -58,7 +58,7 @@ c     vlhmod and vlfmod are only set up for nrf=1
         if (k .eq. kk) then
           do krf=1,mrfn
           do 12 j=1,jx
-            do 13 i=1,iy
+            do 13 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
               dbb(i,j)=dbb(i,j)+wcqlb(i,j,krf,l_)
               dff(i,j)=dff(i,j)+wcqlf(i,j,krf,l_)
               db(i,j)=db(i,j)+wcqlb(i,j,krf,l_)
@@ -86,7 +86,7 @@ c**bh930729if(urfmod.eq."enabled".and.k.eq.kelecg) then
 c         Check if this rf mode is to applied to the current species k:
           if (nrfspecies(krfn(krf)) .eq. k) then
           do 22 j=1,jx
-            do 23 i=1,iy
+            do 23 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
              delb0= urfb(i,j,l,krf)
              if(delb0.ne.0.d0)then 
                 !YuP[03/18/2015] urfe,urff are expr.through urfb,urfc
@@ -119,7 +119,7 @@ c..................................................................
       if (rdcmod.ne."disabled") then
 c         rdcbmax=0.d0     
 c         do j=1,jx
-c            do i=1,iy
+c            do i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
 c               rdcbmax=max(rdcbmax,rdcb(i,j,indxlr_))
 c            enddo
 c         enddo
@@ -129,7 +129,7 @@ c     &        rdcbmax,indxlr_
 !         endif
          
 c$$$         do j=1,jx
-c$$$            do i=1,iy
+c$$$            do i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
 c$$$              dbb(i,j)=dbb(i,j)+rdcb(i,j,indxlr_)
 c$$$              dff(i,j)=dff(i,j)+rdcf(i,j,indxlr_)
 c$$$              db(i,j)=db(i,j)+rdcb(i,j,indxlr_)
@@ -145,7 +145,7 @@ c$$$        xrf=1.
 c         Check if this rf mode is to applied to the current species k:
           if (nrdcspecies(krf) .eq. k) then
           do 42 j=1,jx
-            do 43 i=1,iy
+            do 43 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
              delb0= rdcb(i,j,l,krf)
              if(delb0.ne.0.d0)then 
 c$$$                !YuP[03/18/2015] urfe,urff are expr.through urfb,urfc

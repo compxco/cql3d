@@ -165,7 +165,7 @@ c     main loop for determination of view chord increments
 c.......................................................................
 
  100    continue
-
+ 
 c990131        ds=fds*amin1(rb(ibin1)-rb(ibin1-1),radmin/lrzmax)
 cBH081106        ds=fds*min(rb(ibin1)-rb(ibin1-1),radmin/lrzmax)
         ds=fds*min(rb(ibin1)-rb(ibin1-1),(rb(ibin1)-rb(0))/lrzmax)
@@ -173,6 +173,8 @@ cBH081106        ds=fds*min(rb(ibin1)-rb(ibin1-1),radmin/lrzmax)
         istep=istep+1  ! counts for each view chord
         do 102  j=1,3
  102    xs_(j)=xs_(j)+alphad(j)*ds
+!        write(*,'(a,2i5,1p3e11.3)')' tdsxr0: nn,istep, X,Y,Z=',
+!     &      nn,istep, xs_(1:3)
 
 c.......................................................................
 c     Save view cords for plotting at end of subroutine
@@ -271,6 +273,7 @@ c..................................................................
 
  115      ibin2=ibin2+1
           ibin1=ibin1+1
+          if(ibin1.gt.lrzmax)  stop 'stop 115/ibin1>lrz in tdsxr0'
           go to 150
 
 c..................................................................
@@ -375,7 +378,7 @@ c.......................................................................
 
           ppsi=terp2(rr,zz,nnr,er,nnz,ez,epsi,epsirr,epsizz,
      1      epsirz,nnra,0,0)
-          apsi=psimag-ppsi     !Increases from 0. to psimag at edge.
+          apsi=psimag-ppsi     !Increases from 0. to psimag-psilim at edge.
           apsi=max(apsi,zero)  !Sometimes there might be a small
                                !error in psimag causing a problem
                                !near the magnetic axis [BH, 121115].
@@ -394,10 +397,21 @@ CMPIINSERT_IF_RANK_EQ_0
 CMPIINSERT_ENDIF_RANK  
              go to 420
           endif
+          
           if(((iongrid.eq.0).or.(ppsi.le.psilim)).and.
      +                                        istart.eq.1)  go to 100
+          !YuP[2021-11-05] Flaw in logic: assumes that the sightline
+          !enters plasma at psi=psilim surface, 
+          !which is outside of rya(lrzmax).
+          !The procedure below is checking
+          !where the point is relative to bracket [tr(lrz-1); tr(lrz)]
+          !while it is not there yet. As a result, 
+          !the value of ibin1+1 will exceed lrzmax.
+          !Temporary fixed it by adding a limit
+          !ibin1=min(ibin1,lrzmax)  [see below, after label 170]
 
           istart=0  ! in the plasma
+          !write(*,*)' tdsxr0/L.404 Entering plasma. rr=',rr
 
 c.......................................................................
 c     Exit from this loop if the source point leaves the plasma.
@@ -420,6 +434,10 @@ c.......................................................................
 
           rs1=apsi-tr(ibin1)     !  ibin1 is initialized = lrzmax
           rs2=apsi-tr(ibin1-1)
+          !write(*,*)' psimag-psilim=', psimag-psilim
+          !write(*,*)' tr(19),tr(20)=', tr(19),tr(20)
+          !write(*,*)' apsi=',apsi
+          !write(*,*)' tdsxr0/L.427  rs1,rs2=',rs1,rs2
           if(rs1*rs2.le.zero.and.rs1.ne.zero) go to 190 !in [ibin1,ibin1+1)
 
 c.......................................................................
@@ -435,12 +453,17 @@ c.......................................................................
              stop 'stop 4 in tdsxr0'
           endif
           go to 190
+          
 c.......................................................................
 c     Have changed directions in minor radius
 c.......................................................................
-
  170      ibin2=ibin2+1
           ibin1=ibin1+1
+          ibin1=min(ibin1,lrzmax) !YuP[2021-11-05] added
+          if(ibin1.gt.lrzmax)then
+             write(*,*)' tdsxr0/170: rs1,rs2=',rs1,rs2, ibin1,ibin2
+             stop 'stop 170/ibin1>lrz in tdsxr0'
+          endif
           go to 190
 
 c.......................................................................
@@ -460,10 +483,11 @@ c.......................................................................
           if(rs1.lt.zero)  go to 185
 
 c.......................................................................
-c     Continuing on is same direction
+c     Continuing on in same direction
 c.......................................................................
 
           ibin1=ibin1+1
+          ibin1=min(ibin1,lrzmax) !YuP[2021-11-05] added
           if(ibin1.gt.lrzmax)  stop 'stop 5 in tdsxr0'
           go to 190
 
@@ -519,6 +543,9 @@ c.......................................................................
 cBHandYuP110715: cospitch measured with vpar pos in pos vphi
 cBHandYuP110715: (CCW dirn viewed from top).
           cospitch=bsign*dotprd/bbmag
+          cospitch=max(cospitch,-1.d0) ! to be sure cos>=-1
+          cospitch=min(cospitch,+1.d0) ! to be sure cos<=+1
+          sinpitch=sqrt(1.d0-cospitch**2)
           angle=acos(cospitch)
           sang(ibin1,ibin2)=sang(ibin1,ibin2)+ds*angle
 
@@ -526,7 +553,7 @@ c.......................................................................
 c     Poloidal angle   (rmag is major radius of magnetic axis).
 c.......................................................................
 
-          arg1=zz
+          arg1=zz-zmag
           arg2=rr-rmag
           if(arg1.eq.zero .and. arg2.eq.zero)  then
             polang=0.

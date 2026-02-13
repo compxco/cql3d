@@ -207,7 +207,8 @@ c     of the profiles by subroutine smooth can lead to unphysical
 c     forms of the birth and deposition profiles.
 c--------------------------------------------------------------------
 c     ONETWO DIVERGENCE BELOW
-      nprim=1  !number of primary species. Needs to be equal to ngen.
+      nprim=1  !number of primary species 
+             !(see the scan over kfrsou(ib) in frset to determine nprim)
       nimp=0   !If impurities are present, should include at least =1.
       machinei="iter"
       if (machinei.eq."iter") go to 1660
@@ -222,7 +223,7 @@ c     ONETWO DIVERGENCE BELOW
       ibslow = 1
       fionx = 0.0
       nameb = 'h'
-      relnub=.10
+      relnub=.10 !Not used in CQL3D
 cNLremoved      tfusbb = 0.
 cNLremoved      iddcal = 3
 cNLremoved      fdbeam = 0.150e-3
@@ -239,10 +240,10 @@ cBH091020:  Simply zeroing.
       ibslow = 0
       fionx = 0.0
 c      nameb = 'h'
-      relnub=0.
+      relnub=0. !Not used in CQL3D
       
       nameb = 'd'
-      ranseed=7**7
+      ranseed=dble(7**7) !YuP[2021-01-10] Added dble
 c     ONETWO DIVERGENCE
       npart= 150000 ! YuP-101211: default value. Was: npart=nap
       hdepsmth=-1.0
@@ -255,6 +256,12 @@ c     ONETWO DIVERGENCE BELOW
       npat(2)=nnza
       mf = 41
       nbeams = 1
+      ne_tk=0 !YuP[2022-12-15] Added initialization
+!     ne_tk= number of equi-width energy bins used in forming
+!      n*sigma array.  required for nonzero rotation cases. 
+      ds_tk=0.d0 !Also, for rotation !YuP[2022-12-19] Added initialization
+      fe_tk=0.d0 !Also, for rotation !YuP[2022-12-19] Added initialization
+
 c
 c     ONETWO DIVERGENCE BELOW
       nsourc=1
@@ -425,6 +432,10 @@ c     note izstrp=0 implies coronal equilibrium for impurity j in hexnb
       beamplse="disabled"  
       beampon=0.d0
       beampoff=0.d0
+
+      !Not used in GitHub version (yet): 
+      src_nbi_e="disabled" !YuP[2022-06-30]
+      ! Add source to e_general matching NBI sources
 
 c     defaults for reading NUBEAM particle birth pt list
       read_birth_pts="disabled"

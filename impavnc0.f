@@ -28,7 +28,9 @@ cBH080303    Using f95 intrinsic subroutine, cpu_time
       real*4 tm1,tm(2)    !Dclrtns for lf95 ETIME(). See man etime.
 
       character*8 alloc, factor, dalloc
-      dimension zavarj1(iy+4),ijaj1(iy+4)
+      dimension zavarj1(iymax+4),ijaj1(iymax+4)
+      !YuP[2021-03-11] Changed iy-->iymax in declarations
+      !(just in case if iy is changed by iy=iy_(l_) somewhere)
       dimension  zmatcont(12), janelt(12)
       character*1 transpose
 
@@ -36,8 +38,8 @@ c.................................................................
 c     matrix declared as pointer
 c     need inewjmax in common to use with pointer
 c.................................................................
-      integer ipivot(iyjx) ! output of subr.dgbtrf(). No need to save.
-      real*8,dimension(:,:),allocatable :: abd !(md1abd,inewjx) md1abd=3*(iy+3)+1 
+      integer ipivot(iymax*jx) ! output of subr.dgbtrf(). No need to save.
+      real*8,dimension(:,:),allocatable :: abd !(md1abd,inewjx) md1abd=3*(iymax+3)+1 
 !      pointer abd 
 !      integer ipivot(:) 
 !      pointer ipivot
@@ -46,7 +48,7 @@ c.................................................................
 !      dimension ampfda(:,:),ampfdd(:,:)
 !      pointer ampfda,ampfdd
 !      common /ampf/ ampfda,ampfdd !BH: Saves this data
-      real*8 ampfda(0:iy,jx),ampfdd(0:iy,jx)
+      real*8 ampfda(0:iymax,jx),ampfdd(0:iymax,jx)
 !      save abd !YuP[2019-09] cannot use save: memory alloc problems on NERSC
 
       integer icount_imp   !Counter for calls to impavnc0
@@ -97,22 +99,33 @@ c.......................................................................
 
       itl=itl_(l_)
       itu=itu_(l_)
+
+      iyjx=iyjx_(l_) !YuP[2021-03-04]added. 
+      ![Actually, these two lines are set in tdnflx]
+      iyh=iyh_(l_) !YuP[2021-03-04]added. iyh is used in many places below
+      !Note that for meshy="fixed_mu" iyh_(l_) can be less than iy/2 
+      !But don't use iy=iy_(l_) here! It will overwrite iy,
+      !which is the namelist value, and iy is used to set dimensions
+      !of many arrays.
+       
 cBH071029:  During work on 3d fully-implicit solve, found a problem
 cBH071029:  with iyh=itl cases.  Fixing this case, and moving ipassbnd
 cBH071029:  setting to here [See further notes below for ipassbnd]:
 cBH071029:  [But subsequently found had problems with iyh=itl elsewhere
 cBH071029:  in the code, so suggest bigger rya(1) or iy for time being.]
       if (itl.lt.iyh) then
-         inew=iy/2 + itl - 1
-         ipassbnd=iyh-itl+1
+         inew= iy_(l_)/2 + itl-1 !YuP[2021-03-04] changed iy-->iy_(l_)
+         ipassbnd=iyh-itl+1 
       else  !i.e., itl=iyh
-         inew=iy
+         inew= iy_(l_)  !YuP[2021-03-04] changed iy-->iy_(l_) 
+         ![2021-03-04] for meshy="fixed_mu" iy_(l_) can be less than iy 
          ipassbnd=0  !i.e., no trapped region for iyh=itl, 
                      !as in following case.
       endif
-      if (symtrap .ne. "enabled") then
-         inew=iy
-         ipassbnd=0
+      if (symtrap .ne. "enabled") then !For CQLP, symtrap has to be "disabled"
+         inew=iy_(l_)  !YuP[2021-03-04] changed iy-->iy_(l_) 
+         !Note that for meshy="fixed_mu" iy_(l_) can be less than iy 
+         ipassbnd=0 ! for symtrap='disabled'
       endif
       if (nadjoint.eq.1 .and. symtrap.eq."enabled") inew=2*itl-1
       if (symtrap.ne."enabled" .or. nadjoint.eq.1) ipassbnd=0
@@ -123,6 +136,7 @@ ccc      if(icount_imp.eq.1) then
         if (meshy.eq."fixed_mu".or. manymat.eq."enabled") then
           do 15 ll=2,lrors
             inew1=iy_(ll)/2+itl_(ll)-1
+            ![2021-03-04] for meshy="fixed_mu" iy_(l_) can be less than iy 
             if (symtrap .ne. "enabled") inew1=iy_(ll)
             if (nadjoint.eq.1 .and. symtrap.eq."enabled")
      +        inew1=2*itl_(ll)-1
@@ -147,8 +161,10 @@ c     itu+1 contributes to the equation for itl
       ibandto=ml+mu+1
       inewjx=inew*jx
       navnc=navnc+1
-      md1abd= 3*(iy+3)+1 ! Should be at least 2*ml+mu+1 (see below)
-      
+      md1abd= 3*(iymax+3)+1 ! Should be at least 2*ml+mu+1 (see below)
+      !Note that for meshy="fixed_mu", iy_(l_) can be less than iy,
+      !but here md1abd is used for dimensioning of abd() array   
+      !write(*,*)'impavnc0: l_,inew,inew_(l_)=', l_,inew, inew_(l_) 
 
       !YuP[07-2017] Moved this part from micxinit and tdinitl, 
       ! as it may depend on k in a multi-species run
@@ -186,7 +202,7 @@ c                          !values, for given iy,jx.
          krylov=50  !Krylov subspace size, see below
          
       if ( soln_method.eq.'itsol' ) then
-         icoeff_est=(iy+3)*3+(jx-1)*9*inew  !Number of coeffs + abit
+         icoeff_est=(iymax+3)*3+(jx-1)*9*inew  !Number of coeffs + abit
          icsrij=icoeff_est
          icsrip=inewjx+1
          icsri2=2*inewjx
@@ -342,6 +358,7 @@ c..................................................................
           STOP 'impavnc0/direct: md1abd.lt.(2*ml+mu+1) detected. stop'
         endif
         if(iyjx.lt.inewjx)then
+          write(*,*)'iyjx,inew*jx,inewjx_(l_)=',iyjx,inewjx,inewjx_(l_)
           STOP 'impavnc0/direct: iyjx.lt.inewjx detected. stop'
         endif
         if(size(rhs).lt.inewjx)then
@@ -511,14 +528,21 @@ c.................................................................
               icoeff=0      !  CSR coefficient storage counter 
            endif
         endif
-        if (itl.lt.iyh) then
-           inew=iy/2 + itl - 1
-           ipassbnd=iyh-itl+1
-        else                    !i.e., itl=iyh
-           inew=iy
-           ipassbnd=0           !i.e., no trapped region for iyh=itl, 
-                                !      as in following case.
-        endif
+!YuP        if (itl.lt.iyh) then
+!YuP           inew=iy/2 + itl - 1
+!YuP           ipassbnd=iyh-itl+1
+!YuP        else                    !i.e., itl=iyh
+!YuP           inew=iy
+!YuP           ipassbnd=0           !i.e., no trapped region for iyh=itl, 
+!YuP                                !      as in following case.
+!YuP        endif
+!        !YuP[2021-03-01] Why the above def. for inew and ipassbnd
+!        !repeated here? In any case, it should be followed by 
+!        if (symtrap .ne. "enabled") then !For CQLP, symtrap has to be "disabled"
+!         inew=iy_(l_)
+!         ipassbnd=0 ! for symtrap='disabled'
+!        endif !YuP[2021-03-01] added
+ 
         
         
 ccc        if(ieq. eq. ieq_(l_+1)-1)  ieq=ieq_(l_)-1     
@@ -591,7 +615,9 @@ c.......................................................................
                    if (j.ne.1.or.j.ne.jx) then
                       dfdvz=half*(f(i,j+1,k,l_)-f(i,j-1,k,l_))
      +                         *coss(i,l_)*dxi(j)
-                      if (i.ne.1 .or. i.ne.iy) then
+                      if (i.ne.1 .or. i.ne.iy_(l_) )then 
+                         !YuP[2021-03-04] changed iy-->iy_(l_)
+                         !for meshy="fixed_mu" iy_(l_) can be less than iy
                          dfdvz=dfdvz 
      +                         -half*(f(i+1,j,k,l_)-f(i-1,j,k,l_))
      +                         *sinn(i,l_)*xi(j)*dyi(i,l_)
@@ -665,7 +691,8 @@ c   Set up the ampfda/ampfdd coeffs, and shift to bin bndries
 c   (Following coefedad, and above.  See, also, 131231 notes.)  
 c   (Could dimension by 1:lrz also, and set up once for all l_.)
              do j=1,jx
-                do i=1,iy
+                do i=1,iy_(l_) !YuP[2021-03-04]
+                   ![2021-03-04] for meshy="fixed_mu" iy_(l_) can be less than iy 
 cYuP170227                   ampfda(i,j)=bnumb(k)/fmass(k)*cex(i,j,l_)
 cYuP170227                   ampfdd(i,j)=bnumb(k)/fmass(k)*cet(i,j,l_)
 cBH170228                   ampfda(i,j)=bnumb(k)/fmass(k)*cex(i,j,l_)*300.d0
@@ -681,8 +708,8 @@ cYuP170228                   ampfdd(i,j)=bnumb(k)/fmass(k)*cet(i,j,l_)
              call coefmidt(ampfdd,1)
                    
 
-             ipassbnd=iyh+1-itl
-             if (symtrap.ne."enabled") ipassbnd=0
+             ipassbnd=iyh+1-itl ! here: ampfmod case
+             if (symtrap.ne."enabled") ipassbnd=0  ! here: ampfmod case
              do j=1,jx
                 ihalf=0
                 icntsww=1
@@ -835,10 +862,10 @@ c..................................................................
           zrhsj1=zero !YuP[2019-04-24] was 0.
 cBH040719          call bcast(zavarj1,zero,mu+1)
 cBH040719          call ibcast(ijaj1,0,mu+1)
-          call bcast(zavarj1,zero,iy+4)
+          call bcast(zavarj1,zero,iymax+4)
           zmatcont=zero !YuP[2019-04-24] added
           janelt=0  !YuP[2019-07-12] added
-          call ibcast(ijaj1,0,iy+4)
+          call ibcast(ijaj1,0,iymax+4)
 
           do 12 j=1,jx
           
@@ -887,7 +914,7 @@ c..................................................................
                 icntsww = icntsww + 1
                 idistr = -2
                 idistl = 2
-                if (symtrap.ne."enabled" .and. i.eq.iyh+1) idistr=-1
+                if(symtrap.ne."enabled" .and. i.eq.iyh+1) idistr=-1
               endif
 
 c.................................................................
@@ -925,7 +952,8 @@ c..................................................................
               if (j .eq. jx) go to 1
               if (j .eq. 1) go to 2
               if (i .eq. 1) go to 3
-              if (i .eq. iy) go to 4
+              if (i .eq. iy_(l_)) go to 4 !YuP[2021-03] iy-->iy_(l_)
+              ![2021-03-04] for meshy="fixed_mu" iy_(l_) can be less than iy 
               if (i.eq.itl .and. cqlpmod.ne."enabled") go to 5
               if (i.eq.iyh .and. symtrap.eq."enabled") goto 998
 
@@ -1008,14 +1036,14 @@ c.................................................................
 
 c.................................................................
 c     j=1 (means velocity=0 boundary condition)
-c     Impose all points equal to f(iy,1,k,l_) and add equations
-c     at all i onto eq. for i=iy.
+c     Impose all points equal to f(iy_(l_),1,k,l_) and add equations
+c     at all i onto eq. for i=iy_(l_).
 c     First consider case where f is fixed at v=0 for
 c     (lbdry.ne.("conserv" or "consscal")):
 c     Do not fill in matrix, will be done after "5000 continue"
 c..................................................................
 
- 2            continue ! j=1 (v=0) point (totally iy, or "inew" points)
+ 2            continue ! j=1 (v=0) point (totally iy_(l_), or "inew" points)
               if (lbdry(k).eq."fixed") then
                 janelt(1)=ieq
                 nvar=1
@@ -1094,10 +1122,11 @@ c                write(*,*)'HERE0.1: i,j,icntsww,xnorm',i,j,icntsww,xnorm
                 go to 5000
 
 c.................................................................
-c     Now for the case j=1 and i=iy (theta=pi).
+c     Now for the case j=1 and i=iy_(l_) (theta=pi).
 c.................................................................
 
-              elseif (i .eq. iy) then
+              elseif (i .eq. iy_(l_)) then !YuP[2021-03-04] iy-->iy_(l_)
+                ![2021-03-04] for meshy="fixed_mu" iy_(l_) can be less than iy 
                 rhs(ieq)=z00(i,j,k)
 
                 janelt(1)=ieq+idistr
@@ -1178,7 +1207,7 @@ c                write(*,*)'HERE0.4: i,j,icntsww,xnorm',i,j,icntsww,xnorm
                 go to 5000
 
 c.................................................................
-c     case j=1, i not equal 1 or iy or ...
+c     case j=1, i not equal 1 or iy_(l_) or ...
 c.................................................................
 
               else
@@ -1316,7 +1345,8 @@ c.................................................................
 c     if theta=pi go to 14; if theta=0 go to 13
 c.................................................................
 
-              if (i .eq. iy) go to 14
+              if (i .eq. iy_(l_)) go to 14 !YuP[2021-03-04] iy-->iy_(l_)
+              ![2021-03-04] for meshy="fixed_mu" iy_(l_) can be less than iy 
               if (i .eq. 1) go to 13
               if(i.eq.iyh .and. symtrap.eq."enabled") goto 991
 
@@ -1560,6 +1590,14 @@ cBH050804 bugfix, adding following if clause:
               if(lbdry(k).ne."conserv" .and. lbdry(k).ne."consscal")then
 
                 do jcont=1,nvar
+!              if(l_.eq.8)then
+              !if(j.le.2)then
+!               write(*,*)'1. j,i,jcont,janelt(jcont)=',
+!     &                       j,i,jcont,janelt(jcont)
+              !elseif(j.eq.3)then
+              ! stop
+              !endif
+!              endif
                   abd(ibandpieq-janelt(jcont),janelt(jcont))=
      +              zmatcont(jcont)
                 end do
@@ -1570,6 +1608,7 @@ cBH050804 bugfix, adding following if clause:
               if (j .ne. 1) then
 
                 do jcont=1,nvar
+                  !write(*,*)'2.  janelt(jcont)=',janelt(jcont)
                   abd(ibandpieq-janelt(jcont),janelt(jcont))=
      +              zmatcont(jcont)
                 end do
@@ -1610,6 +1649,7 @@ c     i<iy,j=1: f(i)-f(iy)=0.
                             rhs(ieq)=zero !YuP[2019-04-24] was 0.
                             xnorm=2.d0 !YuP[2019-04-24] was 2.0
                   do jcont=1,nvar
+                  !write(*,*)'3.  janelt(jcont)=',janelt(jcont)
                     abd(ibandpieq-janelt(jcont),janelt(jcont))=
      +                zmatcont(jcont)
                   end do
@@ -1626,6 +1666,7 @@ c   Bug fix, Olivier Sauter, 030509:     nvar=mu + 1
                   rhs(ieq)=zrhsj1
                   call impnorm(xnorm,zavarj1,rhs(ieq),nvar)
                   do jcont=1,nvar
+                  !write(*,*)'4.  ijaj1(jcont)=',ijaj1(jcont)
                  abd(ibandpieq-ijaj1(jcont),ijaj1(jcont))=zavarj1(jcont) !here direct
                   end do
                 endif  ! on ieq.lt.new/else
@@ -2184,7 +2225,7 @@ c.......................................................................
                 endif
                 if (symtrap .ne. "enabled") then
                    inew=iy_(ll)
-                   ipassbnd=0
+                   ipassbnd=0 ! for symtrap='disabled'
                 endif
                 
                 do  ii=1,ipassbnd
@@ -2335,7 +2376,7 @@ c          call sgbtrf(inewjx,inewjx,ml,mu,abd,md1abd,ipivot,info)
 !            write(*,*)'impavnc/consscal: MIN,MAX,SUM val',
 !     &                             val_min,val_max,val_sum
 !          endif
-          
+          !write(*,*)'before dgbtrf: ml,mu,sum(abd)',ml,mu,sum(abd)
           call dgbtrf(inewjx,inewjx,ml,mu,abd(1:md1abd,1:inewjx),md1abd,
      &                ipivot(1:inewjx),info)
 !          if(sum(ipivot).lt.0)then
@@ -2347,8 +2388,8 @@ c          call sgbtrf(inewjx,inewjx,ml,mu,abd,md1abd,ipivot,info)
            WRITE(*,*)' sum(abd),sum(ipivot)=',inewjx,md1abd,
      &     sum(abd),sum(ipivot), size(abd),size(ipivot)    
             PRINT *,
-     &'ERR after sgbtrf in impavnc0:mpirank,n,l_,kopt,icount_ampf,info',
-     &       mpirank,n,l_,kopt,icount_ampf,info,factor
+     &'ERR after sgbtrf in impavnc0: n,l_,kopt,icount_ampf,info,factor',
+     &       n,l_,kopt,icount_ampf,info,factor
             stop 'impavnc0 1'
           endif
         endif ! factor .ne. "disabled"
@@ -2514,8 +2555,8 @@ cBH-YuP:         endif ! "scale"
         if (  ampfmod.eq."enabled" .and. kopt.eq.3
      +        .and. cqlpmod.ne."enabled") then
           if(icount_ampf.eq.2)then ! this is fg=='g' function
-            f(1:iy,1,k,ll)=0.d0 !this is 'g' function: should be 0 at j=1
-            f(1:iy,0,k,ll)=0.d0 !this is 'g' function: should be 0 at j=0
+            f(1:iymax,1,k,ll)=0.d0 !this is 'g' function: should be 0 at j=1
+            f(1:iymax,0,k,ll)=0.d0 !this is 'g' function: should be 0 at j=0
           endif
         endif
 
@@ -2542,8 +2583,8 @@ c.......................................................................
            if (icount_ese.eq.1) then
               
                    !             Store new f into fh
-             call dcopy(iyjx2,f(0:iy+1,0:jx+1,kelec,l_),1, 
-     +                       fh(0:iy+1,0:jx+1,1,l_),1) ! we are in k-loop here
+             call dcopy(iyjx2,f(0:iymax+1,0:jx+1,kelec,l_),1, 
+     +                       fh(0:iymax+1,0:jx+1,1,l_),1) ! we are in k-loop here
                    !YuP[2019-05-30] Note that in case of cqlpmod.eq."enabled",
                    ! fh() is allocated as fh(0:iy+1,0:jx+1,1:ngen,0:ls+1) in wpalloc
               factor="disabled"
@@ -2554,11 +2595,13 @@ c.......................................................................
 
              ! g function is in f.
              ! Calculate fluxes, restore f with f_, and return.
-              flux1(l_)=fluxpar(
-     +             1,x,coss(1:iy,l_),cynt2(1:iy,l_),cint2,temp1,iy,jx)
-              flux2(l_)=fluxpar(
-     +             1,x,coss(1:iy,l_),cynt2(1:iy,l_),cint2,temp2,iy,jx)
-              f(0:iy+1,0:jx+1,k,l_)=f_(0:iy+1,0:jx+1,k,l_) !We are in k-loop here
+              flux1(l_)=fluxpar(1,x,coss(1:iy_(l_),l_),
+     +                  cynt2(1:iy_(l_),l_),cint2,temp1,iy_(l_),jx)
+              !YuP[2021-03-04] changed iy-->iy_(l_)
+              ![2021-03-04] for meshy="fixed_mu" iy_(l_) can be less than iy 
+              flux2(l_)=fluxpar(1,x,coss(1:iy_(l_),l_),
+     +                  cynt2(1:iy_(l_),l_),cint2,temp2,iy_(l_),jx)
+              f(0:iymax+1,0:jx+1,k,l_)=f_(0:iymax+1,0:jx+1,k,l_) !We are in k-loop here
               go to 999
            endif
            
@@ -2578,7 +2621,7 @@ c.......................................................................
                    !             Store new f into fh
 c              call dcopy(iyjx2,f(0:iy+1,0:jx+1,kelec,l_),1, 
 c     +                        fh(0:iy+1,0:jx+1,1,l_),1)
-              fh(0:iy+1,0:jx+1,1,l_)=f(0:iy+1,0:jx+1,kelec,l_)
+              fh(0:iymax+1,0:jx+1,1,l_)=f(0:iymax+1,0:jx+1,kelec,l_)
               !YuP[05-2017] corrected dcopy in the above line:
               !was iyjx2*ngen, but we only copy one species (kelec)
               factor="disabled"
@@ -2590,7 +2633,7 @@ c     +                        fh(0:iy+1,0:jx+1,1,l_),1)
            !             g function is in f, store into fg
 c           call dcopy(iyjx2,f(0:iy+1,0:jx+1,kelec,l_),1, 
 c     +                     fg(0:iy+1,0:jx+1,1,l_),1)
-              fg(0:iy+1,0:jx+1,1,l_)=f(0:iy+1,0:jx+1,kelec,l_)
+              fg(0:iymax+1,0:jx+1,1,l_)=f(0:iymax+1,0:jx+1,kelec,l_)
               !YuP[05-2017] corrected dcopy in the above line:
               !was iyjx2*ngen, but we only copy one species (kelec)
 cBH170312:  Checking effect of zeroing correction part of distn:
@@ -2598,7 +2641,7 @@ cBH170312:              call bcast(fg(0,0,1,l_),zero,iyjx2*ngen)
 c             Restore f with f_, and return.
 c              call dcopy(iyjx2,f_(0:iy+1,0:jx+1,kelec,l_),1,
 c     +                          f(0:iy+1,0:jx+1,kelec,l_),1)
-              f(0:iy+1,0:jx+1,kelec,l_)=f_(0:iy+1,0:jx+1,kelec,l_)
+              f(0:iymax+1,0:jx+1,kelec,l_)=f_(0:iymax+1,0:jx+1,kelec,l_)
               !YuP[05-2017] corrected dcopy in the above line:
               !was iyjx2*ngen, but we only copy one species (kelec)
               go to 999

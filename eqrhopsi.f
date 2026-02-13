@@ -484,7 +484,8 @@ c
         q_(j)=2.*fpsi_*onovrp2*zmaxpsi_/(twopi*bmidplne_)
 c        write(*,*)'eqrhopsi: j,eqvol(j),eqrmcon(j),eqrpcon(j),q_(j) =',
 c     +                       j,eqvol(j),eqrmcon(j),eqrpcon(j),q_(j)
- 20   continue
+ 20   continue ! j=2,nconteqn
+ 
       eqrpcon(1)=rmag
       eqrmcon(1)=rmag
       if(rmag.gt.em8)then ! rmag=0 in a mirror machine

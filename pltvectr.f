@@ -1,6 +1,6 @@
 c
 c
-      subroutine pltvectr(xt,yt,xh,yh,rheads,jpxy,ipxy,veclen,noplots)
+      subroutine pltvectr(xt,yt,xh,yh,jpxy,ipxy,veclen,noplots)
       implicit integer (i-n), real*8 (a-h,o-z)
       character*8 noplots
       save
@@ -14,7 +14,7 @@ c
       dimension tam1(2),tam2(2)
       dimension xt(jpxy,ipxy),yt(jpxy,ipxy)
       dimension xh(jpxy,ipxy),yh(jpxy,ipxy)
-      dimension rheads(*)
+      dimension rheads(jpxy) !YuP[2020-12-17] Why needed in arg list? Made it local
 c     
       REAL*4 RPX1,RPY1,RPX2,RPY2
       REAL*4 ANGLE,BARB,SIZE

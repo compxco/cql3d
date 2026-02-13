@@ -38,10 +38,12 @@ C     PASSING ARRAYS TO PGFUNC1, FOR PGPLOT PGCONX:
       pointer wx,wy
       REAL*4 wx(:),wy(:), xpt,ypt
       REAL*4 RCONT,RXMAXQ,RTEMP1,RXPTS,RYPTS
-      DIMENSION RCONT(NCONTA),RTEMP1(iy,jx),RXPTS(2),RYPTS(2)
+      DIMENSION RCONT(NCONTA),RTEMP1(iymax,jx),RXPTS(2),RYPTS(2)
       COMMON /PGLOCAL1/wx,wy,IIY,JXQ
 C     wx IS V-NORM ARRAY, wy IS THETA ARRAY.  TYPE REAL.
-      real*4 RTAB1(iy),RTAB2(iy) ! local
+      real*4 RTAB1(iymax),RTAB2(iymax) ! local
+      !YuP[2021-03-11] Changed iy-->iymax in declarations
+      !(just in case if iy is changed by iy=iy_(l_) somewhere)
       REAL*4 :: R40=0.,R41=1.
       REAL*4 :: R46=6.,R47=7.,R48=8.,R49=9.
       REAL*4 :: R4P2=.2,R4P8=.8,R4P65=.65,R4P9=.9,R4MP2=-.2
@@ -63,7 +65,7 @@ CMPIINSERT_IF_RANK_NE_0_RETURN
         ! wx and wy are already allocated => do nothing 
       else ! Not allocated yet
         allocate(wx(jx))
-        allocate(wy(iy))
+        allocate(wy(iymax))
       endif
       
       if (mcont.gt.nconta) stop 'in pltcont'
@@ -103,7 +105,7 @@ cyup                   BUT, for 2d plots, use u/c units, not keV
          if (pltlim.eq."disabled") then ! whole range in x(j)
             jxq=jx
             xmaxq=x(jxq)
-            iyjxq=iy*jxq
+            !iyjxq=iy*jxq ! what for? commented [2021-03]
             tx_='v_parallel (u/vnorm)'
             ty_='v_perp (u/vnorm)'
          elseif (pltlim.eq.'u/c' .or. pltlim.eq.'energy') then
@@ -114,20 +116,20 @@ cyup                   BUT, for 2d plots, use u/c units, not keV
             endif
             jxq=min(luf(pltlimmm,uoc,jx),jx)
             xmaxq=uoc(jxq)
-            iyjxq=iy*jxq
+            !iyjxq=iy*jxq ! what for? commented [2021-03]
             tx_='v_parallel (u/c)'
             ty_='v_perp (u/c)'
          elseif (tandem.eq."enabled" .and. fmass(k).gt.1.e-27) then
             jxq=jlwr
             xmaxq=xlwr
-            iyjxq=iy*jlwr
+            !iyjxq=iy*jlwr !what for? commented [2021-03]
             tx_='v_parallel (u/vnorm)'
             ty_='v_perp (u/vnorm)'
          else ! 'x'
             pltlimmm=pltlimm
             jxq=min(luf(pltlimmm,x,jx),jx)
             xmaxq=x(jxq)
-            iyjxq=iy*jxq
+            !iyjxq=iy*jxq ! what for? commented [2021-03]
             tx_='v_parallel (u/vnorm)'
             ty_='v_perp (u/vnorm)'
          endif
@@ -179,13 +181,13 @@ c
 c
 c     initialization..
 c
-          do 15 i=1,iy
+          do 15 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
  15       temp4(i,1)=(hfi(i,1)+hfi(i-1,1))*.5*dxp5(1)
 c
 c     Now complete the integration for all x(j)
 c
           do 20 j=2,jx-1
-            do 31 i=1,iy
+            do 31 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
               temp4(i,j)=(hfi(i,j)+hfi(i-1,j))*.5*dxp5(j)
      1          +temp4(i,j-1)
  31         continue
@@ -194,13 +196,13 @@ c
 c
 c     initialization..
 c
-          do 19 i=1,iy
+          do 19 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
  19       temp4(i,1)=(hfu(i,1)+hfu(i-1,1))*.5*dxp5(1)
 c
 c     Now complete the integration for all x(j)
 c
           do 21 j=2,jx-1
-            do 32 i=1,iy
+            do 32 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
               temp4(i,j)=(hfu(i,j)+hfu(i-1,j))*.5*dxp5(j)
      1          +temp4(i,j-1)
  32         continue
@@ -216,18 +218,18 @@ c
 c
 c     j=jx
 c
-        do 250 i=1,iy
+        do 250 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
           temp4(i,jx)=temp4(i,jx-1)
  250    continue
 c
 c     patch in a value at x=0
 c
-        do 50 i=1,iy
+        do 50 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
           temp4(i,1)=temp4(1,1)
  50     continue
         do 210 i=iyh+1,itu-1
           do 211 j=1,jx
-            temp4(i,j)=temp4(iy+1-i,j)
+            temp4(i,j)=temp4(iy_(l_)+1-i,j) !YuP[2021-03-11] iy-->iy_(l_)
  211      continue
  210    continue
 c
@@ -256,7 +258,9 @@ c-sww60continue
             if (cn2 .gt. temp4(i,j)) cn2=temp4(i,j)
             if (cx2 .lt. temp4(i,j)) cx2=temp4(i,j)
  61       continue
-          call aminmx(temp4(itu+1,j),1,iy-itu,1,swwmin,swwmax,kmin,kmax)
+          call aminmx(temp4(itu+1,j),1,iy_(l_)-itu,1,
+     &                 swwmin,swwmax,kmin,kmax)
+          !YuP[2021-03-11] iy-->iy_(l_)
 c990131          cn3=amin1(cn3,swwmin)
 c990131          cx3=amax1(cx3,swwmax)
           cn3=min(cn3,swwmin)
@@ -278,7 +282,7 @@ c
         do 82 j=1,jx
           do 83 i=itl+1,itu-1
  83       temp4(i,j)=1.-(temp4(i,j)-cn2)/(cx2-cn2)
-          do 84 i=itu,iy
+          do 84 i=itu,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
  84       temp4(i,j)=1.-(temp4(i,j)-cn3)/(cx3-cn3)
  82     continue
 c
@@ -296,7 +300,8 @@ c 110    continue
         !call pack21(cd,1,iy,1,jx,tem6,iy,jx) ! NOT NEEDED?
 cBobH990608:Is there a problem here with getting desired data into tem5?
 c           I.E., is temp4(0,*) temp4(*,0) wanted?
-        call pack21(temp4,0,iyp1,0,jxp1,tem5,iy,jx)
+        call pack21(temp4,0,iyp1,0,jxp1,tem5,iymax,jx) !
+                       !YuP[2021-03-11] iy-->iymax
 c
 c
 c     determine the contour step size
@@ -348,7 +353,7 @@ c990131        sminr=alog(constr)
         dmin=0.d0
         dmax=0.d0
         DO J=1,JXQ
-         DO I=1,iy
+         DO I=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
             DMIN=MIN(temp1(I,J),DMIN)
             DMAX=MAX(temp1(I,J),DMAX)
             RTEMP1(I,J)=temp4(I,J) ! the cont() levels of this function 
@@ -360,14 +365,14 @@ c990131        sminr=alog(constr)
         DO J=1,JXQ
          wx(J)=TAM1(J)
         ENDDO
-        DO I=1,iy
+        DO I=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
          wy(I)=y(I,L_)
         ENDDO
         DO JS=1,mcont
          RCONT(JS)=CONT(JS)
          !write(*,*)'pltcont: lr_,JS,CONT(JS)=',lr_,JS,CONT(JS)
         ENDDO
-        IIY=iy
+        IIY=iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
         RXMAXQ=XMAXQ
 
 
@@ -401,18 +406,20 @@ c990131        sminr=alog(constr)
 
         !plot v=vnorm line
         if (pltlim.eq.'u/c' .or. pltlim.eq.'energy') then        
-          do i=1,iy
+          do i=1,iymax
           RTAB1(i)= coss(i,lr_)/cnorm ! v_par/c  (cnorm is c/vnorm)
           RTAB2(i)= sinn(i,lr_)/cnorm ! v_perp/c
           enddo
         else ! v/vnorm units
-          do i=1,iy
+          do i=1,iymax
           RTAB1(i)= coss(i,lr_) ! v_par/vnorm
           RTAB2(i)= sinn(i,lr_) ! v_perp/vnorm
           enddo
         endif
-        CALL PGLINE(iy,RTAB1,RTAB2) ! v=vnorm line (or v=vnorm/c)
-      
+        CALL PGLINE(iymax,RTAB1,RTAB2) ! v=vnorm line (or v=vnorm/c)
+        !YuP[2021-03-11] Changed iy-->iymax 
+        !(just in case if iy is changed by iy=iy_(l_) somewhere)
+
         !plot v=vth line, for the k-th gen. species
 c..................................................................
 c     Note: the do loop below uses vth(),
@@ -421,26 +428,30 @@ c     But, T==temp(k,lr) can be changed in profiles.f,
 c     in case of iprote (or iproti) equal to "prbola-t" or "spline-t"
 c..................................................................
         if (pltlim.eq.'u/c' .or. pltlim.eq.'energy') then        
-          do i=1,iy
+          do i=1,iymax
           RTAB1(i)= (vth(k,lr_)/clight)*coss(i,lr_) ! vth_par/c
           RTAB2(i)= (vth(k,lr_)/clight)*sinn(i,lr_) ! vth_perp/c
           enddo
         else ! v/vnorm units
-          do i=1,iy
+          do i=1,iymax
           RTAB1(i)= (vth(k,lr_)/vnorm)*coss(i,lr_) ! vth_par/vnorm
           RTAB2(i)= (vth(k,lr_)/vnorm)*sinn(i,lr_) ! vth_perp/vnorm
           enddo
         endif
+        !YuP[2021-03-11] Changed iy-->iymax 
+        !(just in case if iy is changed by iy=iy_(l_) somewhere)
         ! Five different line styles are available:
         ! 1 (full line), 2 (dashed), 3 (dot-dash-dot-dash), 4 (dotted),
         CALL PGSLS(4) 
-        CALL PGLINE(iy,RTAB1,RTAB2) ! v=vth line
+        CALL PGLINE(iymax,RTAB1,RTAB2) ! v=vth line
         CALL PGSLS(1) ! 1-> restore solid line     
         CALL PGSLW(lnwidth) !lnwidth=3 line width in units of 0.005
         !--------------------------------------------------------
-        CALL PGCONX(RTEMP1,iy,jx,1,iy,1,JXQ,RCONT,mcont,PGFUNC1)
+        CALL PGCONX(RTEMP1,iymax,jx,1,iymax,1,JXQ,RCONT,mcont,PGFUNC1)
         !subr.PGFUNC1(VISBLE,yplt,xplt,zplt) uses /PGLOCAL1/wx,wy,IIY,JXQ
         !--------------------------------------------------------
+        !YuP[2021-03-11] Changed iy-->iymax 
+        !(just in case if iy is changed by iy=iy_(l_) somewhere)
         !Add some text on the plot:
         CALL PGSCH(R41) !(1.) ! set character size; default is 1. !YuP[2019-10-28]
         write(t_,5001) k

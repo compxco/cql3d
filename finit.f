@@ -15,6 +15,8 @@ c..................................................................
 
       include 'param.h'
       include 'comm.h'
+      
+      integer ireturn
       data ireturn/0/
 c.......................................................................
 
@@ -42,7 +44,8 @@ c.......................................................................
             open (unit=iunit,file='fpld_dsk',status='old')
          endif
          do 80 k=1,ngen
-            read (iunit,1000) ((f(i,j,k,l_),i=1,iy),j=1,jx)
+            read (iunit,1000) ((f(i,j,k,l_),i=1,iymax),j=1,jx) 
+                               !YuP[2021-03-11] iy-->iymax
  80      continue
          if (l_.eq.1) then
             close(unit=iunit)
@@ -67,16 +70,18 @@ c     density.
 c..................................................................
 
         if ((n.eq.0) .and. (fpld(1,1).ne.-1.0)) then
-        thta=fmass(k)*clite2/(temp(k,lr_)*ergtkev)
-        if (cqlpmod .eq. "enabled") 
-     +    thta=fmass(k)*clite2/(temppar(k,ls_)*ergtkev)
-        do 2 j=1,jx
+          if (cqlpmod.eq."enabled") then
+             thta=fmass(k)*clite2/(temppar(k,ls_)*ergtkev)
+          else
+             thta=fmass(k)*clite2/(temp(k,lr_)*ergtkev)
+          endif
+          do 2 j=1,jx
           swwtemp=exp(-gamm1(j)*thta)
-          do 3 i=1,iy
+          do 3 i=1,iymax !!YuP[2021-03-11] iy-->iymax
             f(i,j,k,l_)=swwtemp
  3        continue
- 2       continue
-         endif
+ 2        continue
+        endif
 
 c..................................................................
 c     Additional loading if fpld(1,k).ne.0.
@@ -128,19 +133,19 @@ c shifted "Maxwellian" in temp2.
             if (ids1.ne.1) then
                thta1=fmass(k)*clite2/(fpld(4,k)*ergtkev)
                gmpeak=fpld(3,k)*ergtkev/(fmass(k)*clite2)
-               do 30 i=1,iy
+               do 30 i=1,iymax !YuP[2021-03-11] iy-->iymax
                   temc1(i)=exp(-(y(i,l_)-fpld(5,k))**2*.5/fpld(6,k))
  30            continue
                do 31 j=1,jx
                   swwtmp=exp(-(gamm1(j)-gmpeak)*thta1)
-                  do 32 i=1,iy
+                  do 32 i=1,iymax !YuP[2021-03-11] iy-->iymax
                      temp2(i,j)=swwtmp*temc1(i)
  32               continue
  31            continue
             else
                iunit=20
                open (unit=iunit,file='fpld_dsk',status='old')
-               read (iunit,1000) ((temp2(i,j),i=1,iy),j=1,jx)
+               read (iunit,1000) ((temp2(i,j),i=1,iymax),j=1,jx)
                close(unit=iunit)
             endif
                
@@ -150,15 +155,15 @@ c  Window down constant and shifted "Maxwellian" preloading:
 
          fmc2=fmass(k)*clite2/ergtkev
          iimin=1
-         do 40 i=1,iy
+         do 40 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
             if (y(i,l_).ge.fpld(9,k)) then
                iimin=i
                go to 41
             endif
  40      continue
  41      continue
-         iimax=iy
-         do 42 i=iy,1,-1
+         iimax=iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
+         do 42 i=iy_(l_),1,-1
             if (y(i,l_).le.fpld(10,k)) then
                iimax=i
                go to 43
@@ -173,12 +178,12 @@ c  Window down constant and shifted "Maxwellian" preloading:
                   temp2(i,j)=0.
                   temp1(i,j)=0.
  34            continue
-               do 35 i=iimax+1,iy
+               do 35 i=iimax+1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
                   temp2(i,j)=0.
                   temp1(i,j)=0.
  35            continue
             else
-               do 36 i=1,iy
+               do 36 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
                   temp2(i,j)=0.
                   temp1(i,j)=0.
  36            continue
@@ -192,7 +197,7 @@ c     hn =density of relativistic Maxwellian
 c     hn0=density of constant distribution
 c     hn1=density of shifted "maxwellian"
 
-         do 20 i=1,iy
+         do 20 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
           do 10 j=1,jx
             tam1(j)=tam1(j)+temp1(i,j)*cynt2(i,l_)*
      1        abs(coss(i,lmdpln_))*tau(i,lr_)
@@ -234,13 +239,13 @@ c to the definitions of fpld(1,k) and fpld(2,k):
 
         if (fpld21.ne.1.) then
            do 51 j=1,jx
-              do 50 i=1,iy
+              do 50 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
                  temp2(i,j)=stp*temp1(i,j)+stp*sp*temp2(i,j)
  50           continue
  51        continue
         else
            do 53 j=1,jx
-              do 52 i=1,iy
+              do 52 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
                  temp2(i,j)=stp*sp*temp2(i,j)
  52           continue
  53        continue
@@ -248,13 +253,13 @@ c to the definitions of fpld(1,k) and fpld(2,k):
 
         if (fpld11.ne.1.) then
            do 55 j=1,jx
-              do 54 i=1,iy
+              do 54 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
                  f(i,j,k,l_)=f(i,j,k,l_)+temp2(i,j)
  54           continue
  55        continue
         else
            do 57 j=1,jx
-              do 56 i=1,iy
+              do 56 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
                  f(i,j,k,l_)=temp2(i,j)
  56           continue
  57        continue
@@ -263,7 +268,7 @@ c to the definitions of fpld(1,k) and fpld(2,k):
 c     Symmetrize trapped particles
         do 61 j=1,jx
            do 60 i=itl+1,iyh
-              iu=iy+1-i
+              iu=iy_(l_)+1-i !!YuP[2021-03-11] iy-->iy_(l_)
               f(i,j,k,l_)=0.5*(f(i,j,k,l_)+f(iu,j,k,l_))
               f(iu,j,k,l_)=f(i,j,k,l_)
  60        continue
@@ -280,7 +285,7 @@ c     delete the particles on loss orbits..
          ! YuP: how about other models, "mirrsnk" and "mirrsnk1" ?
          call lossorbm(ephicc,k)
          do 100 j=1,jx
-            do 90 i=1,iy
+            do 90 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
                if(gone(i,j,k,indxlr_) .lt. -0.9) then
                  f(i,j,k,l_)=zero
                endif

@@ -15,8 +15,12 @@ c.......................................................................
 c     Compute the total current in AMPS, (currza).
 c.......................................................................
 
-      if (cqlpmod .eq. "enabled") print *," WARNING in tddiag: routine",
-     +  " not yet ready for CQLP"
+      if (cqlpmod.eq."enabled") then
+        print *," WARNING in tddiag: routine"," not yet ready for CQLP"
+        !Except, it can compute this along field line:
+        call starnue_sptz !Get starnue(),tauee(),taueeh(),sptzr(); all l_
+        return
+      endif
 
 
 c.......................................................................
@@ -42,9 +46,9 @@ c.......................................................................
       !===> YuP[2019-12-19] Added calculation of resistivity.
       !Normally something similar is done in tdoutput, 
       !but not necessarily at every time step. 
-      call starnue_sptz !Get starnue(),tauee(),taueeh(),sptzr(); all lr
+      call starnue_sptz !Get starnue(),tauee(),taueeh(),sptzr(); all l_
       do lll=1,lrz 
-          call tdnflxs(lll) ! determine l_,lr_, etc.
+          call tdnflxs(lll) ! determine l_,lr_, ls_, etc.
           call restcon ! for given l_, lr_
           !We would not need to call restcon at each time step,
           ! but because such output values as xconn are not saved
@@ -94,6 +98,7 @@ c.......................................................................
          if (ioutput(1).ge.1) then !YuP[2020] Useful diagnostic printout
          write(*,'(a,3e14.6)')'rya(lll), bscurm_n, dj[A/cm2]',
      &   rya(lll), bscurm_n(lll), 
+!     1   elec_cgs
      &   currpar_starnue_n(lll)-currpar_starnue0_n(lll)
          endif
       enddo ! lll YuP[2019-12-19] done

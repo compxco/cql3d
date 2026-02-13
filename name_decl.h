@@ -23,7 +23,7 @@ c.......................................................................
 
       character*8
      1  chang,
-     1  eqmod,eleccomp,f4d_out,tavg,
+     1  eqmod,eleccomp,f4d_out,f3d_out,f3d_format,tavg,
      1  iactst,ineg,idrop,idskf,idskrf,ichkpnt,implct,
      1  lbdry0,locquas,lrzdiff,lsdiff,taunew,
      1  machine,meshy,manymat,
@@ -53,7 +53,7 @@ c.......................................................................
      1  contrmin,constr,chang,colmodl,
      1  deltabdb,droptol,dtr,dtr0,xsink,
      1  esink,ephicc,esfac,eoved,enorm,enorme,enormi,eleccomp,
-     1  eqmod, f4d_out,tavg,
+     1  eqmod, f4d_out,f3d_out,f3d_format,tavg,
      1  gsla,gslb,gamaset,gamafac,
      1  iactst,ineg,idrop,idskf,idskrf,ichkpnt,implct,
      1  isigtst,isigsgv1,isigsgv2,
@@ -132,7 +132,7 @@ c..................................................................
      1  totcrt(nbctimea),
      1  nplot(nplota),nsave(nsavea),
      1  difus_type(ngena),difus_io(ngena),
-     1  tavg1(ntavga),tavg2(ntavga)
+     1  tavg1(ntavga),tavg2(ntavga),kfrsou(kb)
 
 c..................................................................
 c     TWO DIMENSIONAL NAMELIST SETUP COMMON BLOCK.....
@@ -310,7 +310,7 @@ c..................................................................
      1  tmdmeth,partner,pinch,plt3d,pltvs,radcoord,
      1  relaxtsp,rzset,
      1  ndeltarho,softxry,npa_diag,atten_npa,
-     1  transp,adimeth,
+     1  transp,pltdrr,adimeth,
      1  efswtch,efswtchn,efiter,efflag,npa_process
 
       character*256 difus_io_file
@@ -320,15 +320,16 @@ c..................................................................
      1  enmin,enmax,bootst,bootcalc,bootupdt,bootsign,pinch,
      1  fds,
      1  iprone,iprote,iproti,iprozeff,iprovphi,iproelec,ipronn,iprocur,
-     1  tmdmeth,kfrsou,
+     1  tmdmeth,
      1  mmsv,msxr,njene,njte,njti,nonboot,jhirsh,
      1  nrskip,nen,nv,nen_npa,nv_npa,npaproc,
      1  nr_delta,nz_delta,nt_delta,
      1  nr_f4d,nz_f4d,nv_f4d,nt_f4d,
+     1  npol_f3d, nvpar_f3d, nmu_f3d, f3d_rho,
      1  plt3d,pltvs,partner,radcoord,
      1  rfacz,rzset,roveram,relaxden,relaxtsp,
      1  ndeltarho,softxry,npa_diag,
-     1  transp,
+     1  transp,pltdrr,
      1  enmin_npa,enmax_npa,fds_npa,
      1  atten_npa,adimeth,nonadi,
      1  efswtch,efswtchn,efiter,efflag,
@@ -341,7 +342,8 @@ c..................................................................
      1  npa_process(npaproca),
      1  difus_io_drrscale(nbctimea,ngena), 
      1  difus_io_drscale(nbctimea,ngena),
-     1  difus_io_t(nbctimea)
+     1  difus_io_t(nbctimea),
+     &  drr_scale !YuP[2021-08] added
 
 c******************************************************************
 c     BEGIN arrays for EQUILIBRIUM MODEL (eq..) (NON-CIRCULAR CROSS
@@ -445,7 +447,7 @@ c      logical
      1  elpar0,
      1  lmidpln,lmidvel,laddbnd,
      1  nchgdy,ngauss,nlagran,
-     1  nonavgf,nofavgf,
+     1  nonavgf,nofavgf, 
      1  nontran, nofftran, nonelpr, noffelpr,
      1  nlrestrt,nlwritf,nummods,numixts,
      1  oldiag,
@@ -454,11 +456,14 @@ c      logical
 !YuP[2019-12-26] Added ampfadd
 
       common /readvec/
-     1  denpar(ntotala,0:lza+1),
+     1  denpar(ntotala,0:lsa+1),
+     1  temppar(ntotala,0:lsa+1),
      1  nkconro(ntotala),nlotp1(noutpta),nlotp2(noutpta),
-     1  nlotp3(noutpta),nlotp4(noutpta),
-     1  temppar(ntotala,0:lza+1)
-
+     1  nlotp3(noutpta),nlotp4(noutpta)
+       !YuP[2021-02] Changed lza-->lsa for temppar and denpar
+       !it is better for proper understanding/meaning
+       !as grid size related to CQLP.
+       ! (Compare to arrays in common /wpvec/ )
 
       !---> For ADPAK data on impurity ionization states: YuP[2019-07-31]--[2019-09]
       integer imp_bounde_collscat, imp_bounde_collslow
@@ -524,14 +529,18 @@ c      logical
 !     (Initial purpose - coupling with NIMROD. 
 !      Can be extended to coupling with other codes.)
       character*8 read_data ! 'disabled' or 'nimrod', for now.
-      character*128, dimension(101) :: read_data_filenames !list of files
-      ! Max number of files is 101, for now. 
+      character*128, dimension(1000) :: read_data_filenames !list of files
+      character*8 read_data_filenames_prefix,read_data_filenames_suffix !YuP[2021-04-06]
+      ! Max number of files is 1000, for now. 
       ! For coupling with NIMROD, each file contains data at one time slice.
       ! Therefore, it is recommended to match the max number of files
       ! with value of nbctimea [set in param.h]
       real*8 temp_min_data ![keV] Lower limit, to adjust Te and Ti data
       ! In NIMROD data, Te and Ti may go down to ~0.3eV; not physical.
+      character*8 elecfld_data ![2022-07] 'jspitzer' or 'readdata'
       common /read_data_comm/ read_data, read_data_filenames,
+     &  read_data_filenames_prefix, read_data_filenames_suffix, !YuP[2021-04-06]
+     &  elecfld_data,
      &  temp_min_data
 !-----------------------------------------------------------------------      
       

@@ -23,8 +23,8 @@ c       return, if no nuclear fusion general species
 
       call bcast(fuspwrvt,zero,4)
       call bcast(fuspwrmt,zero,4)
-      call bcast(fuspwrv,zero,4*lrorsa)
-      call bcast(fuspwrm,zero,4*lrorsa)
+      call bcast(fuspwrv,zero,4*lrors)
+      call bcast(fuspwrm,zero,4*lrors)
       call bcast(sigft,zero,4)
       call bcast(sigmt,zero,4)
 

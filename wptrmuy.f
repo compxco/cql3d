@@ -1,11 +1,15 @@
 c
 c
       subroutine wptrmuy
+!Called from tdinitl when  cqlpmod.eq."enabled"
+!  .and. meshy.eq."fixed_mu" .and. tfac.lt.0.0
       implicit integer (i-n), real*8 (a-h,o-z)
       include 'param.h'
       include 'comm.h'
 
-      dimension zmunod(iy+lsa),zmidth0(lsa+2),zyfix(lsa+1)
+      dimension zmunod(iymax+lsa),zmidth0(lsa+2),zyfix(lsa+1)
+      !YuP[2021-03-11] Changed iy-->iymax in declarations
+      !(just in case if iy is changed by iy=iy_(l_) somewhere)
 
 c..............................................................
 c     Special mu mesh such that at each position l, y(iyh_(l),l) is
@@ -15,7 +19,10 @@ c.......................................................................
       ztfac=abs(tfac)
       iyhtr=iymax/2
       ilshalf=ls
+      !YuP[2021]: Probably need to enforce iy/2 > ls-1, otherwise 
+      !  iypass=iyhtr-ilshalf+1 == iy/2 -ls+1 may become 0 or negative
       if (sbdry .eq. "periodic") ilshalf=ls/2+1
+      write(*,*)'wptrmuy0 sbdry,ilshalf,ls ',sbdry,ilshalf,ls
       itrap=ilshalf-1
       if (ztfac .le. 1.0) then
         do 110 l=2,ilshalf
@@ -62,10 +69,11 @@ c     insert in sin**2 array
       endif
 
       zrat=iyhtr*(1.-zmunod(1))/dfloat(itrap)
-
       if (zrat .le. 1.5) then
         iypass=iyhtr-ilshalf+1
         zdmupas=zmunod(1)/dfloat(iypass)
+       write(*,*)'wptrmuy1: iyhtr,ilshalf,itrap',iyhtr,ilshalf,itrap 
+       !40,80,79; or     75,81,80 then iypass= 75-81+1=-5
         do 120 i=1,iypass
           mun(i)=dfloat(i-1)*zdmupas
  120    continue
@@ -75,10 +83,12 @@ c     insert in sin**2 array
       else
         iypass=int(iyhtr*zmunod(1))
         zdmupas=zmunod(1)/dfloat(iypass)
+       write(*,*)'wptrmuy2: iypass',iypass
         do 122 i=1,iypass+1
           mun(i)=dfloat(i-1)*zdmupas
  122    continue
         iextra=iyhtr-iypass-itrap
+       write(*,*)'wptrmuy3: iextra',iextra
         do 123 ii=1,iextra
           zdmumax=0.0
           do 124 ll=1,itrap-1
@@ -94,6 +104,7 @@ c     insert in sin**2 array
           itrap=itrap+1
  123    continue
 c
+       write(*,*)'wptrmuy4: itrap',itrap
         do 126 l=2,itrap
           mun(iypass+l)=zmunod(l)
  126    continue

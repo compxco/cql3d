@@ -22,7 +22,7 @@ c..................................................................
 c     orbit loss term - see subroutine losscone.
 c..................................................................
 
-      do 30 i=1,iy
+      do 30 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
         do 31 j=1,jx
           if(gone(i,j,k,indxlr_).lt.zero) then ! lost
             gon(i,j)=vnorm*x(j)*gone(i,j,k,indxlr_)/tau(i,lr_)

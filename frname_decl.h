@@ -29,12 +29,16 @@ c     Remove NBI source at psi outside of psicutoff:
 c................................................................
 
       character*8 frplt,frmod,fr_gyro,beamplse,multiply
+      character*8 src_nbi_e ![2022-06-30] Add source to e_general matching NBI sources
+                            !(Not ready)
 
       common /nub2_/ 
      &  ibcur,ibcx,iborb,ibslow,inubpat,npat(2),itrapfi,itrapech
 c     ONETWO DIVERGENCE
      &  ,smooth,multiply,bmsprd,frmod,fr_gyro,beamplse,frplt,nfrplt
      &  ,multiplyn,beampon,beampoff
+     &  ,src_nbi_e ![2022-06-30] Add source to e_general matching NBI sources
+                   !(Not ready)
 
 c................................................................
 

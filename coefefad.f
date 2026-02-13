@@ -15,9 +15,14 @@ c.......................................................................
 cl    Include electrostatic field
 c.......................................................................
 
-      do 20 i=1,iy
-        ztrda=-elparnw(l_)*charge/vnorm*coss(i,l_)
-        ztrdd=elparnw(l_)*charge/vnorm*sinn(i,l_)**2
+      do 20 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
+        if(cqlpmod.eq."enabled") then !YuP[2021-03-18] Added
+         ztrda=-elparnw(l_)*charge/vnorm*coss(i,l_) !elparnw(): only for CQLP
+         ztrdd= elparnw(l_)*charge/vnorm*sinn(i,l_)**2
+        else
+         ztrda=0.d0
+         ztrdd=0.d0
+        endif
         do 21 j=1,jx
           da(i,j)=da(i,j)+bnumb(k)/fmass(k)*(elecfld(lr_)*cex(i,j,l_)+
      +      ztrda*xsq(j))

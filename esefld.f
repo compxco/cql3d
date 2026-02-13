@@ -1,6 +1,6 @@
 c
 c 
-      subroutine efld_cd(dz,ls,vnorm,flux1,flux2,elparnw,flux0)
+      subroutine efld_cd(dz,ls,vnorm,flux1,flux2,elparnw,flux0) !for cqlpmod.eq."enabled"
       implicit integer (i-n), real*8 (a-h,o-z)
 
 c.......................................................................
@@ -45,8 +45,10 @@ c.......................................................................
       end  
 c
 c
-      real*8 function fluxpar
-     +     (kopt,x,coss,cynt2,cint2,f,iy,jx)
+      real*8 function fluxpar(kopt,x,coss,cynt2,cint2,f,iy_l,jx)
+      !YuP Note a usual call: fluxpar(1,x,coss(1:iy_(l_),l_),
+      !                 cynt2(1:iy_(l_),l_),cint2,temp1,iy_(l_),jx)
+      !Renamed iy to iy_l, for convenience (input/local)
       implicit integer (i-n), real*8 (a-h,o-z)
 
 c..................................................................
@@ -59,14 +61,14 @@ c     kopt=1 the flux from the total function f
 c     kopt=2 the flux from half of f  at v_par >0
 c     kopt=3 the flux from half of f  at v_par <0
 c..................................................................
-
-      real*8 x(jx),coss(iy),cynt2(iy),cint2(jx),
-     +                 f(0:iy+1,0:jx+1)
+      integer iy_l
+      real*8 x(jx),coss(iy_l),cynt2(iy_l),cint2(jx),
+     +                 f(0:iy_l+1,0:jx+1)
 
       fluxpar=0.d0
 
       if (kopt.eq.1) then
-        do 20 i=1,iy
+        do 20 i=1,iy_l
           dum=cynt2(i)*coss(i)         
           do 10 j=1,jx          
             fluxpar=fluxpar+f(i,j)*cint2(j)*x(j)*dum         
@@ -75,7 +77,7 @@ c..................................................................
       endif
 
       if (kopt.eq.2) then
-        ihy=iy/2
+        ihy=iy_l/2
         do i=1,ihy
           dum=cynt2(i)*coss(i)         
           do j=1,jx          
@@ -85,8 +87,8 @@ c..................................................................
       endif
 
       if (kopt.eq.3) then
-        ihy=iy/2
-        do i=ihy+1,iy
+        ihy=iy_l/2
+        do i=ihy+1,iy_l
           dum=cynt2(i)*coss(i)         
           do j=1,jx          
             fluxpar=fluxpar+f(i,j)*cint2(j)*x(j)*dum         

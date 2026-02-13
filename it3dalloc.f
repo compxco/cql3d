@@ -132,10 +132,24 @@ CMPIINSERT_ENDIF_RANK
 
       if ( soln_method.eq.'itsol' .or. soln_method.eq.'it3dv' 
      +     .or. soln_method.eq.'it3drv') then
-         deallocate (a_csr,ja_csr,ia_csr,alu,jlu,ju,
-     +              jw_ilu,w_ilu,rhs0,sol,vv)
+         if(associated(a_csr)) deallocate(a_csr)
+         if(associated(ja_csr)) deallocate(ja_csr)
+         if(associated(ia_csr)) deallocate(ia_csr)
+         if(associated(alu)) deallocate(alu)
+         if(associated(jlu)) deallocate(jlu)
+         if(associated(ju)) deallocate(ju)
+         if(associated(jw_ilu)) deallocate(jw_ilu)
+         if(associated(w_ilu)) deallocate(w_ilu)
+         if(associated(rhs0)) deallocate(rhs0)
+         if(associated(sol)) deallocate(sol)
+         if(associated(vv)) deallocate(vv)
          if (soln_method.eq.'it3drv') then
-            deallocate (ar_csr,jar_csr,iar_csr,ac_csr,jac_csr,iac_csr)
+          if(associated(ar_csr)) deallocate(ar_csr)
+          if(associated(jar_csr)) deallocate(jar_csr)
+          if(associated(iar_csr)) deallocate(iar_csr)
+          if(associated(ac_csr)) deallocate(ac_csr)
+          if(associated(jac_csr)) deallocate(jac_csr)
+          if(associated(iac_csr)) deallocate(iac_csr)
          endif
          
       elseif ( soln_method.eq.'itsol1' ) then
@@ -247,9 +261,9 @@ CMPIINSERT_ENDIF_RANK
       if(ASSOCIATED(egylosa)) then
         deallocate(egylosa)
       endif
-      if(ASSOCIATED(i0tran)) then
-        deallocate(i0tran)
-      endif
+!      if(ASSOCIATED(i0tran)) then
+!        deallocate(i0tran)
+!      endif
       if(ASSOCIATED(cal)) then
         deallocate(cal,cbl,ccl,cdl,cel,cfl,eal,ebl,scal,cet,cex)
         deallocate(synca,syncd,taulos,psi0bar)

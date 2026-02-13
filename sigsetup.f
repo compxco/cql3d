@@ -174,7 +174,7 @@ cYuP[07-2016]     +                  +igenrlp(1,kk)+igenrlp(2,kk)
 CMPIINSERT_IF_RANK_EQ_0
          WRITE(*,*)
          WRITE(*,*) 'sigsetup:  No nuclear fusion species'
-         WRITE(*,*) 'sigsetup:  Setting isigmod=disabled'
+         WRITE(*,*) 'sigsetup:  Setting sigmamod=disabled'
          WRITE(*,*)
 CMPIINSERT_ENDIF_RANK
          sigmamod='disabled'

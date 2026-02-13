@@ -4,12 +4,13 @@ c
       !YuP[2018-02-07] added input itype, to identify what is plotted.
       ! itype=1 for plots of f(),
       !      =2 for df
-      !      =3 for source
+      !      =3 for source (from subr.souplt)
       !      =4 for urfb
       !      =5 for vlfb
       !      =6 for vlhb
       !      =7 for rdcb
       !      =8 for loss region (from pltlosc)
+      !      =9 for Drr coeff (from subr.drrplt) !Added [2021-08]
       implicit integer (i-n), real*8 (a-h,o-z)
       save
       include 'param.h'
@@ -28,7 +29,8 @@ cmnt  This routine performs contour plots of distributions
 cmnt  given in temp1(0:iyp1,0,jxp1) as a function of v,theta,
 cmnt  as specified by x,y.
 cmnt    pltcase=1: geometric progression of plot contours,
-cmnt    pltcase.ne.1: contours equispaced for max. at temp(k,lr_).
+cmnt    pltcase.ne.1: contours equispaced for max. at temp(k,lr_),
+!                     or temppar(k,ls_) for CQLP
 cmnt    k gives species index.
 cmnt    tt_ is contour plot heading.
 cmnt    Additional annotation of the plot can be added from
@@ -39,10 +41,12 @@ C     PASSING ARRAYS TO PGFUNC1, FOR PGPLOT PGCONX:
       pointer wx,wy
       REAL*4 wx(:),wy(:), xpt,ypt
       REAL*4 RCONT,RXMAXQ,RTEMP1,RXPTS,RYPTS
-      DIMENSION RCONT(NCONTA),RTEMP1(iy,jx),RXPTS(2),RYPTS(2)
+      DIMENSION RCONT(NCONTA),RTEMP1(iymax,jx),RXPTS(2),RYPTS(2)
       COMMON /PGLOCAL1/wx,wy,IIY,JXQ
 C     wx IS V-NORM ARRAY, wy IS THETA ARRAY.  TYPE REAL.
-      real*4 RTAB1(iy),RTAB2(iy) ! local
+      real*4 RTAB1(iymax),RTAB2(iymax) ! local
+      !YuP[2021-03-11] Changed iy-->iymax in declarations
+      !(just in case if iy is changed by iy=iy_(l_) somewhere)
 
       !YuP[2018-01-27] Local, for PGPLOT:
       parameter(npar=200, nprp=100)
@@ -67,9 +71,9 @@ CMPIINSERT_IF_RANK_NE_0_RETURN
         ! wx and wy are already allocated => do nothing 
       else ! Not allocated yet
         allocate(wx(jx))
-        allocate(wy(iy))
+        allocate(wy(iymax))
       endif
-      
+
       if (ncont.gt.nconta) stop 'in pltcont'
 
       dmin=0.
@@ -88,7 +92,7 @@ cyup                   BUT, for 2d plots, use u/c units, not keV
       if (pltlim.eq."disabled") then ! whole range in x(j)
          jxq=jx
          xmaxq=x(jxq)
-         iyjxq=iy*jxq
+         !iyjxq=iymax*jxq !YuP[2021-03] What for? Commented
          tx_='v_parallel (u/vnorm)'
          ty_='v_perp (u/vnorm)'
       elseif (pltlim.eq.'u/c' .or. pltlim.eq.'energy') then
@@ -99,20 +103,20 @@ cyup                   BUT, for 2d plots, use u/c units, not keV
          endif
          jxq=min(luf(pltlimmm,uoc,jx),jx)
          xmaxq=uoc(jxq)
-         iyjxq=iy*jxq
+         !iyjxq=iy*jxq !YuP[2021-03] What for? Commented
          tx_='v_parallel (u/c)'
          ty_='v_perp (u/c)'
       elseif (tandem.eq."enabled" .and. fmass(k).gt.1.e-27) then
          jxq=jlwr
          xmaxq=xlwr
-         iyjxq=iy*jlwr
+         !iyjxq=iy*jlwr !YuP[2021-03] What for? Commented
          tx_='v_parallel (u/vnorm)'
          ty_='v_perp (u/vnorm)'
       else ! 'x'
          pltlimmm=pltlimm
          jxq=min(luf(pltlimmm,x,jx),jx)
          xmaxq=x(jxq)
-         iyjxq=iy*jxq
+         !iyjxq=iy*jxq !YuP[2021-03] What for? Commented
          tx_='v_parallel (u/vnorm)'
          ty_='v_perp (u/vnorm)'
       endif
@@ -130,8 +134,8 @@ cyup                   BUT, for 2d plots, use u/c units, not keV
 C     
 
       DO J=1,JXQ
-         DO I=1,iy
-            DMIN=MIN(temp1(I,J),DMIN)
+         DO I=1,iy_(l_) !YuP[2021-03] For meshy="fixed_mu" iy_(l_)<iy at some l_
+            DMIN=MIN(temp1(I,J),DMIN) !temp1() contains f(), or other arrays
             DMAX=MAX(temp1(I,J),DMAX)
             RTEMP1(I,J)=temp1(I,J)
          ENDDO
@@ -147,7 +151,10 @@ C
      +    (itype.eq.3 .and. pltso.eq.'first_cl')  .or.
      +    (itype.eq.4 .and. plturfb.eq.'color')   .or.
      +    (itype.eq.7 .and. pltrdc.eq.'onecolor')   .or.
-     +    (itype.eq.7 .and. pltrdc.eq.'allcolor')     ) then 
+     +    (itype.eq.7 .and. pltrdc.eq.'allcolor')   .or.
+     +    (itype.eq.9 .and. pltdrr.eq.'color')    .or. 
+     +    (itype.eq.9 .and. pltdrr.eq.'first_cl') 
+     &                                                  ) then 
           !Other itype can be added later
      
       !YuP[2018-01-27] Added: interpolate f(i,j) to fparprp(npar,nprp)
@@ -185,7 +192,7 @@ C
          ! rweightu,rweightl are the weight factors for lin. interpolation.
          !-2-> For the given ploc, find the nearest i index
          !     in y0pi(i) pitch grid.
-         call lookup_tdf(ploc,y,iy,pweightu,pweightl,iloc)
+         call lookup_tdf(ploc,y,iy_(l_),pweightu,pweightl,iloc)
          !write(*,*)ploc,iloc
          ! ploc is between y(iloc-1) and y(iloc).
          !-3-> Interpolate values of f(i,j) from four points
@@ -246,13 +253,18 @@ c
             do 30 kc=1,ncont
                cont(kc)=exp(cont(kc))
  30         continue
-         else
+         else !pltcase>1
 
 c     Modifying above case, which is usual situation for a function
 c     for which dmin .ge.0. .or. not very  negative, to contours which
 c     will be equispaced for a Maxwellian distribution with temperature
 c     equal to that defined for the distribution:
-            emax=-temp(k,lr_)*log(contrmin)
+            if(cqlpmod.ne."enabled")then
+              temp_kev= temp(k,lr_)  !CQL3D
+            else ! cqlpmod.ne."enabled"
+              temp_kev= temppar(k,ls_) ! CQLP [2021-03-02] added
+            endif
+            emax=-temp_kev*log(contrmin)
             if (emax.gt.enorm) emax=enorm
             gammax=1.+emax/restmkev
             uocmax=sqrt(gammax**2-1.)
@@ -261,9 +273,9 @@ c     equal to that defined for the distribution:
             enddo
             do j=1,ncont
                cont(j)=dmax*
-     +              exp(-restmkev*(sqrt(1.+cont(j)**2)-1.)/temp(k,lr_))
+     +              exp(-restmkev*(sqrt(1.+cont(j)**2)-1.)/temp_kev)
             enddo
-         endif
+         endif !pltcase
 
       else
         if (dmax .gt. 0.) then
@@ -298,7 +310,9 @@ c     equal to that defined for the distribution:
             cont(kc)=exp(cont(kc))
  70       continue
         endif
-      endif
+      endif !dmax
+      
+      
       if (k2.eq.0) k2=1 ! YuP: bug? was if(k.eq.0)
       do 71 js=1,ncont
         tempcntr(js)=cont(js)
@@ -307,22 +321,26 @@ c     equal to that defined for the distribution:
       DO J=1,JXQ
          wx(J)=TAM1(J)
       ENDDO
-      DO I=1,iy
-         wy(I)=y(I,L_)
+      DO I=1,iymax
+         wy(I)=y(i,l_)
       ENDDO
       DO JS=1,NCONT
          RCONT(JS)=CONT(JS)
          !write(*,*)'pltcont: t_,lr_,JS,CONT(JS)=',lr_,JS,CONT(JS)
          if(CONT(JS).gt.0.d0)then
-           RCONTLOG(JS)=LOG10(CONT(JS)) !Can be used for (as an option):
+           if(pltcase.eq.1) then !YuP[2021-08-04] added branch
+             RCONTLOG(JS)=LOG10(CONT(JS)) !Can be used for (as an option):
            !CALL PGCONT(RTEMP2,npar,nprp,1,npar,1,nprp,RCONTLOG,-NCONT,TR)
            ! where RTEMP2(ipar,iprp)=log10(fparprp(ipar,iprp)) 
            ! The LOG10 scale is needed for PGIMAG()
+           else
+             RCONTLOG(JS)= CONT(JS) !
+           endif !pltcase
          else
            RCONTLOG(JS)=-100.
          endif       
       ENDDO
-      IIY=iy
+      IIY=iy_(l_) !YuP: What for?
       RXMAXQ=XMAXQ
 
       CALL PGSVP(R4P2,R4P8,R4P65,R4P9)
@@ -330,8 +348,10 @@ c     equal to that defined for the distribution:
            RXMAXQ=1.
         ENDIF
       CALL PGSWIN(-RXMAXQ,RXMAXQ,R40,RXMAXQ)
-      CALL PGBOX('BCNST',R40,0,'BCNST',R40,0)
-      CALL PGLAB(tx_,ty_,tt_)
+      !CALL PGBOX('BCNST',R40,0,'BCNST',R40,0)
+       !moved PGBOX AFTER plotting contours,
+       !otherwise ticks are overlapped by colored levels
+      !CALL PGLAB(tx_,ty_,tt_)
 
       if( (itype.eq.1 .and. pltd.eq.'color')   .or. 
      +    (itype.eq.1 .and. pltd.eq.'df_color')      .or.
@@ -340,7 +360,10 @@ c     equal to that defined for the distribution:
      +    (itype.eq.3 .and. pltso.eq.'first_cl')  .or.
      +    (itype.eq.4 .and. plturfb.eq.'color')   .or.
      +    (itype.eq.7 .and. pltrdc.eq.'onecolor')   .or.
-     +    (itype.eq.7 .and. pltrdc.eq.'allcolor')     ) then 
+     +    (itype.eq.7 .and. pltrdc.eq.'allcolor')   .or.
+     +    (itype.eq.9 .and. pltdrr.eq.'color')      .or. 
+     +    (itype.eq.9 .and. pltdrr.eq.'first_cl')  
+     &                                                 ) then 
           !Other itype can be added later
 
       !BH,YuP[2018-01-26] Version 2 for color map of distr.func.
@@ -357,9 +380,6 @@ c     equal to that defined for the distribution:
       ! 5- AIPS ( not so bad, but 2 probably is the best)
       FMIN=max(f_zero,dmin) ! or could be a fraction of it.
       FMAX=dmax ! or could be a fraction of it.
-      FLOGMAX=LOG10(dmax)
-      FLOGMIN=LOG10(dmax*contrmin) ! => FLOGMIN=FLOGMAX-LOG10R 
-      !write(*,*)'FLOGMIN,FLOGMAX=',FLOGMIN,FLOGMAX
       !dmin, dmax are found above, for TEMP1(I,J)=f(I,J) (lin. scale). 
       !      but RCONT() levels are log()
       
@@ -383,39 +403,54 @@ c     equal to that defined for the distribution:
       TRPG(4) = 0.0-dvprp
       TRPG(5) = 0.0
       TRPG(6) = dvprp
-      !FLOGMIN=FLOGMAX
-      do ipar=1,npar
-      do iprp=1,nprp
+      if(pltcase.eq.1) then !YuP[2021-08-04] added branch
+        do ipar=1,npar
+        do iprp=1,nprp
          RTEMP2(ipar,iprp)=log10(fparprp(ipar,iprp)) ! to REAL*4
          ! LOG scale - better for color plots?
          !FLOGMIN=MIN(FLOGMIN,RTEMP2(ipar,iprp))
-      enddo
-      enddo
+        enddo
+        enddo
+        ! Draw the map with PGIMAG. 
+        ! Valid only for RTEMP2(ipar,iprp) over rectangular grid!
+        FLOGMAX=LOG10(dmax)
+        FLOGMIN=LOG10(dmax*contrmin) ! => FLOGMIN=FLOGMAX-LOG10R 
+        CALL PGIMAG(RTEMP2,npar,nprp,1,npar,1,nprp,FLOGMIN,FLOGMAX,TRPG)
+        CALL pgwedg('RI',R42,R45, FLOGMIN,FLOGMAX, 'log10(..)') !Colorbar
+      else ! pltcase>1
+        do ipar=1,npar
+        do iprp=1,nprp
+         RTEMP2(ipar,iprp)= fparprp(ipar,iprp) ! to REAL*4
+         ! LIN scale scale in this case
+        enddo
+        enddo
+        CALL PGIMAG(RTEMP2,npar,nprp,1,npar,1,nprp,FMIN,FMAX,TRPG)
+        CALL pgwedg('RI',R42,R45, FMIN,FMAX, '(lin.scale)') !Colorbar
+      endif ! pltcase
       
-      ! Draw the map with PGIMAG. 
-      ! Valid only for RTEMP2(ipar,iprp) over rectangular grid!
-      CALL PGIMAG(RTEMP2,npar,nprp,1,npar,1,nprp,FLOGMIN,FLOGMAX,TRPG)
-      ! Colorbar:
-      CALL pgwedg('RI',R42,R45, FLOGMIN,FLOGMAX, 'log10(..)')
       
-      endif ! on color option
+      endif !----------- on color option
+      
+      
 
       ! Overlay contours, with black color:
       CALL PGSCI(1) ! 1==black 
 
       ! Plot original f(i,j) in (v,pitch) coord 
       ! (lin.scale of f, but log scale of RCONT)
-      CALL PGCONX(RTEMP1,iy,jx,1,iy,1,JXQ,RCONT,NCONT,PGFUNC1)
+      CALL PGCONX(RTEMP1,iymax,jx,1,iy_(l_),1,JXQ, RCONT,NCONT,PGFUNC1)
 
       ! Or plot the interpolated fparprp(ipar,iprp) 
       ! over (vpar,vprp) rectangular grid:
       !CALL PGSLW(1) !lnwidth=1 thin line
       !CALL PGCONT(RTEMP2,npar,nprp,1,npar,1,nprp,RCONTLOG,-NCONT,TR)
       CALL PGSLW(3) !restore lnwidth=3 normal line width
-
+      CALL PGBOX('BCNST',R40,0,'BCNST',R40,0) !with ticks on sides
+      CALL PGLAB(tx_,ty_,tt_) !labels
 
 
       t0t=sin(thb(l_))/cos(thb(l_))  ! PLOT t-p boundary (ZOW cone)
+      CALL PGSLS(2) ! 2-> dashed
       if (t0t .lt. 1.) then
          RXPTS(1)=0.
          RYPTS(1)=0.
@@ -433,22 +468,30 @@ c     equal to that defined for the distribution:
          RXPTS(2)=-XMAXQ/T0T
          CALL PGLINE(2,RXPTS,RYPTS)
       endif
+      CALL PGSLS(1) ! 1-> restore solid line
 
 
       !YuP[03-2016] Added: plot v=vnorm line
       !plot v=vth line, for the k-th gen. species
       if (pltlim.eq.'u/c' .or. pltlim.eq.'energy') then        
-        do i=1,iy
-        RTAB1(i)= coss(i,lr_)/cnorm ! v_par/c  (cnorm is c/vnorm)
-        RTAB2(i)= sinn(i,lr_)/cnorm ! v_perp/c
+        do i=1,iy_(l_)
+        RTAB1(i)= coss(i,l_)/cnorm ! v_par/c  (cnorm is c/vnorm)
+        RTAB2(i)= sinn(i,l_)/cnorm ! v_perp/c
+        !YuP[2021-03-02] changed lr_ to l_ (important for CQLP)
         enddo
       else ! v/vnorm units
-        do i=1,iy
-        RTAB1(i)= coss(i,lr_) ! v_par/vnorm
-        RTAB2(i)= sinn(i,lr_) ! v_perp/vnorm
+        do i=1,iy_(l_)
+        RTAB1(i)= coss(i,l_) ! v_par/vnorm
+        RTAB2(i)= sinn(i,l_) ! v_perp/vnorm
+        !YuP[2021-03-02] changed lr_ to l_ (important for CQLP)
         enddo
       endif
-      CALL PGLINE(iy,RTAB1,RTAB2)
+      CALL PGLINE(iy_(l_),RTAB1,RTAB2)
+      CALL PGSCI(2) !red color
+      do i=1,iy_(l_)  ![2022-02-10] Added dots at y-mesh points.
+      CALL PGPT1(RTAB1(i),RTAB2(i),17) !Marker at each grid point.
+      enddo
+      CALL PGSCI(1) ! black color restore
       
       !plot v=vth line, for the k-th gen. species
 c..................................................................
@@ -457,21 +500,28 @@ c     vth is the thermal velocity =sqrt(T/m) (at t=0 defined in ainpla).
 c     But, T==temp(k,lr) can be changed in profiles.f, 
 c     in case of iprote (or iproti) equal to "prbola-t" or "spline-t"
 c..................................................................
+      if(cqlpmod .ne. "enabled")then
+          vth_l= vth(k,lr_)
+      else !(cqlpmod.eq."enabled") ! YuP[2021-02-26]
+          vth_l= vthpar(k,ls_)
+      endif
       if (pltlim.eq.'u/c' .or. pltlim.eq.'energy') then        
-          do i=1,iy
-          RTAB1(i)= (vth(k,lr_)/clight)*coss(i,lr_) ! vth_par/c
-          RTAB2(i)= (vth(k,lr_)/clight)*sinn(i,lr_) ! vth_perp/c
+          do i=1,iy_(l_)
+          RTAB1(i)= (vth_l/clight)*coss(i,l_) ! vth_par/c
+          RTAB2(i)= (vth_l/clight)*sinn(i,l_) ! vth_perp/c
+          !YuP[2021-03-02] changed lr_ to l_ (important for CQLP)
           enddo
       else ! v/vnorm units
-          do i=1,iy
-          RTAB1(i)= (vth(k,lr_)/vnorm)*coss(i,lr_) ! vth_par/vnorm
-          RTAB2(i)= (vth(k,lr_)/vnorm)*sinn(i,lr_) ! vth_perp/vnorm
+          do i=1,iy_(l_)
+          RTAB1(i)= (vth_l/vnorm)*coss(i,l_) ! vth_par/vnorm
+          RTAB2(i)= (vth_l/vnorm)*sinn(i,l_) ! vth_perp/vnorm
+          !YuP[2021-03-02] changed lr_ to l_ (important for CQLP)
           enddo
       endif
       ! Five different line styles are available:
       ! 1 (full line), 2 (dashed), 3 (dot-dash-dot-dash), 4 (dotted),
       CALL PGSLS(4) 
-      CALL PGLINE(iy,RTAB1,RTAB2)
+      CALL PGLINE(iy_(l_),RTAB1,RTAB2)
       CALL PGSLS(1) ! 1-> restore solid line
       CALL PGSLW(lnwidth) !lnwidth=3 line width in units of 0.005
 
@@ -482,16 +532,22 @@ c..................................................................
         CALL PGMTXT('B',R46,R40,R40,t_)
       write(t_,151) rovera(lr_),rr
         CALL PGMTXT('B',R47,R40,R40,t_)
-      write(t_,153) rya(lr_), rpcon(lr_), lr_
+      if(cqlpmod.ne."enabled")then
+        write(t_,153) rya(lr_), rpcon(lr_), lr_
+      else ! (cqlpmod.eq."enabled")
+        write(t_,154) rya(lr_), l_ !YuP[2021-03-02] added, for CQLP
+      endif
         CALL PGMTXT('B',R48,R40,R40,t_)
  150  format("time step n=",i5,5x,"time=",1pe10.2," secs")
  151  format( "r/a=",1pe10.3,5x,"radial position (R)=",1pe12.4," cm")
  153  format( "rya=",1pe10.3,5x,"R=rpcon=",1pe12.4," cm,  Surf#",i4)
+ 154  format( "rya=",1pe10.3,5x, "l_(index along B)=",i5)
  999  return
       end
 C
 C
       subroutine PGFUNC1(VISBLE,yplt,xplt,zplt)
+      !Used in subr. pltcont and pltstrml
       INTEGER VISBLE
       REAL*4 xplt,yplt,zplt
       pointer wx,wy
@@ -518,12 +574,12 @@ C     THIS SUBROUTINE MOVES PEN TO NORMALIZED V_PARALLEL,V_PERP COORDS.
       ENDIF
 
       IIY=INT(yplt)
-      IF (IIY.GE.1 .AND. IIY.LT.iy) THEN
+      IF (IIY.GE.1 .AND. IIY.LT.iymax) THEN
          YY=wy(IIY) + (yplt-IIY)*(wy(IIY+1)-wy(IIY))
       ELSEIF (IIY.LE.1) THEN
          YY=wy(1)
       ELSE
-         YY=wy(iy)
+         YY=wy(iymax)
       ENDIF
 
       XWORLD=XX*COS(YY)

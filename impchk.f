@@ -15,9 +15,10 @@ c..................................................................
       include 'comm.h'
       include 'advnce.h'
 C%OS  
-      dimension zermx(51),imx(51),jmx(51),zsumj3(iy),zsumj4(iy)
-      dimension zdiffj(iy),zdiffi(jx)
-      dimension zdns(lrorsa)
+      dimension zermx(51),imx(51),jmx(51),zsumj3(iymax),zsumj4(iymax)
+      !YuP[2021-03-11] Renamed iy-->iymax in declarations, just in case.
+      dimension zdiffj(iymax),zdiffi(jx)
+      dimension zdns(lrors) !local (not really needed)
 C%OS  
       fpithta(i,j)=f(i+1,j,k,l_)*(1.-dithta(i,j,l_)) + 
      +  f(i  ,j,k,l_)*dithta(i,j,l_)
@@ -33,7 +34,7 @@ c..................................................................
 c     temp3 contains the r.h.s. and temp4 the l.h.s.
 c..................................................................
 
-      do 10 i=1,iy
+      do 10 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
         if ((i.eq.itl .or. i.eq.itu) .and. cqlpmod.ne."enabled")go to 10
 c%OS  do 2 j=1,jx
         do 2 j=2,jx-1
@@ -63,7 +64,7 @@ c..................................................................
 c     Pass/trapped boundary
 c..................................................................
 
-      if (cqlpmod .eq. "enabled") go to 50
+      if (cqlpmod.eq."enabled") go to 50
 
 c%OS  should be j=1,jx? may depend on lbdry
       do 3 j=2,jx-1
@@ -96,7 +97,7 @@ c     compute highest errors
         zermx(ii) = 0.0
  99   continue
 c
-      do 100 i=1,iy
+      do 100 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
         zsumj3(i) = 0.0
         zsumj4(i) = 0.0
         do 110 j=1,jx
@@ -135,7 +136,7 @@ c
       do 120 j=1,jx
         zsumi3 = 0.0
         zsumi4 = 0.0
-        do 121 i=1,iy
+        do 121 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
           zsumi3 = zsumi3 + temp3(i,j)
           zsumi4 = zsumi4 + temp4(i,j)
  121    continue
@@ -151,7 +152,7 @@ c..................................................................
 
       if (symtrap .eq. "enabled") then
         do 4 i=iyh+1,itu
-          ii=iy+1-i
+          ii=iy_(l_)+1-i  !iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
           do 6 j=1,jx
             temp3(i,j)=temp3(ii,j)
  6        continue

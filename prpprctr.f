@@ -105,5 +105,6 @@ c990131        smaxm=alog(-dmin)
       CALL PGSLS(1) ! restore: solid line
       CALL PGSLW(lnwidth) ! restore linewidth
 
+      CALL PGSCH(R41) ! restore to default font size      
       return
       end

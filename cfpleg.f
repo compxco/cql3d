@@ -47,25 +47,38 @@ c     and iy+1-imax,iy
 c.......................................................................
 
       iend=itl
-      if (cqlpmod .eq. "enabled") iend=iyh
+      if (cqlpmod.eq."enabled") iend=iyh
+      
+      if (cqlpmod.eq."enabled") then !YuP[2021-04-02] added
+        iiy=iy_(l) !CQLP: iy_ at given poloidal index;
+        !However, in CQLP run, cfpleg is called from 
+        !loop  do 600 l=iorbstr,iorbend == l_,l_ 
+        !so that l=l_ anyway.
+      else !CQL3D
+        iiy=iy_(l_) !CQL3D: at given radial index
+      endif
 
-c     passing particles
+c     passing particles for CQL3D (or all particles for CQLP)
       do 100 i=1,iend
-        ia=iy-i+1
+        ia=iiy-i+1 !!YuP[2021-03-12] iy-->iy_(l_)
         do 110 j=jzmin,jx
           tam1(j)=tam1(j)+temp3(i,j)*dcofleg(i,l,m,indxlr_)+
      +      temp3(ia,j)*dcofleg(ia,l,m,indxlr_)
  110    continue
  100  continue
 
-      if (cqlpmod .eq. "enabled") go to 200
+      if (cqlpmod.eq."enabled") go to 200 !skip another loop below.
       if (l.eq.lz .or. imax(l,lr_).eq.itl) go to 200
 
 c     particles in trapped region but passing poloidal position l
 c     Note: dcofleg(imax) includes contribution up to turning point
 
       do 120 i=iend+1,imax(l,lr_)
-        ia=iy-i+1
+        !CQL3D: l is index along pol.angle (field line), and l_=radial
+        !CQLP:  l is along field line, and l_ is also along field line
+        !But this part is skipped by CQLP anyway, because ALL particles
+        !are already included in the i=1,iend loop above.
+        ia=iiy-i+1 !!YuP[2021-03-12] iy-->iy_(l_)
         do 121 j=jzmin,jx
           tam1(j)=tam1(j)+temp3(i ,j)*dcofleg(i,l,m,indxlr_)+
      +      temp3(ia,j)*dcofleg(ia,l,m,indxlr_)
@@ -74,7 +87,8 @@ c     Note: dcofleg(imax) includes contribution up to turning point
 
  200  continue
       sa=dfloat(2*m+1)*0.5  !Per Eq. 3.1.63 in Killeen book for V_m
-      call dscal(jx,sa,tam1,1)
+      !call dscal(jx,sa,tam1,1) !YuP[2022-12] issues in some debug mode
+      tam1=tam1*sa !YuP[2022-12-16] same as above dscal
 
       return
       end

@@ -20,7 +20,7 @@ c..................................................................
       include 'advnce.h'
       sumleft=0.
       sumright=0.
-      do 90 i=1,iy
+      do 90 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
 
 c..................................................................
 c     Pass/trapped boundary condition (itl and itu)

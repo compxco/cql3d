@@ -44,7 +44,7 @@ CMPIINSERT_IF_RANK_EQ_0
      +   SUM(totcurz),SUM(rovs)
 CMPIINSERT_ENDIF_RANK
         
-      else
+      else ! (cqlpmod.eq."enabled")
       
         write(iunwrif,9103)
         do k=1,ngen

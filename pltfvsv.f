@@ -10,7 +10,7 @@ c
       REAL*4 REMAX,REMIN
       REAL*4 :: R4P2=.2,R4P8=.8,R4P35=.35,R4P9=.9
       REAL*4 :: R40=0.,R41P44=1.44
-      REAL*4 :: R47=7.,R48=8.,R49=9.,R410=10.
+      REAL*4 :: R47=7.,R48=8.,R49=9.,R410=10.,R412=12.
 
       CHARACTER*64 TX_
       real*8 wkd(jx) 
@@ -69,7 +69,8 @@ c...
          imsh(1)=1
          imsh(2)=itl
          imsh(3)=iyh
-         imsh(4)=iy
+         imsh(4)=iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
+         !Note that for meshy="fixed_mu" iy_(l_) can be less than iy
          imsh(5)=0
          
          call bcast(tam4,zero,jx)
@@ -79,10 +80,14 @@ c          function.
 c     tam5 to contain pitch angle integrated distribution <f> such
 c          that integral{<f> d(gamma)} = fsa density.
 c          tam5=2*pi*x*cnorm2*gamma*int_i{sinn*dy*vptb*f_code}/zmaxpsi.
-         do 40 i=1,iy
+         do 40 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
+            !Note that for meshy="fixed_mu" iy_(l_) can be less than iy
             do 30 j=1,jx
                tam4(j)=tam4(j)+f(i,j,k,l_)*cynt2(i,l_)
-               tam5(j)=tam5(j)+f(i,j,k,l_)*cynt2(i,l_)*vptb(i,l_)
+               tam5(j)=tam5(j)+f(i,j,k,l_)*cynt2(i,l_)*vptb(i,lr_)
+               !YuP[2021-02-26] Corrected vptb(i,l_)->vptb(i,lr_)
+               !This is important for CQLP (when lr_=1, but l_=1:ls)
+               !Probably should not be using vptb in CQLP version at all.
  30         continue
  40      continue
          do 41 j=1,jx
@@ -120,7 +125,8 @@ c-----------------------------
            if (fmax .gt. emax) emax=fmax
  60     continue
         emax=emax*1.03
-        emin=emax/1.e+12
+!        emin=emax/1.e+12
+        emin=emax*contrmin
 
 
         DO J=1,JXQ
@@ -186,16 +192,21 @@ c-----------------------------
           write(t_,10020) 
        endif
 
-        CALL PGMTXT('B',R47,R40,R40,t_)
-        write(T_,10023) K,ENORM
-        CALL PGMTXT('B',R48,R40,R40,t_)
-
-
+       CALL PGMTXT('B',R47,R40,R40,t_)
+       write(T_,10023) K,ENORM
+       CALL PGMTXT('B',R48,R40,R40,t_)
 
        write(t_,10010) n,timet
-        CALL PGMTXT('B',R49,R40,R40,t_)
+       CALL PGMTXT('B',R49,R40,R40,t_)
        write(t_,10011) rovera(lr_),rr
-        CALL PGMTXT('B',R410,R40,R40,t_)
+       CALL PGMTXT('B',R410,R40,R40,t_)
+
+       if(cqlpmod.eq."enabled")then !YuP[2021-03-03] added for CQLP:
+        write(t_,10032) l_,sz(l_)
+10032 format("Index along B, l=",i4, 4x,  
+     &       "Parallel position s=",1pe14.6,"cm")
+        CALL PGMTXT('B',R412,R40,R40,t_)
+       endif
 
 c        CALL PGEND
 c        STOP

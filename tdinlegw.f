@@ -65,7 +65,7 @@ c     CQL3D: imax points in two intervals [1,imax] and [iy+1-imax,iy]
       iigstrt=(iistart-1)*ngauss+1
       iparts=2
 c     CQLP: one interval [1,iy]
-      if (cqlpmod .eq. "enabled") then
+      if (cqlpmod.eq."enabled") then
         ipoints=iy_(klmesh)
         iistart=0
         iigstrt=0
@@ -107,7 +107,7 @@ c     compute m=1 (i.e. cos(th)) and total weight
             zxgh(ig,0)=zxgh(ig,0)*bbpsi(klpar,klrad)*sin(zxg(ig))*
      +        cos(zxg(ig))/zxgh(ig,1)
  111      continue
-        else
+        else ! (cqlpmod.eq."enabled")
           do 112 ig=ig0+1,ig0+inxgau
             zxgh(ig,1)=cos(zxg(ig))
             zxgh(ig,0)=zxgh(ig,0)*sin(zxg(ig))
@@ -204,7 +204,7 @@ cl    1.4 For CQL3D case, add contribution of integral between theta=imax
 cl    and the turning-point, computed in dpcosz(imax)
 c.......................................................................
 
-      if (cqlpmod .eq. "enabled") return
+      if (cqlpmod.eq."enabled") return
 
       iimax=iy_(klmesh)+1-imax(klpar,klrad)
       do 140 m=0,mmx
@@ -232,7 +232,7 @@ c.......................................................................
  200  continue
 
       iend=imax(klpar,klrad)-1
-      if (cqlpmod .eq. "enabled") iend=iyh_(klmesh)-1
+      if (cqlpmod.eq."enabled") iend=iyh_(klmesh)-1
 
       do 201 m=0,mmx
         do 202 i=2,iend

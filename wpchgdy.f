@@ -43,7 +43,7 @@ c.......................................................................
       cynt2(iyh,l_)=dy(iyh,l_)*twopi*sinn(iyh,l_)
       cynt2(iyh+1,l_)=cynt2(iyh,l_)
       twoint(l_)=0.
-      do 200 i=1,iy
+      do 200 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
         twoint(l_)=twoint(l_)+cynt2(i,l_)
  200  continue
 

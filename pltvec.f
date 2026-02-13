@@ -19,6 +19,8 @@ c...................................................................
       REAL*4 :: R40=0.,R4P2=.2,R4P25=.25,R4P5=.5
       REAL*4 :: R4P8=.8,R4P65=.65,R4P9=.9
 
+      real*8 xh(jpxy,ipxy),yh(jpxy,ipxy) !YuP[2020-12-17] added working array,
+         ! to avoid overwriting xtail,ytail arrays
 
       include 'advnce.h'
 
@@ -201,7 +203,7 @@ c          sin(theta)*Gamma_theta interpolated onto the code mesh
 c          x,theta.  temp5 and temp4 are the parallel and perpendicular
 c          components of Gamma, respectively, on the x,theta-mesh.
          if (implct .eq. "enabled") then
-            do 140 i=2,iy-1
+            do 140 i=2,iy_(l_)-1 !YuP[2021-03-12] iy-->iy_(l_) in many places
                do 141 j=2,jxm1
                   tam2(j)=-(gfi(i,j,k)+gfi(i,j-1,k))*.5/xsq(j)
                   tam3(j)=-(hfi(i,j)+hfi(i-1,j))*.5*xi(j)
@@ -218,16 +220,16 @@ c$$$     +                    ((temp4(i,j),i=46,50),j=1,20)
 
 
          else
-            temp1(0:iy+1,0:jx+1)=f_(0:iy+1,0:jx+1,k,l_)
-            temp2(0:iy+1,0:jx+1)=fxsp(0:iy+1,0:jx+1,k,l_)
+            temp1(0:iy_(l_)+1,0:jx+1)=f_(0:iy_(l_)+1,0:jx+1,k,l_)
+            temp2(0:iy_(l_)+1,0:jx+1)=fxsp(0:iy_(l_)+1,0:jx+1,k,l_)
             do 240 j=2,jxm1
-               do 241 i=2,iy-1
+               do 241 i=2,iy_(l_)-1
                   temp6(i,j)=-(gfu(i,j,k)+gfu(i,j-1,k))*.5/xsq(j)
  241           continue
  240        continue
             call dcopy(iyjx2,temp2(0,0),1,temp1(0,0),1)
             call dcopy(iyjx2,f(0,0,k,l_),1,temp2(0,0),1)
-            do 242 i=2,iy-1
+            do 242 i=2,iy_(l_)-1
                do 243 j=2,jxm1
                   tam3(j)=-(hfu(i,j)+hfu(i-1,j))*.5*xi(j)
                   temp5(i,j)=temp6(i,j)*coss(i,l_)-tam3(j)
@@ -251,9 +253,9 @@ c      write(*,*)'pltvec:  lr_,lefct =',lr_,lefct
 c      write(*,*)'pltvec:  temp4, temp5',
 c     +     ((temp4(i,j),temp5(i,j),i=1,10),j=1,10)
 
-         call dcopy(iyjx2,temp5(0,0),1,temp3(0,0),1)
+         call dcopy(iyjx2,temp5(0,0),1,temp3(0,0),1) !temp5-->temp3
 
-         call prppr(target,"norm",xll,xlu,xpl,xpu)
+         call prppr(target,"norm",xll,xlu,xpl,xpu) !uses temp3; makes fpn
 
 cBH090226         call dcopy(iyjx2,temp2(0,0),1,temp1,1)
          ipxjpx=jpxy*ipxy
@@ -261,21 +263,24 @@ cBH090226         call dcopy(iyjx2,temp2(0,0),1,temp1,1)
 
          call dcopy(iyjx2,temp4(0,0),1,temp3(0,0),1)
 
-         call prppr(target,"norm",xll,xlu,xpl,xpu)
+         call prppr(target,"norm",xll,xlu,xpl,xpu) !uses temp3; makes fpn
 
 cBH090226          call dcopy(iyjx2,temp2(0,0),1,temp4,1)
          call dcopy(ipxjpx,fpn,1,yhead,1)
-
+         
          do 150 i=1,ipxy
             do 151 j=1,jpxy
                xtail(j,i)=xpar(j)
                ytail(j,i)=xperp(i)
  151        continue
  150     continue
+         xh(:,:)=xhead(:,:) !YuP[2020-12-17] Save. xhead can be adjusted below
+         yh(:,:)=yhead(:,:) !YuP[2020-12-17] Save. yhead can be adjusted below
          !write(*,*)'pltvec: jpxy,xpar=',jpxy,(xpar(j),j=1,jpxy)
          !write(*,*)'pltvec: ipxy,xperp=',ipxy,(xperp(i),i=1,ipxy)
 
-        
+
+         !------- LOWER plot (linear scale for arrows) --------------
          RPG1=xmaxq
          CALL PGSWIN(-RPG1,RPG1,R40,RPG1)
          CALL PGBOX('BCNST',R40,0,'BCNST',R40,0)
@@ -302,8 +307,30 @@ c     +                 jp,ip,xhead(jp,ip),yhead(jp,ip)
 c      enddo
 c      enddo
 c         write(*,*)'pltvectr lin: n,lr_,lefct=',n,lr_,lefct
-         call pltvectr(xtail,ytail,xhead,yhead,rheads,jpxy,ipxy,veclen,
-     +                noplots)
+
+         !YuP[2020-12-17] Trying some adjustments for arrow length,
+         ! for linear-scale plot:
+!         do i=1,ipxy !perp index
+!         do j=1,jpxy ! par index
+!           if(l_.eq.1 .and. i.eq.2)then
+!             rheads(j)=sqrt(xhead(j,i)**2+yhead(j,i)**2)
+!             write(*,'(a,3e11.3)')'xhead,yhead,rheads(j)',
+!     &        xhead(j,i),yhead(j,i),rheads(j)
+!           endif
+!           !xhead(j,i)=min(xhead(j,i),1.d23)
+!           !xhead(j,i)=max(xhead(j,i),-1.d23)
+!           !yhead(j,i)=min(yhead(j,i),1.d23)
+!           !yhead(j,i)=max(yhead(j,i),-1.d23)
+!         enddo
+!         enddo
+         
+         call pltvectr(xtail,ytail,xhead,yhead,jpxy,ipxy,veclen,
+     +                noplots)  ! here: LOWER plot - lin.scale
+     
+         xhead(:,:)=xh(:,:) !YuP[2020-12-17] restore. xhead could be adjusted above
+         yhead(:,:)=yh(:,:) !YuP[2020-12-17] restore. yhead could be adjusted above
+     
+         !---> Plot trap-pass boundary
          t0t=sin(thb(l_))/cos(thb(l_))
          if (t0t .lt. 1.) then
             RPGX(1)=0.
@@ -326,26 +353,30 @@ cBH060411            RPGX(2)=-xmaxq*t0t
             CALL PGLINE(2,RPGX,RPGY)
          endif
 
+
+         !------- TOP plot (log() scale for arrows) --------------
          rhmin=ep90
          rhmax=-ep90
-         do 160 i=1,ipxy
-            do 159 j=1,jpxy
- 159           rheads(j)=sqrt(xhead(j,i)**2+yhead(j,i)**2)+em90
-               call aminmx(rheads,1,jpxy,1,rhminsww,rhmaxsww,kmin,kmax)
-               rhmin=min(rhmin,rhminsww)
-               rhmax=max(rhmax,rhmaxsww)
- 160        continue
-            if (rhmin.lt.rhmax*contrmin) rhmin=rhmax*contrmin
-            rhscale=log(rhmax)-log(rhmin)
-            do 170 i=1,ipxy
-               do 171 j=1,jpxy
+         do i=1,ipxy
+            do j=1,jpxy
+               rheads(j)=sqrt(xhead(j,i)**2+yhead(j,i)**2)+em90
+            enddo
+            call aminmx(rheads,1,jpxy,1,rhminsww,rhmaxsww,kmin,kmax)
+            rhmin=min(rhmin,rhminsww)
+            rhmax=max(rhmax,rhmaxsww)
+         enddo
+         if (rhmin.lt.rhmax*contrmin) rhmin=rhmax*contrmin
+         rhscale=log(rhmax)-log(rhmin)
+         do 170 i=1,ipxy
+              do 171 j=1,jpxy
                   rhead=em90+sqrt(xhead(j,i)**2+yhead(j,i)**2)
                   rhlog=log(rhead)+rhscale
                   if (rhlog.lt.0.) rhlog=0.
                  xhead(j,i)=xhead(j,i)*rhlog/rhead
-                 yhead(j,i)=yhead(j,i)*rhlog/rhead
+                 yhead(j,i)=yhead(j,i)*rhlog/rhead                 
  171          continue
- 170       continue
+ 170     continue
+
 cBH060411           CALL PGSVP(.2,.8,.6,.9)
            CALL PGSVP(R4P2,R4P8,R4P65,R4P9)
            RPG1=xmaxq
@@ -361,8 +392,13 @@ cBH060411           CALL PGSVP(.2,.8,.6,.9)
            CALL PGLAB(' ','Perp '//t_,' ')
 c     Plot vector field, vector lengths proportional to log(abs(flux)),
 c     from max(abs(flux)) to contrmin*max(abs(flux)):
-           call pltvectr(xtail,ytail,xhead,yhead,rheads,jpxy,ipxy,
-     +          veclen,noplots)
+           call pltvectr(xtail,ytail,xhead,yhead,jpxy,ipxy,
+     +          veclen,noplots) !here: Top plot: log scale for arrows
+
+           xhead(:,:)=xh(:,:) !YuP[2020-12-17] restore. xhead could be adjusted above
+           yhead(:,:)=yh(:,:) !YuP[2020-12-17] restore. yhead could be adjusted above
+     
+           !---> Plot trap-pass boundary
            t0t=sin(thb(l_))/cos(thb(l_))
            if (t0t .lt. 1.) then
               RPGX(1)=0.
@@ -384,7 +420,8 @@ cBH170721            RPGX(2)=-xmaxq*t0t
               RPGX(2)=-xmaxq/t0t
               CALL PGLINE(2,RPGX,RPGY)
            endif
- 190    continue
+           
+ 190  continue ! k=1,ngen
       return
       end subroutine pltvec
       

@@ -253,7 +253,7 @@ c     special case if only one point: l_lower(i)=l_upper(i)=1
             go to 230
           endif
 
-          ii=iymax+1-i
+          !YuP: Not used in this loop? ii=iymax+1-i
           do 2301 l=1,ls
             do 2302 icol=1,iband
               do 2303 j=2,jx
@@ -263,7 +263,8 @@ c     special case if only one point: l_lower(i)=l_upper(i)=1
  2302       continue
             do 2304 j=2,jx
               rhspar(l,j,1)=0.0
-              rhspar(ls-2+l,j,1)=0.0
+              rhspar(ls-2+l,j,1)=0.0  !YuP: from this line, the size of rhspar
+                                      !should be 2*ls-2 (in first dimension) 
               rhspar(l,j,2)=0.0
  2304       continue
  2301     continue
@@ -274,6 +275,7 @@ c.......................................................................
 
           do 231 l=1+ipstrt*imstrt,l_upper(i)-ipend*imend
             ilsrow=lsbtopr(l)
+            !write(*,*)'l,ilsrow=lsbtopr(l)=',l,ilsrow
 
 c.......................................................................
 cl    2.3.1.1 cos(theta) > 0
@@ -328,10 +330,11 @@ c     yet treated
 c.......................................................................
 
  2313       if (sbdry.ne."periodic" .or. l_upper(i).eq.ls .or. l.eq.1)
-     1        go to 231
+     1        go to 231 ! next l
 
             ll=ls+2-l
             ilsrow=lsbtopr(ll)
+            !write(*,*)'ll,ilsrow=lsbtopr(ll)=',ll,ilsrow
 
 c.......................................................................
 cl    2.3.1.3.1 cos(theta) > 0, ll=ls+2-l
@@ -380,7 +383,8 @@ c.......................................................................
 c.......................................................................
 c     end of construction of matrix
 
- 231      continue
+ 231      continue ! l
+
 
 c.......................................................................
 cl    2.3.2 Apply the boundary conditions
@@ -464,7 +468,7 @@ c     point l=1:
                 zmat(ijdiag-2)=bndmats(j,1,4,2)
                 zmat(ijdiag-1)=bndmats(j,1,5,2)
                 zmat(ijdiag  )=bndmats(j,1,3,2)
-              endif
+              endif ! icombin .eq. 2
 
 c%OS  
               call dcopy(ilslen*iband,zmat,1,zmat2,1)
@@ -485,12 +489,18 @@ c.......................................................................
      +          ," nonsym: icond = ",i4)') icond
 
 c%OS  check solution
+!YuP[2021-03-08] Something is wrong here: l-ileft-1+jcol gets to -1
+! but 1st dimension in rhspar starts with 0.  Commenting this part 
               zdiff=0.0
               do 2337 l=1,ilslen
                 zzzl=0.0
                 do 2338 jcol=1,iband
-                  zzzl=zzzl+zmat2((l-1)*iband+jcol)
-     !              *rhspar(l-ileft-1+jcol,j,iic)
+                !write(*,*)' l-ileft-1+jcol=',l-ileft-1+jcol !YuP: becomes -1
+                !when ileft=2 (for sbdry="periodic") , jcol=1.
+                !It seems this version (two lines below) is only valid
+                !when sbdry.ne."periodic" (in which case ileft=1)
+!YuP                  zzzl=zzzl+zmat2((l-1)*iband+jcol)
+!YuP     !              *rhspar(l-ileft-1+jcol,j,iic)
  2338           continue
                 zdiff=zdiff + abs((zxdumy2(l)-zzzl)/zxdumy2(l))
  2337         continue
@@ -541,7 +551,6 @@ c     end of loop over general species
 c.......................................................................
 cl    3. Check the solution
 c.......................................................................
-
       if (scheck .eq. "enabled") call wpcheck
 
 c.......................................................................

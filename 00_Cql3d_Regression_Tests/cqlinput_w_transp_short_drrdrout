@@ -1,0 +1,434 @@
+ &setup0
+ ibox='hector',
+ iuser='anderson',
+ ioutput=6,
+ noplots='enabled',
+ lrz=7
+ lrzmax=7
+ mnemonic='aniso_maxwell_80v_100V_st_fusionrate_enabled_3species_z6_transp_short_drrdrout'
+ &end
+
+ &setup
+ bnumb(1)=+1.,
+ bnumb(2)=+1.,
+! bnumb(3)=+13.,
+ bnumb(3)=-1.,
+! bootcalc='method1',
+ bootcalc='disabled',
+ bootsign=+1.
+ bootupdt='enabled'
+ bootst='disabled',
+ bth=1.00e+3,
+ btor=1.032e+4,
+ chang='noneg',
+ colmodl=0,
+ contrmin=1.e-12,
+
+
+!!adding in lines to compute neutron flux 
+sigmamod = "enabled"
+!sigmamod = "disabled"
+isigmas(1)=0,
+isigmas(2)=0,
+isigmas(3)=1,
+isigmas(4)=1,
+isigmas(5)=0,
+isigmas(6)=0,
+isigsgv1 = 0
+isigsgv2 = 0
+
+
+
+ dtr=.2e-3
+ nondtr1=5,6,46,55,78,79,119,128
+ dtr1=.1e-3 .01e-3 .1e-3 .2e-3 .1e-3 .01e-3 .1e-3 .2e-3
+ 
+ eegy(1,1,1,1)=0.,
+ eegy(1,2,1,1)=2.,
+ eegy(2,1,1,1)=0.,
+ eegy(2,2,1,1)=6.,
+ efswtch='method1'
+ efflag='parallel'
+! elecfld(0)=+25.0e-4
+! elecfld(1)=+25.0e-4
+! elecfld(0)=+25.0e-5
+! elecfld(1)=+25.0e-5
+
+!Simple time-dependent electric field and profiles (can add points).
+ nbctime=9
+ bctime(1)= 0. 0.9e-3 1.00e-3 1.092e-3 6.e-3 6.9e-3 7.00e-3 7.092e-3 10e-3  !secs    could expand to 400us
+ elecb=  1.e-5 1.e-5 -.20    1.e-5  1.e-5 1.e-5 -.20    1.e-5  1.e-5     !V/cm
+ elecc= 1.e-4 1.e-4 0.8 1.e-4 1.e-4 1.e-4 1.0 1.e-4 1.e-4     !V/cm
+ tempb(1,1)= .01 .01 .01 .01 .01 .01 .01 .01 .01 
+ tempc(1,1)= .22 .22 .22 .22 .22 .22 .22 .22 .22
+ tempb(1,2)= .01 .01 .01 .01 .01 .01 .01 .01 .01 
+ tempc(1,2)= .22 .22 .22 .22 .22 .22 .22 .22 .22
+! tempb(1,3)= .01 .01 .01 .01 .01 .01 .01 .01 .01 
+! tempc(1,3)= .325 .325 .325 .325 .325  .325 .325 .325 .325 
+ tempb(1,3)=  .01 .01 .01 .01 .01 .01 .01 .01 .01 
+ tempc(1,3)=  .34 .34 .34 .34 .34 .34 .34 .34 .34 
+ redenb(1,1)= 0.1e12 0.1e12 0.1e12 0.1e12 0.1e12 0.1e12 0.1e12 0.1e12 0.1e12 
+ redenc(1,1)= .65e13 .65e13 .65e13 .65e13 .65e13 .65e13 .65e13 .65e13 .65e13 
+ redenb(1,2)= 0.1e12 0.1e12 0.1e12 0.1e12 0.1e12 0.1e12 0.1e12 0.1e12 0.1e12 
+ redenc(1,2)= .65e13 .65e13 .65e13 .65e13 .65e13 .65e13 .65e13 .65e13 .65e13
+
+! redenb(1,3)= 1.0e10 1.0e10 1.0e10 1.0e10 1.0e10 1.0e10 1.0e10 1.0e10 1.0e10 
+! redenc(1,3)= 1.0e11 1.0e11 1.0e11 1.0e11 1.0e11 1.0e11 1.0e11 1.0e11 1.0e11
+
+
+ redenb(1,3)= 0.1e12 0.1e12 0.1e12 0.1e12 0.1e12 0.1e12 0.1e12 0.1e12 0.1e12 
+ redenc(1,3)= .75e13 .75e13 .75e13 .75e13 .75e13 .75e13 .75e13 .75e13 .75e13  
+ zeffb(1)= 2. 2. 2. 2. 2. 2. 2. 2. 2. 
+ zeffc(1)= 6. 6. 6. 6. 6. 6. 6. 6. 6. 
+
+! enein =  1.720E+13   1.540E+13   1.100E+13  0.920E+13  0.690E+13
+ enloss(1)=200.,
+ enmax=100.,
+ enmin=5.,
+ enorm=500.,
+ eoved=.00,
+ ephicc=1.,
+ fds=.2,
+ fpld(1,1) = -2
+ fpld(2,1) = 0.1,
+ fpld(3,1) = 0,
+ fpld(4,1) = 0.,
+ fpld(5,1) = 0.,
+ fpld(6,1) = 0,
+ fpld(7,1) = 0.,
+ fpld(8,1) = 10.,
+ fpld(9,1) = 1.27,
+ fpld(10,1) = 1.87,
+ nfpld=0,
+ fmass(1)=3.34e-24,
+ fmass(2)=3.34e-24,
+! fmass(3)=43.42e-24,
+ fmass(3)=9.1095e-28,
+! gamaset=0.,
+ gamaset=15.,
+ gsla=270.,gslb=35.,
+ iactst='enabled',
+ idskf='disabled',
+ idskrf='disabled',
+ implct='enabled',
+ ineg='enabled',
+! iproelec='parabola'
+! iprone='parabola',
+! iprote='parabola',
+! iproti='parabola',
+!! iprozeff='disabled',
+! iprozeff='parabola',
+ iproelec="prbola-t"
+ iprone="prbola-t"
+ iprote="prbola-t"
+ iproti="prbola-t"
+ iprozeff="prbola-t"
+ tmdmeth="method1"
+ irzplt(1)=1,
+ irzplt(2)=4,
+ irzplt(3)=0,
+ irzplt(4)=0,
+ irzplt(5)=0,
+ iy=100,
+ izeff='backgrnd',
+ jx=300,
+ kfrsou=0,
+ kpress(2)='enabled',
+ kspeci(1,1)='d',kspeci(2,1)='general',
+ kspeci(1,2)='d',kspeci(2,2)='maxwell',
+ kspeci(1,3)='al',kspeci(2,3)='maxwell',
+ kspeci(1,4)='e',kspeci(2,8)='maxwell',
+ lbdry(1)='scale',
+ locquas='disabled',
+ lossmode(1)='disabled',
+ lz=30,
+ machine='toroidal',
+ manymat='disabled'
+ meshy='fixed_y',
+ mpwr(0)=1.72, 5.4, 5.4, 1, 1, 1, 1, 1, 5.18
+ !mpwrelec=26.594
+ mpwrelec=5.43
+ mx=3,
+ nchec=1,
+ ncoef=1,
+ ncont=20,
+ nen=30,
+ netcdfnm='enabled',
+ netcdfshort="longer_f"
+ ngen=1,
+ njene=5,
+ nmax=2,
+ noffel=10000,
+ nonboot=1
+ nonel=0,
+! nplot=10,30
+ nplot=3,5
+! nplt3d=10,30
+ nplt3d=3,5
+ npwr(0)=5.4,2.12,2.12,2,2,2,2, 2, 2.0
+ !npwrelec=2.948
+ npwrelec=2.15
+ nrskip=0,
+ nrstrt=1,
+! nstop=135,
+ nstop=3,
+ numby=30,
+ nv=3,
+ partner='bramb',
+ plt3d='enabled',
+ pltd='enabled',
+ pltdn='disabled',
+ pltend='enabled',
+ pltfofv='enabled'
+ pltfvs='enabled',
+ pltinput='enabled',
+ pltmag=1.,
+ pltpowe='last',
+ pltprpp='enabled',
+ pltrst='disabled',
+ pltstrm='enabled',
+ pltvecal='enabled',
+ pltvecc='enabled',
+ pltvece='enabled',
+ pltvecrf='disabled',
+ pltvflu='enabled',
+ pltvs='rho',
+ profpsi='disabled',
+ psimodel='axitorus',
+ radcoord='sqarea'
+ qsineut='disabled',
+ radmaj=150.,
+ radmin=50.,
+ rd=60.,
+ reden(1,0)=0.9e13
+ reden(1,1)=0.02e13
+ reden(2,0)=0.9e13
+ reden(2,1)=0.02e13
+ reden(3,0)=0.9e13
+ reden(3,1)=0.02e13
+ relativ='enabled',
+ rfacz=1.,
+ rmirror=7.5,
+ rovera=1.e-6,
+ roveram=.00,
+ rya(1)= .05 .1 .3 .5 .7 .9 .95
+ rzset='enabled',
+ softxry='enabled',
+ syncrad='disabled',
+ tandem='disabled',
+ tauloss(1,1)=.3,
+ tauloss(2,1)=0.,
+ tauloss(3,1)=0.,
+ tbnd=.002,
+ temp(1,0)=.8
+ temp(1,1)=.05
+ temp(2,0)=.8
+ temp(2,1)=.05
+ temp(3,0)=.8
+ temp(3,1)=.05
+ tfac=0.75,
+ tfacz=1.,
+ thet1=80.,  90.,  100., 110., 130.
+ thet2=180., 180., 180., 180., 180.
+ thetd=0.0
+ tiin=1.5,1.1,.7,.4,.2,.1,
+ torloss(1)='disabled',
+ veclnth=1.5,
+ xfac=+1.,
+ xlwr=.085,
+ xmdl=.25,
+ xpctlwr=.1,
+ xpctmdl=.4,
+ ylower=1.22,
+ yreset='disabled',
+ yupper=1.275,
+ zmax=408.
+ ryain= 0.0     0.42    0.57   0.85 0.98
+ enein= 1.05e13 1.15e13 1.2e13 7e12 1e12
+ tein=  .750    .6     .57     .30  .1
+! zeffin(1)=  2. 2. 2. 2. 2. 2. 2. 2. 2. 2. 2.
+ zeffin(1)=  6. 6. 6. 6. 6. 6. 6. 6. 6. 6. 6.
+ tiin=    .200 .195 .183 .173 .167 .171 .156 .099 .049 .020 .008
+ &end
+ 
+ &trsetup
+ difus_io(1)="drrdrout"
+ difus_io_file="drrdrout.nc"
+ adimeth = 'disabled'
+ difusr=100.e4
+ difus_vshape = 0.0, 0.0, 0.0, 0.0
+ difus_rshape = 1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0
+ pinch='case2',
+ relaxden=1.,
+ relaxtsp='disabled',
+ transp='enabled',
+ advectr=1.
+ &end
+ 
+ &sousetup
+ asor(1,1,1)=.25e+13,asor(1,2,1)=3.25e+13,
+ noffso(1,1)=21,noffso(1,2)=21,
+ nonso(1,1)=0,nonso(1,2)=0,
+ nso=0,
+ nsou=1000,
+ pltso='enabled',
+ scm2(1,1)=.001,scm2(1,2)=10000.,
+ sellm1(1,1)=1.,sellm1(1,2)=1.,
+ sellm2(1,1)=1.,sellm2(1,2)=1.,
+ sem1(1,1)=1600.,sem1(1,2)=0.,
+ sem2(1,1)=.5,sem2(1,2)=25.,
+ seppm1(1,1)=1.,seppm1(1,2)=1.,
+ seppm2(1,1)=1.,seppm2(1,2)=1.,
+ soucoord='polar',
+ sthm1(1,1)=5.,sthm1(1,2)=0.,
+ szm1(1,1)=0.,szm1(1,2)=0.,
+ szm2(1,1)=1.e+5,szm2(1,2)=1.e+5
+ &end
+ 
+ &eqsetup
+ bsign=-1.0
+ atol=1.e-8,
+ ellptcty=0.,
+ eqmod='enabled',
+ eqsource='eqdsk',
+ methflag=10
+ nconteq='disabled',
+ nconteqn=21,
+ rtol=1.e-8
+ &end
+ 
+ &rfsetup
+ call_lh='disabled',
+ call_ech='disabled',
+ call_fw='disabled',
+ lh='disabled',
+ ech='enabled',
+ fw='disabled',
+ iurfl='disabled',
+ iurfcoll='disabled',
+ nbssltbl=2000,
+ nharms=0,
+ nharm1=1,
+ nrfitr1=1000,
+ nrfitr2=0,
+ nrfitr3=1,
+ nrfpwr=0,
+ nrfstep1(1)=600,
+ nrfstep1(2)=600,
+ nrfstep2=000,
+ noffrf(1)=100000,
+ nonrf(1)=0,
+ nrf=0,
+ pwrscale(1)=.1666666e-1
+ pwrscale(2)=.1666666e-1
+ scaleurf='enabled',
+ urfdmp='secondd',
+ urfmod='disabled',
+ vlfmod='disabled',
+ vlhmod='disabled',
+ vparmax=.7956,
+ vparmin=.1768,
+ vprprop='disabled'
+ &end
+ &frsetup
+ aheigh(1,1)=250.,
+ aheigh(1,2)=250.,
+ aheigh(1,3)=250.,
+ alen(1,1)=3650.,
+ alen(1,2)=3650.,
+ alen(1,3)=3650.,
+ angleh(1)=39.3,
+ angleh(2)=39.3,
+ angleh(3)=39.3,
+ anglev(1)=0.0,
+ anglev(2)=0.0,
+ anglev(3)=0.0,
+ ashape(1,1)='s-rect',
+ ashape(1,2)='s-rect',
+ ashape(1,3)='s-rect',
+ awidth(1,1)=60.,
+ awidth(1,2)=60.,
+ awidth(1,3)=60.,
+ bcur(1)=110.,
+ bcur(2)=110.,
+ bcur(3)=110.,
+ bhdiv(1)=.4,
+ bhdiv(2)=.4,
+ bhdiv(3)=.4,
+ bheigh(1)=100.,
+ bheigh(2)=100.,
+ bheigh(3)=100.,
+ bhfoc(1)=3650.,
+ bhfoc(2)=3650.,
+ bhfoc(3)=3650.,
+ bhofset(1)=0.0,
+ bhofset(2)=0.0,
+ bhofset(3)=0.0,
+ bleni(1)=3650.,
+ bleni(2)=3650.,
+ bleni(3)=3650.,
+ blenp(1)=3650.,
+ blenp(2)=3650.,
+ blenp(3)=3650.,
+ bmsprd=.1,
+ bptor(1)=36.25e6,
+ bptor(2)=36.25e6,
+ bptor(3)=36.25e6,
+ bshape(1)='rect',
+ bshape(2)='rect',
+ bshape(3)='rect',
+ bvdiv(1)=.4,
+ bvdiv(2)=.4,
+ bvdiv(3)=.4,
+ bvfoc(1)=3650.,
+ bvfoc(2)=3650.,
+ bvfoc(3)=3650.,
+ bvofset(1)=0.0,
+ bvofset(2)=0.0,
+ bvofset(3)=0.0,
+ bwidth(1)=20.,
+ bwidth(2)=20.,
+ bwidth(3)=20.,
+ ebkev(1)=1300.,
+ ebkev(2)=1300.,
+ ebkev(3)=1300.,
+ fbcur(1,1)=1.,
+ fbcur(1,2)=1.,
+ fbcur(1,3)=1.,
+ fbcur(2,1)=00.,
+ fbcur(2,2)=00.,
+ fbcur(2,3)=00.,
+ fbcur(3,1)=00.,
+ fbcur(3,2)=00.,
+ fbcur(3,3)=00.,
+ frmod='disabled',
+ frplt='enabled',
+ ibcur=1     iborb=0,
+ iexcit=-1,
+ inubpat=0,
+ multiply='disabled',
+ naptr=1,
+ nbeams=3,
+ nfrplt=400,
+ nimp=1,
+ npart=10000,
+ nprim=2,
+ npskip=1,
+ nsourc=1,
+ rpivot(1)=900.,
+ rpivot(2)=900.,
+ rpivot(3)=900.,
+ sfrac1(1)=1.0,
+ sfrac1(2)=1.0,
+ sfrac1(3)=1.0,
+ smooth=.125,
+ zpivot(1)=0.0,
+ zpivot(2)=100.,
+ zpivot(3)=+200.
+ &end
+end
+end
+end
+LEAVE
+THESE
+HERE!

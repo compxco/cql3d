@@ -45,9 +45,9 @@ c     anti-symmetric quantities
         solzs(l)=-solzs(ls-l+2)
  110  continue
 c     fix some quantities (periodic conditions assumed)
-      z(lz+1,lr_)=zmaxtot
-      pol(lz+1,lr_)=2.*pi
-      bbpsi(lz+1,lr_)=bbpsi(1,lr_)
+      z(lz+1,lr_)=zmaxtot !YuP[2021-04-09] lz+1 can get to lz+1
+      pol(lz+1,lr_)=2.*pi !YuP[2021-04-09] lz+1 can get to lz+1
+      bbpsi(lz+1,lr_)=bbpsi(1,lr_) !YuP[2021-04-09] lz+1 can get to lz+1
       sz(ls+1)=zmaxtot
       psis(0)=psis(ls)
       psis(ls+1)=psis(1)

@@ -13,15 +13,17 @@ c..............................................................
       include 'param.h'
       include 'comm.h'
 C%OS  
-      dimension zermx(51,lsa),imx(51,lsa),jmx(51,lsa),zsumj3(iy,lsa)
+      dimension zermx(51,lsa),imx(51,lsa),jmx(51,lsa),zsumj3(iymax,lsa)
       dimension zermxii(51,lsa),imxii(51,lsa),jmxii(51,lsa)
-      dimension zdiffj(iy,lsa),zdiffi(jx,lsa),zsumj4(iy,lsa)
+      dimension zdiffj(iymax,lsa),zdiffi(jx,lsa),zsumj4(iymax,lsa)
 C%OS  
-      dimension zdns(lrorsa),zdns1(lrorsa)
-      dimension zdnsr1(lrorsa),zdnsr2(lrorsa)
-      dimension zdnsb(lrorsa),zdnsr1b(lrorsa),zdnsr2b(lrorsa)
-      dimension zdn2th(iy),zdn2thb(iy)
-      dimension zdnsth(iy),zdnsthb(iy)
+      dimension zdns(lrors),zdns1(lrors)  !local, changed to lrors (YuP)
+      dimension zdnsr1(lrors),zdnsr2(lrors) !local, changed to lrors (YuP)
+      dimension zdnsb(lrors),zdnsr1b(lrors),zdnsr2b(lrors)
+      dimension zdn2th(iymax),zdn2thb(iymax)
+      dimension zdnsth(iymax),zdnsthb(iymax)
+      !YuP[2021-03-11] Changed iy-->iymax in declarations
+      !(just in case if iy is changed by iy=iy_(l_) somewhere)
 
       include 'wpadvnc.h'
 c.......................................................................
@@ -35,10 +37,10 @@ c.......................................................................
       call bcast(zdnsr2,zero,lrors)
       call bcast(zdnsr1b,zero,lrors)
       call bcast(zdnsr2b,zero,lrors)
-      call bcast(zdn2th,zero,iy)
-      call bcast(zdn2thb,zero,iy)
-      call bcast(zdnsth,zero,iy)
-      call bcast(zdnsthb,zero,iy)
+      call bcast(zdn2th,zero,iymax)
+      call bcast(zdn2thb,zero,iymax)
+      call bcast(zdnsth,zero,iymax)
+      call bcast(zdnsthb,zero,iymax)
 
 c.......................................................................
 cl    0. Parameters determining numerical scheme
@@ -95,19 +97,19 @@ c     l loop between 1+i.strt and l_upper(i)+i.end, with .=p or m for i< or >iyh
       ip2t1p1=ipshft2*(1+ipshft1)
       im2t1p1=imshft2*(1+imshft1)
 
-      zvelmid=1.0
-      if (mod(nummods,10).le.4 .and. lmidvel.ne.0) zvelmid=0.5
-      zfcen=0.5
-      if (numindx.eq.4 .or. lmidvel.eq.0) zfcen=1.0
+      zvelmid=1.d0
+      if (mod(nummods,10).le.4 .and. lmidvel.ne.0) zvelmid=0.5d0
+      zfcen=0.5d0
+      if (numindx.eq.4 .or. lmidvel.eq.0) zfcen=1.d0
 
 c.......................................................................
 cl    1. Loop over general species
 c.......................................................................
 
       do 100 k=1,ngen
-        sumleft=0.
-        sumlftn=0.
-        sumrigt=0.
+        sumleft=0.d0
+        sumlftn=0.d0
+        sumrigt=0.d0
 c     j=1:
         j=1
         do 101 l=1,ls
@@ -123,7 +125,7 @@ cl    2. Loop over theta in [0,pi/2]
 c.......................................................................
 
         do 200 i=1,iymax/2
-          ii=iymax+1-i
+          ii=iymax+1-i ! Here l=1, so that iy_(1)=iymax
           if (l_upper(i) .eq. 1) then
             ii=iy_(1)+1-i
             do 201 j=2,jx
@@ -146,15 +148,16 @@ c.......................................................................
             if (sbdry.eq."periodic" .and. laddbnd.eq.1 .and.
      !        l.eq.l_upper(i) .and. l_upper(i).ne.ls) then
               iief=iy_(l)+1-i
-              ii=iymax+1-i
+              ii=iymax+1-i !YuP: why iymax?
               ll=ls+2-l_upper(i)
               ztra2=cynt2(i,l)*(ipshft2*dszp5(l)-ipshft1*dszm5(l))/
      !          dtreff
               ztra2l=cynt2(i,ll)*(ipshft2*dszp5(ll)-ipshft1*dszm5(ll))/
      !          dtreff
-              iief=iy_(l)+1-i
-              ii=iymax+1-i
-              ll=ls+2-l_upper(i)
+              !iief=iy_(l)+1-i
+              !ii=iymax+1-i !YuP: why iymax?
+              !ll=ls+2-l_upper(i) !YuP: repeated from few lines above
+              !write(*,*)'l,i,ii,iymax=',l,i,ii,iymax
               do 401 j=2,jx
 c     points A_i and A_ii (notes p. Num(13))
                 f(i,j,k,l)=(fnp1(i,j,k,l)-fnhalf(i,j,k,l))*ztra2*
@@ -209,11 +212,12 @@ c.......................................................................
             l12=lpm1eff(l,ipshft1+ipshft2)
             ztrders=vnorm*coss(i,l)/(ipshft2*dszp5(l)-ipshft1*dszm5(l))
             do 411 j=2,jx
-              f(i,j,k,l)=(zfcen*fnp1(i,j,k,l)+(1.-zfcen)*fnp1(i,j,k,l12)
+              f(i,j,k,l)=
+     &         (zfcen*fnp1(i,j,k,l)+(1.d0-zfcen)*fnp1(i,j,k,l12)
      -          -fnhalf(i,j,k,l+ip1t1m2))*ztra2*cint2(j)
               fxsp(i,j,k,l)=ztra1*cint2(j)*
      !          (zvelmid*velsou(i,j,k,l+ip1t1m2)+
-     +          (1.-zvelmid)*velsou(i,j,k,l+ip2t1p1)
+     +          (1.d0-zvelmid)*velsou(i,j,k,l+ip2t1p1)
      !          -x(j)*ztrders*(fnp1(i,j,k,l2)-fnp1(i,j,k,l1)))
               sumleft=sumleft+f(i,j,k,l)
               sumrigt=sumrigt+fxsp(i,j,k,l)
@@ -224,7 +228,7 @@ c.......................................................................
               sumlftn=sumlftn+(fnp1(i,j,k,l)-f_(i,j,k,l))*ztra2*cint2(j)
               zdns1(l)=zdns1(l)+fnp1(i,j,k,l)*cynt2(i,l)*cint2(j)
               zdnsr1(l)=zdnsr1(l)+(zvelmid*velsou(i,j,k,l+ip1t1m2)+
-     +          (1.-zvelmid)*velsou(i,j,k,l+ip2t1p1))*cynt2(i,l)
+     +          (1.d0-zvelmid)*velsou(i,j,k,l+ip2t1p1))*cynt2(i,l)
      +          *cint2(j)
               zdnsr2(l)=zdnsr2(l)-x(j)*ztrders*
      !          (fnp1(i,j,k,l2)-fnp1(i,j,k,l1))*cynt2(i,l)*cint2(j)
@@ -259,11 +263,11 @@ c.......................................................................
             ztrders=vnorm*coss(iieff,l)/
      !        (imshft2*dszp5(l)-imshft1*dszm5(l))
             do 412 j=2,jx
-              f(ii,j,k,l)=(zfcen*fnp1(iieff,j,k,l)+(1.-zfcen)*
+              f(ii,j,k,l)=(zfcen*fnp1(iieff,j,k,l)+(1.d0-zfcen)*
      !          fnp1(il12,j,k,l12)-fnhalf(ila,j,k,la))*ztra2*cint2(j)
               fxsp(ii,j,k,l)=ztra1*cint2(j)*
      +          (zvelmid*velsou(ila,j,k,la)+
-     +          (1.-zvelmid)*velsou(ilb,j,k,lb)
+     +          (1.d0-zvelmid)*velsou(ilb,j,k,lb)
      !          -x(j)*ztrders*(fnp1(il2,j,k,l2)-fnp1(il1,j,k,l1)))
               sumleft=sumleft+f(ii,j,k,l)
               sumrigt=sumrigt+fxsp(ii,j,k,l)
@@ -276,7 +280,7 @@ c.......................................................................
               zdns1(l)=zdns1(l)+fnp1(iieff,j,k,l)*cynt2(iieff,l)
      +          *cint2(j)
               zdnsr1(l)=zdnsr1(l)+(zvelmid*velsou(ila,j,k,la)+
-     +          (1.-zvelmid)*velsou(ilb,j,k,lb))*cynt2(iieff,l)*cint2(j)
+     +        (1.d0-zvelmid)*velsou(ilb,j,k,lb))*cynt2(iieff,l)*cint2(j)
               zdnsr2(l)=zdnsr2(l)-x(j)*ztrders*
      !          (fnp1(il2,j,k,l2)-fnp1(il1,j,k,l1))*cynt2(iieff,l)
      +          *cint2(j)
@@ -314,11 +318,11 @@ c.......................................................................
      +        /(ipshft2*dszp5(ll)-ipshft1*dszm5(ll))
             do 421 j=2,jx
               f(i,j,k,ll)=(zfcen*fnp1(i,j,k,ll)+
-     +          (1.-zfcen)*fnp1(i,j,k,l12)
+     +          (1.d0-zfcen)*fnp1(i,j,k,l12)
      -          -fnhalf(i,j,k,ll+ip1t1m2))*ztra2*cint2(j)
               fxsp(i,j,k,ll)=ztra1*cint2(j)*
      !          (zvelmid*velsou(i,j,k,ll+ip1t1m2)+
-     +          (1.-zvelmid)*velsou(i,j,k,ll+ip2t1p1)
+     +          (1.d0-zvelmid)*velsou(i,j,k,ll+ip2t1p1)
      !          -x(j)*ztrders*(fnp1(i,j,k,l2)-fnp1(i,j,k,l1)))
               sumleft=sumleft+f(i,j,k,ll)
               sumrigt=sumrigt+fxsp(i,j,k,ll)
@@ -330,7 +334,7 @@ c.......................................................................
      +          *cint2(j)
               zdns1(ll)=zdns1(ll)+fnp1(i,j,k,ll)*cynt2(i,ll)*cint2(j)
               zdnsr1(ll)=zdnsr1(ll)+(zvelmid*velsou(i,j,k,ll+ip1t1m2)+
-     +          (1.-zvelmid)*velsou(i,j,k,ll+ip2t1p1))*cynt2(i,ll)
+     +          (1.d0-zvelmid)*velsou(i,j,k,ll+ip2t1p1))*cynt2(i,ll)
      +          *cint2(j)
               zdnsr2(ll)=zdnsr2(ll)-x(j)*ztrders*
      !          (fnp1(i,j,k,l2)-fnp1(i,j,k,l1))*cynt2(i,ll)*cint2(j)
@@ -364,11 +368,11 @@ c.......................................................................
             ztrders=vnorm*coss(iieff,ll)/
      !        (imshft2*dszp5(ll)-imshft1*dszm5(ll))
             do 422 j=2,jx
-              f(ii,j,k,ll)=(zfcen*fnp1(iieff,j,k,ll)+(1.-zfcen)*
+              f(ii,j,k,ll)=(zfcen*fnp1(iieff,j,k,ll)+(1.d0-zfcen)*
      !          fnp1(il12,j,k,l12)-fnhalf(ila,j,k,la))*ztra2*cint2(j)
               fxsp(ii,j,k,ll)=ztra1*cint2(j)*
      +          (zvelmid*velsou(ila,j,k,la)+
-     +          (1.-zvelmid)*velsou(ilb,j,k,lb)
+     +          (1.d0-zvelmid)*velsou(ilb,j,k,lb)
      !          -x(j)*ztrders*(fnp1(il2,j,k,l2)-fnp1(il1,j,k,l1)))
               sumleft=sumleft+f(ii,j,k,ll)
               sumrigt=sumrigt+fxsp(ii,j,k,ll)
@@ -381,7 +385,7 @@ c.......................................................................
               zdns1(ll)=zdns1(ll)+fnp1(iieff,j,k,ll)*cynt2(iieff,ll)*
      !          cint2(j)
               zdnsr1(ll)=zdnsr1(ll)+(zvelmid*velsou(ila,j,k,la)+
-     +          (1.-zvelmid)*velsou(ilb,j,k,lb))*cynt2(iieff,ll)
+     +          (1.d0-zvelmid)*velsou(ilb,j,k,lb))*cynt2(iieff,ll)
      +          *cint2(j)
               zdnsr2(ll)=zdnsr2(ll)-x(j)*ztrders*
      !          (fnp1(il2,j,k,l2)-fnp1(il1,j,k,l1))*cynt2(iieff,ll)
@@ -397,14 +401,14 @@ c     missing point theta<pi/2, l
               if (itest1.eq.0 .or. itest1.eq.10) then
                 do 431 j=2,jx
                   zdnsb(l)=zdnsb(l)+(zfcen*fnp1(i,j,k,l)+
-     !              (1.-zfcen)*fnp1(i,j,k,l+ipshft1+ipshft2)
+     !              (1.d0-zfcen)*fnp1(i,j,k,l+ipshft1+ipshft2)
      -              -fnhalf(i,j,k,l+ip1t1m2))*cynt2(i,l)*cint2(j)
                   zdnsthb(i)=zdnsthb(i)+(zfcen*fnp1(i,j,k,l)+
-     !              (1.-zfcen)*fnp1(i,j,k,l+ipshft1+ipshft2)
+     !              (1.d0-zfcen)*fnp1(i,j,k,l+ipshft1+ipshft2)
      -              -fnhalf(i,j,k,l+ip1t1m2))*cynt2(i,l)*cint2(j)
                   zdns1(l)=zdns1(l)+fnp1(i,j,k,l)*cynt2(i,l)*cint2(j)
                   zdnsr1b(l)=zdnsr1b(l)+(zvelmid*velsou(i,j,k,l+ip1t1m2)
-     +              +(1.-zvelmid)*velsou(i,j,k,l+ip2t1p1))*cynt2(i,l)
+     +              +(1.d0-zvelmid)*velsou(i,j,k,l+ip2t1p1))*cynt2(i,l)
      +              *cint2(j)
                   zdnsr2b(l)=zdnsr2b(l)-x(j)*vnorm*coss(i,l)/dszm5(l)*
      !              (fnp1(i,j,k,l)-fnp1(i,j,k,l-1))*cynt2(i,l)*cint2(j)
@@ -421,18 +425,18 @@ c     missing point theta>pi/2, l
                 iieffe=ilpm1ef(iieff,l,ip2t1p1)
                 do 432 j=2,jx
                   zdnsb(l)=zdnsb(l)+(zfcen*fnp1(iieff,j,k,l)+
-     !              (1.-zfcen)*fnp1(iieffc,j,k,l+ipshft1+ipshft2)
+     !              (1.d0-zfcen)*fnp1(iieffc,j,k,l+ipshft1+ipshft2)
      -              -fnhalf(iieffd,j,k,l+ip1t1m2))*cynt2(iieff,l)
      +              *cint2(j)
                   zdnsthb(ii)=zdnsthb(ii)+(zfcen*fnp1(iieff,j,k,l)+
-     !              (1.-zfcen)*fnp1(iieffc,j,k,l+ipshft1+ipshft2)
+     !              (1.d0-zfcen)*fnp1(iieffc,j,k,l+ipshft1+ipshft2)
      -              -fnhalf(iieffd,j,k,l+ip1t1m2))*cynt2(iieff,l)
      +              *cint2(j)
                   zdns1(l)=zdns1(l)+fnp1(iieff,j,k,l)*cynt2(iieff,l)
      !              *cint2(j)
                   zdnsr1b(l)=zdnsr1b(l)+
      +              (zvelmid*velsou(iieffd,j,k,l+ip1t1m2)+
-     +              (1.-zvelmid)*velsou(iieffe,j,k,l+ip2t1p1))
+     +              (1.d0-zvelmid)*velsou(iieffe,j,k,l+ip2t1p1))
      +              *cynt2(iieff,l)*cint2(j)
                   zdnsr2b(l)=zdnsr2b(l)-x(j)*vnorm*coss(iieff,l)
      +              /dszm5(l)*
@@ -453,14 +457,14 @@ c     missing point theta<pi/2, ll
                   zdns1(ll)=zdns1(ll)+fnp1(i,j,k,ll)*cynt2(i,ll)
      +              *cint2(j)
                   zdnsb(ll)=zdnsb(ll)+(zfcen*fnp1(i,j,k,ll)+
-     !              (1.-zfcen)*fnp1(i,j,k,ll+ipshft1+ipshft2)
+     !              (1.d0-zfcen)*fnp1(i,j,k,ll+ipshft1+ipshft2)
      -              -fnhalf(i,j,k,ll+ip1t1m2))*cynt2(i,ll)*cint2(j)
                   zdnsthb(i)=zdnsthb(i)+(zfcen*fnp1(i,j,k,ll)+
-     !              (1.-zfcen)*fnp1(i,j,k,ll+ipshft1+ipshft2)
+     !              (1.d0-zfcen)*fnp1(i,j,k,ll+ipshft1+ipshft2)
      -              -fnhalf(i,j,k,ll+ip1t1m2))*cynt2(i,ll)*cint2(j)
                   zdnsr1b(ll)=zdnsr1b(ll)+
      +              (zvelmid*velsou(i,j,k,ll+ip1t1m2)+
-     +              (1.-zvelmid)*velsou(i,j,k,ll+ip2t1p1))*cynt2(i,ll)
+     +              (1.d0-zvelmid)*velsou(i,j,k,ll+ip2t1p1))*cynt2(i,ll)
      +              *cint2(j)
                   zdnsr2b(ll)=zdnsr2b(ll)-x(j)*vnorm*coss(i,ll)
      +              /dszm5(ll)*
@@ -482,16 +486,16 @@ c     missing point theta>pi/2, ll
                   zdns1(ll)=zdns1(ll)+fnp1(iieff,j,k,ll)*cynt2(iieff,ll)
      !              *cint2(j)
                   zdnsb(ll)=zdnsb(ll)+(zfcen*fnp1(iieff,j,k,ll)+
-     !              (1.-zfcen)*fnp1(iieffc,j,k,ll+ipshft1+ipshft2)
+     !              (1.d0-zfcen)*fnp1(iieffc,j,k,ll+ipshft1+ipshft2)
      -              -fnhalf(iieffd,j,k,ll+ip1t1m2))*cynt2(iieff,ll)
      +              *cint2(j)
                   zdnsthb(ii)=zdnsthb(ii)+(zfcen*fnp1(iieff,j,k,ll)+
-     !              (1.-zfcen)*fnp1(iieffc,j,k,ll+ipshft1+ipshft2)
+     !              (1.d0-zfcen)*fnp1(iieffc,j,k,ll+ipshft1+ipshft2)
      -              -fnhalf(iieffd,j,k,ll+ip1t1m2))*cynt2(iieff,ll)
      +              *cint2(j)
                   zdnsr1b(ll)=zdnsr1b(ll)+
      !              (zvelmid*velsou(iieffd,j,k,ll+ip1t1m2)+
-     +              (1.-zvelmid)*velsou(iieffe,j,k,ll+ip2t1p1))*
+     +              (1.d0-zvelmid)*velsou(iieffe,j,k,ll+ip2t1p1))*
      !              cynt2(iieff,ll)*cint2(j)
                   zdnsr2b(ll)=zdnsr2b(ll)-x(j)*vnorm*coss(iieff,ll)/
      !              dszm5(ll)*(fnp1(iieff,j,k,ll)-fnp1(iieffm,j,k,ll-1))
@@ -503,7 +507,7 @@ c     missing point theta>pi/2, ll
               endif
             endif
 
- 300      continue
+ 300      continue ! l
 
  200    continue
 
@@ -511,18 +515,19 @@ C%OS
 c     compute highest errors
         do 900 l=1,ls
           do 9001 i=1,10
-            zermx(i,l) = 0.0
-            zermxii(i,l) = 0.0
+            zermx(i,l) = 0.d0
+            zermxii(i,l) = 0.d0
  9001     continue
- 900    continue
+ 900    continue ! l
 c
-        do 901 ll=1,ls
+        do 901 ll=1,ls  ! YuP: Notice: ll here, not l
           do 902 i=1,iyh_(ll)
-            ii=iymax+1-i
-            zsumj3(i,ll) = 0.0
-            zsumj4(i,ll) = 0.0
-            zsumj3(ii,ll) = 0.0
-            zsumj4(ii,ll) = 0.0
+            ii=iy_(ll)+1-i ! YuP[2021-03-12] iymax-->iy_(ll)
+            zsumj3(i,ll) = 0.d0
+            zsumj4(i,ll) = 0.d0
+            zsumj3(ii,ll) = 0.d0
+            zsumj4(ii,ll) = 0.d0
+            !write(*,*)'ll,i,ii=',ll,i,ii
             do 910 j=2,jx
               zsumj3(i,ll) = zsumj3(i,ll) + f(i,j,k,ll)
               zsumj4(i,ll) = zsumj4(i,ll) + fxsp(i,j,k,ll)
@@ -591,10 +596,10 @@ c
  902      continue
 
           do 920 j=2,jx
-            zsumi3 = 0.0
-            zsumi4 = 0.0
-            do 921 i=1,iyh_(l)
-              ii=iymax+1-i
+            zsumi3 = 0.d0
+            zsumi4 = 0.d0
+            do 921 i=1,iyh_(ll) !YuP[2021-03-08] was bug: 1,iyh_(l)
+              ii=iy_(ll)+1-i !YuP[2021-03-12] iymax-->iy_(ll)
               zsumi3 = zsumi3 + f(i,j,k,ll) + f(ii,j,k,ll)
               zsumi4 = zsumi4 + fxsp(i,j,k,ll) + fxsp(ii,j,k,ll)
  921        continue
@@ -603,14 +608,14 @@ c
 c
 C%OS  if (ll.eq.1 .and. (n/2)*2.eq.n)
 C%OS  + write(6,'(1pe10.2,2i5)') (zermx(ii,ll),imx(ii,ll),jmx(ii,ll),ii=1,10)
- 901    continue
+ 901    continue ! ll=1,ls
 
 
 c     check solution for each species
         zerror=2.*abs(sumleft-sumrigt)/(sumleft+sumrigt)
 c%OS  if (abs(zerror) .gt. 1.0E-08) then
-        write(6,'(/," error in parallel transport equation =",1pe11.3,
-     1    " time-step n =",i4,"  dn1/2= ",e11.3,"  dn1= ",
+        write(6,'(/," error(accuracy) in parallel transport equation =",
+     1    1pe11.3," time-step n =",i4,"  dn1/2= ",e11.3,"  dn1= ",
      1    e11.3)') zerror,n,sumleft,sumlftn
         if (iactst .eq. "abort") stop 'wpcheck'
 c%OS  endif
@@ -618,13 +623,13 @@ c%OS  endif
  100  continue
 
 c%OS  
-      zsums=0.0
-      zsumr1=0.0
-      zsumr1b=0.0
-      zsumr2=0.0
-      zsumr2b=0.0
-      zsum2th=0.0
-      zsum2thb=0.0
+      zsums=0.d0
+      zsumr1=0.d0
+      zsumr1b=0.d0
+      zsumr2=0.d0
+      zsumr2b=0.d0
+      zsum2th=0.d0
+      zsum2thb=0.d0
       do 951 l=1,lrors
         zsums=zsums+zdns(l)
         zsumr1=zsumr1+zdnsr1(l)

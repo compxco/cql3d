@@ -111,6 +111,8 @@ c.......................................................................
         rovera(ll)=rya(ll)
         if (0.lt.rovera(ll) .and. rovera(ll).lt.1.e-8) 
      +    rovera(ll)=1.e-8
+        write(*,'(a,i4,2f8.5)')'tdxinitl: ll,rya,rovera=',
+     +                                 ll,rya(ll),rovera(ll)
  30   continue
 
 
@@ -434,6 +436,7 @@ c     density ratio, .le.1. for diff species with same bnumb.
       else         
          nsame_bnumb1=nsame_bnumb-1
       endif
+      if(nionm.gt.0)then ![2022-05-26] added nionm condition
       do 14 k=kionm(1),kionm(nionm)
 c     write(*,*)'tdxinitl, do 14 loop, k= ',k
 c        For k pointing to equal-bnumb species (2 or more)
@@ -470,6 +473,7 @@ c        For k beyond equal-bnumb species
             enddo
          endif
  14   continue
+      endif !(nionm.gt.0) ![2022-05-26] added nionm condition
       
       
 c      write(*,*)
@@ -495,11 +499,32 @@ c     in order of the indexes.
       endif  ! on iprozeff.eq."parabola" .or. iprozeff.eq."spline"
       
 c     Renormalize densities using enescal
-      do k=1,ntotal
+      !YuP[2022-03-10] Added distinction between time-independent
+      !and time-dependent rescaling.
+      if(iprone.eq.'spline' .or. iprone.eq.'parabola' 
+     &   .or. iprone.eq."asdex" )then ! t-independent
+         do k=1,ntotal
          do l=0,lrzmax
             reden(k,l)=enescal*reden(k,l)
          enddo
-      enddo
+         enddo
+       elseif(iprone.eq."spline-t" .or. iprone.eq."prbola-t")then
+         !Time-dependent
+         ![2022-03-10] moved this rescaling from profiles.f to tdxinitl
+         redenc(1:nbctimea,1:ntotala)= enescal*redenc(:,:)
+         redenb(1:nbctimea,1:ntotala)= enescal*redenb(:,:)
+         enein_t(1:njenea,1:ntotala,1:nbctimea)=enescal*enein_t(:,:,:)
+         !The original namelist input is rescaled,
+         !so that there is no need to rescale at each time step.
+       else !Just in case, if new iprone is added but forgot to include
+CMPIINSERT_IF_RANK_EQ_0      
+         WRITE(*,*)
+         WRITE(*,*)'tdxinitl: Unrecognized iprone during rescaling'
+         WRITE(*,*)'tdxinitl: iprone= ',iprone
+         WRITE(*,*)
+CMPIINSERT_ENDIF_RANK
+         STOP
+       endif  
 
 c     Diagnostic printout of general species densities:
 c      write(*,*)'After setting general species densities:'

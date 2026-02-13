@@ -42,7 +42,7 @@ c.......................................................................
 cl    1.2 parallel mesh
 c.......................................................................
 
-      if (cqlpmod .eq. "enabled") then
+      if (cqlpmod.eq."enabled") then
 
         do 120 k=1,ntotal
           rstmss=fmass(k)*clite2/ergtkev
@@ -64,7 +64,7 @@ c.......................................................................
           endif
  120    continue
 
-      endif
+      endif !(cqlpmod.eq."enabled")
 c.......................................................................
 c     2. Compute radial Z-effective
 c.......................................................................
@@ -74,8 +74,14 @@ c.......................................................................
       else
         k1=1
       endif
-      do 200 l=1,lrzmax
-        zeff(l)=0.
+      
+      if(cqlpmod.eq."enabled")then !generalized to include CQLP 
+       l_max=lsmax   ! Full grid
+      else ! (cqlpmod.ne."enabled")
+       l_max=lrzmax  ! Full grid
+      endif
+      do 200 l=1,l_max !YuP: was lrzmax, generalized to include CQLP
+        zeff(l)=0. !Notice: full grid here, same as for reden() or denpar()
         zeff1=0.
         zeff4(l)=0.d0 !Yup[2014-05-27] Initialize to 0.
         xq=0.
@@ -83,10 +89,15 @@ c.......................................................................
           if (k.eq.kelecg .or. k.eq.kelecm) goto 210
 cBobH990128          if (k.eq.izeff) goto 210
           xq=xq+1.
-          zeff(l)=zeff(l)+bnumb(k)**2*reden(k,l)
-          zeff4(l)=bnumb(k)**4*reden(k,l)+zeff4(l)
-          zeff1=zeff1+bnumb(k)*reden(k,l)
- 210    continue
+          if(cqlpmod.eq."enabled")then !generalized to include CQLP
+           dens= denpar(k,l)
+          else ! (cqlpmod.ne."enabled")
+           dens= reden(k,l)
+          endif
+          zeff(l)=zeff(l)+bnumb(k)**2*dens
+          zeff4(l)=bnumb(k)**4*dens+zeff4(l)
+          zeff1=zeff1+bnumb(k)*dens
+ 210    continue 
 
         !if(nstates.gt.0)then
          !YuP[2020-06-22] Skip this part 
@@ -106,7 +117,7 @@ cBobH990128          if (k.eq.izeff) goto 210
         !endif ! 
         zeff4(l)=zeff4(l)/xq
         zeff(l)=zeff(l)/zeff1
- 200  continue ! l=1,lrzmax
+ 200  continue ! l= 1 to lrzmax or lsmax
 
       return
       end
@@ -139,7 +150,7 @@ CMPIINSERT_INCLUDE
       !real*8, dimension(:), pointer :: excit_enrgy !(0:nstates)
       
       SELECT CASE (imp_type)
-      ! imp_type: 1->He,2->Be,3->C,4->N,5->Ne,6->Ar,7->Xe,8->W
+      ! imp_type: 1->He,2->Be,3->C,4->N,5->Ne,6->Ar,7->Xe,8->W,9->B
       CASE(1) ! He
          nstates=2 ! He[0](neutral), He[1+], He[2+]
          allocate(a_imp(0:nstates),STAT=istat) !== a^bar in paper (Table 1)
@@ -271,6 +282,31 @@ CMPIINSERT_INCLUDE
          excit_enrgy(kstate)=15.*(bnumb_imp(kstate)+1.)**2 !15ev*(Z+1)^2
          enddo
          excit_enrgy(nstates)=1. ! Any number .ne.0
+      CASE(9) ! B (Zat=5)  !YuP[2021-08-12] Added
+         nstates=5 
+         allocate(a_imp(0:nstates),STAT=istat) !== a^bar (Table 1)
+         allocate(bnumb_imp(0:nstates),STAT=istat) !Z0j in Hesslow
+         allocate(excit_enrgy(0:nstates),STAT=istat) !Ij in Hesslow
+         fmass_imp=11.*proton !(10.8)
+         a_imp(:)=0.d0
+         !From Kirillov model: a_kir= (2.0/alfa)*(0.75/Zat)*(Zat-Zj).^(2/3) 
+         !where alfa=1/137, Zat= atomic number; Zj= 0:1:Zat
+         a_imp=(/120.2, 103.6, 85.5, 65.2, 41.1, 0.0/)
+         do kstate=0,nstates
+         bnumb_imp(kstate)= kstate*1.d0 
+         enddo
+         !No data on excit energy for B. Use approximation:
+         excit_enrgy(0)=10.*bnumb_imp(nstates) ! 10ev*Zatomic_number for neutral
+         !We take excit_enrgy_eV= 10eV *Z_imp (atomic number) 
+         ![See Breizman/NF2019, after Eq.(27): mean excit. potential] 
+         !This is ok for an atom, but not good for a partially-ionized ion.
+         do kstate=1,nstates-1 !All ionized states, except fully-ionized
+         excit_enrgy(kstate)= 15.*bnumb_imp(kstate)**2 ! 15ev*Zion^2
+         !This is a very rough estimate, so better find data.
+         enddo
+         excit_enrgy(nstates)=1. ! Fully-ionized: Any number .ne.0
+         !For fully-ionized state hbethe()=0 because z_bound=0.
+         
       CASE DEFAULT 
          !If none of allowed imp_type was used: 
          nstates=0 ! Effectively, no impurities. Below, gscreen(0,j)-->0
@@ -400,7 +436,7 @@ CMPIINSERT_ENDIF_RANK
       !Read impurity emissivity and charge state from POST93 data files.
       !Available data files: 
       ! [should match impurity types in subr. set_gscreen_hesslow]
-      !               imp_type: 1->He,2->Be,3->C,4->N,5->Ne,6->Ar,7->Xe,8-W
+      !  imp_type: 1->He,2->Be,3->C,4->N,5->Ne,6->Ar,7->Xe,8-W,9->B
       ! Oxygen.ntau,   (--- imp_type not set)
       ! Argon.ntau     (corr to imp_type=6), 
       ! Beryllium.ntau (corr to imp_type=2),
@@ -439,7 +475,7 @@ CMPIINSERT_ENDIF_RANK
       ! OUTPUT:
       !        z1av= <Z> Average charge state (a value between 0 and atomic number)
       !        z2av= <Z^2> Average of Z^2 for given impurity
-      ! The data tables are based on Corona equilibrium.
+      ! The data tables are based on Coronal equilibrium.
 
       implicit none
 CMPIINSERT_INCLUDE
@@ -492,6 +528,18 @@ CMPIINSERT_IF_RANK_EQ_0
 CMPIINSERT_ENDIF_RANK
         STOP
       endif
+      if(imp_type.eq.8)then
+CMPIINSERT_IF_RANK_EQ_0
+        WRITE(*,*)'set_get_ADPAK: missing data file W.ntau'
+CMPIINSERT_ENDIF_RANK
+        STOP
+      endif
+      if(imp_type.eq.9)then
+CMPIINSERT_IF_RANK_EQ_0
+        WRITE(*,*)'set_get_ADPAK: missing data file B.ntau'
+CMPIINSERT_ENDIF_RANK
+        STOP
+      endif
       !These are available:
       if(imp_type.eq.2)then
         fname='./ADPAK_data/Beryllium.ntau'
@@ -507,6 +555,9 @@ CMPIINSERT_ENDIF_RANK
       endif
       if(imp_type.eq.6)then
         fname='./ADPAK_data/Argon.ntau'
+CMPIINSERT_IF_RANK_EQ_0
+      WRITE(*,*)'set_get_ADPAK: For Ar, better use ADC (adpak=disabled)'
+CMPIINSERT_ENDIF_RANK
       endif
       
       !Open this file:
@@ -1920,7 +1971,7 @@ CMPIINSERT_INCLUDE
            endif !(imp_depos_method.eq.'instant') !YuP[2019-12-05]
            
            !--------- NOW Find distribution over charge states.
-           ! Based on Corona model, and using ADPAK data (from *.ntau files).
+           ! Based on Coronal model, and using ADPAK data (from *.ntau files).
            ! general INPUT arguments for sub.set_get_ADPAK() :
            kopt=1 ! option flag: '1' is to get <Z> and <Z^2> 
            tau_r=adpak_tau_r ![sec] Characteristic time of radial decay of T_e

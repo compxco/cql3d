@@ -176,7 +176,7 @@ c     test if l in lsindx(i) => ilcqlp=1
         iiyh=iyh
         iitl=itl
         iitu=itu
-        if (cqlpmod .eq. "enabled") then
+        if (cqlpmod.eq."enabled") then
           if (ilcqlp .eq. 1) then
             iiyh=iyh_(indxls(l))
             iiy=iy_(indxls(l))
@@ -307,12 +307,13 @@ c     soft xray and fusion rate modules.
       endif
       mmxp1=mmx+1
 
-      call bcast(ss(1,1,0,lr_),zero,iy*lz*(mmxp1+1))
-      call bcast(ssy(1,1,0,lr_),zero,iy*lz*mxp1)
-      call bcast(ssyi(1,1,0,lr_),zero,iy*lz*mxp1)
-      call bcast(ssyy(1,1,0,lr_),zero,iy*lz*mxp1)
-      call bcast(ssyyy(1,1,0,lr_),zero,iy*lz*mxp1)   !Not used?
-      call bcast(dpcosz(1,1,0,lr_),zero,iy*lz*mmxp1)
+      call bcast(ss(1,1,0,lr_),zero,iymax*lz*(mmxp1+1))
+      call bcast(ssy(1,1,0,lr_),zero,iymax*lz*mxp1)
+      call bcast(ssyi(1,1,0,lr_),zero,iymax*lz*mxp1)
+      call bcast(ssyy(1,1,0,lr_),zero,iymax*lz*mxp1)
+      call bcast(ssyyy(1,1,0,lr_),zero,iymax*lz*mxp1)   !Not used?
+      call bcast(dpcosz(1,1,0,lr_),zero,iymax*lz*mmxp1)
+      !YuP[2021-03-11] iy->iymax in the above few lines
 
       do 270 l=1,lz
 c     test if l in lsindx(i) => ilcqlp=1
@@ -332,10 +333,10 @@ c     test if l in lsindx(i) => ilcqlp=1
         iiyh=iyh
         iitl=itl
         iitu=itu
-        if (cqlpmod .eq. "enabled") then
+        if (cqlpmod.eq."enabled") then
           if (ilcqlp .eq. 1) then
             iiyh=iyh_(indxls(l))
-            iiy=iy_(indxls(l))
+            iiy=iy_(indxls(l)) !CQLP: iiy can be different at different l
             iitl=itl_(indxls(l))
             iitu=itu_(indxls(l))
           else
@@ -345,9 +346,10 @@ c     test if l in lsindx(i) => ilcqlp=1
             iitu=itu_(1)
           endif
         endif
+        !write(*,*)'micxinil: l,iiy,imax(l,lr_)=',l,iiy,imax(l,lr_)
         do 260 ii=0,1
           do 250 iii=1,imax(l,lr_)
-            i=ii*iii-(iiy+1-iii)*(ii-1)
+            i=ii*iii-(iiy+1-iii)*(ii-1) ! i=iiy+1-iii or i=iii
             tom1(0)=1.
             tom2(0)=0.
             tom3(0)=0.
@@ -412,7 +414,7 @@ c     test if l in lsindx(i) => ilcqlp=1
         iiyh=iyh
         iitl=itl
         iitu=itu
-        if (cqlpmod .eq. "enabled") then
+        if (cqlpmod.eq."enabled") then
           if (ilcqlp .eq. 1) then
             iiyh=iyh_(indxls(l))
             iiy=iy_(indxls(l))
@@ -484,7 +486,7 @@ c.......................................................................
 
  360  continue
 
-      call dscal(iy*lz*mmxp1,-one,dpcosz(1,1,0,lr_),1)
+      call dscal(iymax*lz*mmxp1,-one,dpcosz(1,1,0,lr_),1) !YuP[2021-03] iy->iymax
 cBH110330:  Doesn't look like waa and wbb are used for anything?
       call dscal(lz*mxp1,-one,waa(1,0,lr_),1)
       call dscal(lz*mxp1,-one,wbb(1,0,lr_),1)
@@ -492,13 +494,13 @@ cBH110330:  Doesn't look like waa and wbb are used for anything?
 
 
 c......................................................................
-c     lmax(i,lr_) is the highest l such a particle with midplane
-c     pitch angle y(i,lr_) attains and passes z(l,lr_). 
-c     Exception: lmax(itl,lr_)=lz_bmax(lr_), although particle attains
-c                but does not pass z(lz,lr_).
-c                taunew.ne."enabled", lmax(itl,lr_) reset in 
+c     lmax(i,l_) is the highest l such a particle with midplane
+c     pitch angle y(i,l_) attains and passes z(l,l_). 
+c     Exception: lmax(itl,l_)=lz_bmax(lr_), although particle attains
+c                but does not pass z(lz,l_).
+c                taunew.ne."enabled", lmax(itl,l_) reset in 
 c                micgnbnd, called from baviorbto: elsewise, 
-c                lmax(itl,lr_) is set here to lz_bmax(lr_).
+c                lmax(itl,l_) is set here to lz_bmax(lr_).
 c     NOTE for eqsym.eq."none": Don't symmetrize lmax about pi/2,
 c                               instead use lmax(i>iyh) for lower
 c                               half of flux surface.
@@ -532,7 +534,7 @@ c         trapped particle at z < z(l):
              lmax(iy+1-i,lr_)=lmax(i,lr_)
           endif
 
-        else
+        else ! (cqlpmod.eq."enabled")
           do 392 l=2,lz
             if (i .gt. imax(l,lr_)) go to 393
  392     continue

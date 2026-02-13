@@ -36,13 +36,12 @@ c     lrza
         zgeom(l)=0.0
         rovs(l)=0.0
         rovsn(l)=0.0
-        tauee(l)=0.0
         xlbnd(l)=0.0
         xlndn0(l)=0.0
         bdre(l)=0.0
         bdrep(l)=0.0
         sorpwt(l)=0.0
-        xlncurt(l)=0.0
+        !xlncurt(l)=0.0
         area(l)=0.0
         areamid(l)=0.0
         volmid(l)=0.0
@@ -101,6 +100,7 @@ c     lrza
         rhol_b(l)=0.
         rhol_pol_b(l)=0.
  100  continue
+      xlncurt(:)=0.d0 !YuP[2022-02-11] now l_ (was lr_)
 
       call bcast(bscurm,zero,size(bscurm))
       call bcast(bscurmi,zero,(lrza+1)*4)
@@ -120,36 +120,32 @@ c     lrza
       rya(lrza+1)=0.0
 
 c     lrorsa
-      do 110 l=1,lrorsa
-        n_(l)=0        ! YuP[2017]added
-        time_(l)=0.d0  ! YuP[2017]added
-        consn(l)=0.0
-        consn0(l)=0.0
-        currmtp(l)=0.0
-        currmt(l)=0.0
-        sgaint1(l)=0.0
-        thb(l)=0.0
-        tbnd(l)=0.0
-        currmtz(l)=0.0
-        currmtpz(l)=0.0
-        starnue(l)=0.0
-        taueeh(l)=0.0
-        vfluxz(l)=0.d0
-        rovsloc(l)=0.0
-        irzplt(l)=0
-        sptzr(l)=0.0
+      !YuP[2021-03-18] Moved most of these initializations into ainalloc, 
+      ! next to their allocations
+      do 110 l=1,lrorsa ! FPE grid (can be smaller than full grid)
+        !n_(l)=0        ! ! allocated in ainsetpa
+        !time_(l)=0.d0  ! ! allocated in ainsetpa
+        !consn(l)=0.0
+        !consn0(l)=0.0
+        !currmtp(l)=0.0
+        !currmt(l)=0.0
+        !sgaint1(l)=0.0
+        !thb(l)=0.0
+        tbnd(l)=0.0 ! in namelist: dimensioned as (lrorsa)
+        !currmtz(l)=0.0
+        !currmtpz(l)=0.0
+        !vfluxz(l)=0.d0
+        !rovsloc(l)=0.0
+        irzplt(l)=0 ! in namelist: dimensioned as (lrorsa)
+        !sptzr(l)=0.0
  110  continue
 
-c     lsa
-c%OS  do 120 l=1,lsa
-c%OS  120  continue
-
-
+      
 c.......................................................................
 cl    2. 2-D arrays
 c.......................................................................
 
-c     (ntotala,lrza) ; (ntotala,lrorsa)
+c     (ntotala,lrza) ; (ntotala,lrors)
       do 200 k=1,ntotala
         reden(k,0)=0.0
         temp(k,0)=0.0
@@ -161,10 +157,10 @@ c     (ntotala,lrza) ; (ntotala,lrorsa)
  201    continue
         denpar(k,0)=0.0
         temppar(k,0)=0.0
-        do 202 l=0,lsa1
+        do 202 l=0,lsa1 ! Over full s-grid (lsmax points)
           enrgypa(k,l)=0.0
           vthpar(k,l)=0.0
-          if (cqlpmod .eq. "enabled") then
+          if (cqlpmod.eq."enabled") then
             denpar(k,l)=0.0
             temppar(k,l)=0.0
           endif
@@ -185,7 +181,7 @@ c     (ngena,lrza)
           wpar(k,l)=0.0
           wperp(k,l)=0.0
           xlndn00(k,l)=0.0
-          xlncur(k,l)=0.0
+          !xlncur(k,l)=0.0
           xlndn(k,l)=0.0
           xlndnr(k,l)=0.0
           energyr(k,l)=0.0
@@ -198,19 +194,20 @@ c     (ngena,lrza)
           rfpwrz(k,l)=0.0
           pegyz(k,l)=0.0
           pplossz(k,l)=0.0
-          denra(k,l)=0.0
-          curra(k,l)=0.0
-          fdenra(k,l)=0.0
-          fcurra(k,l)=0.0
+          !denra(k,l)=0.0 !YuP[2021-04-09] now pointer (ngen,lrors)
+          !curra(k,l)=0.0 !YuP[2021-04-09] now pointer (ngen,lrors)
+          !fdenra(k,l)=0.0 !YuP[2021-04-09] now pointer (ngen,lrors)
+          !fcurra(k,l)=0.0 !YuP[2021-04-09] now pointer (ngen,lrors)
  215    continue
+        xlncur(k,:)=0.d0 !YuP[2022-02-11] Now as lrors
 
-c     (ngena,lrorsa)
-        do 216 l=1,lrorsa
-          currm(k,l)=0.0
-          energym(k,l)=0.0
-          jchang(k,l)=0
- 216    continue
- 210  continue
+c     (ngen,lrors)
+!        do 216 l=1,lrors
+!          currm(k,l)=0.0      !Now in ainalloc
+!          energym(k,l)=0.0    !Now in ainalloc
+!          jchang(k,l)=0       !Now in ainalloc
+! 216    continue
+ 210  continue ! k
 
 c     (lrza,nmodsa)
       do 220 l=1,nmodsa

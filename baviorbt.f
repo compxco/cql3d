@@ -1,6 +1,6 @@
 c
 c
-      subroutine baviorbt
+      subroutine baviorbt !for taunew.eq."enabled"
       implicit integer (i-n), real*8 (a-h,o-z)
       save
  
@@ -76,11 +76,13 @@ c     Limit the range of integration at the pass/trapped boundary
 c...................................................................
 
 c      call bcast (tau(1,lr_),zero,iyh)
-      call bcast(tau(1,lr_),zero,iy)
-      call bcast(dtau(1,1,lr_),zero,iy*lz)
-      call bcast(tem2,zero,iyjx)
+      call bcast(tau(1,lr_),zero,iymax)
+      call bcast(dtau(1,1,lr_),zero,iymax*lz)
+      call bcast(tem2,zero,iymax*jx)
 c      call ibcast(itemc1,1,iy)    ! Test
-      call ibcast(itemc1,0,iy)
+      call ibcast(itemc1,0,iymax)
+      !YuP[2021-03-11] Changed iy-->iymax 
+      !(just in case if iy is changed by iy=iy_(l_) somewhere)
 
 c...................................................................
 c     Begin loop over the particle orbit, doing upper "half" of
@@ -88,9 +90,10 @@ c     the flux surface.
 c     If eqsym.eq."none", then lower in second section done below.
 c...................................................................
 
-      if (eqsym.ne."none") then
+      if (eqsym.ne."none") then !up-down symmetry
          ilzhfs=lz
-         if (numclas .eq. 1) ilzhfs=lz/2+1
+         if (cqlpmod.eq."enabled" .and. numclas .eq. 1) ilzhfs=lz/2+1
+      !YuP[2025-12-12] added cqlpmod.eq."enabled" in the above line
       else  !  i.e., non-up-down symmetric case
          ilzhfs=lz_bmax(lr_) ! index in pol.mesh corresponding to Bmax
       endif
@@ -459,16 +462,16 @@ c......................................................................
 CDIR$ IVDEP
 
       do 120 i=1,iyh
-         tau(iy+1-i,lr_)=tau(i,lr_)
+         tau(iy_(l_)+1-i,lr_)=tau(i,lr_) !YuP[2021-03-11] iy-->iy_(l_)
  120  continue
       
-      do 121 i=1,iy
+      do 121 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
          vptb(i,lr_)=abs(coss(i,l_))*tau(i,lr_)
  121  continue
       
       do 131 l=1,lz             !  For all l
          do i=1,iyh
-            dtau(iy+1-i,l,lr_)=dtau(i,l,lr_)
+            dtau(iy_(l_)+1-i,l,lr_)=dtau(i,l,lr_) !YuP[2021-03-11] iy-->iy_(l_)
          enddo
 ccc         do i=1,iy
 ccc            prnt5(i)=dtau(i,l,lr_)
@@ -498,7 +501,7 @@ c=======================================================================
 c=======================================================================
 c
 c
-      subroutine baviorbto
+      subroutine baviorbto ! for taunew='disabled'
       implicit integer (i-n), real*8 (a-h,o-z)
       save
 c...................................................................
@@ -543,17 +546,24 @@ c     Limit the range of integration at the pass/trapped boundary
 c...................................................................
 
       zboun(itl,lr_)=zstar
+      !Note: zstar=zboun(itl_(lmdpln_)+2,lr_)+.7*(zboun(itl_(lmdpln_)+1,lr_)
       call bcast(tau(1,lr_),zero,iyh)
-      call bcast(dtau(1,1,lr_),zero,iy*lz)
+      call bcast(dtau(1,1,lr_),zero,iymax*lz)
 
 c...................................................................
 c     Begin loop over the particle orbit
 c...................................................................
 
       ilzhfs=lz
-      if (numclas .eq. 1) ilzhfs=lz/2+1
+      if (cqlpmod.eq."enabled" .and. numclas .eq. 1) ilzhfs=lz/2+1
+      !YuP[2025-12-12] added cqlpmod.eq."enabled" in the above line     
+      !write(*,*)'baviorbto: ilzhfs',ilzhfs
       do 70 l=1,ilzhfs-1
-
+         if(cqlpmod.ne."enabled")then !YuP[2021-03-09] added
+           ll=l_ !CQL3D: l_ is radial index
+         else
+           ll=l  !CQLP: ll will be used in such arrays as iy_(ll)
+         endif
 c...................................................................
 c     Evaluate the bbpsi function where it will normally be required for
 c     integration. Doing this outside the "60" loop saves time.
@@ -618,6 +628,11 @@ c...................................................................
               xs=psif(pt)
               wp=wp+step2sww*(1.-(xs-x2)/(x3-x2))
      1          /sqrt(1.-sinn(i,l_)**2*xs)
+              !YuP[2021-03] For CQL3D, sinn(i,l_) corr. to 
+              !pitch angle at midplane, for each given flux surf l_.
+              !For CQLP, baviorbto is called with l_=lmdpln_=1 only,
+              !which is the first point on field line,
+              !so again it is sin(theta0) at the midplane.
               pt=pt+step2sww
  30         continue
           else
@@ -647,12 +662,17 @@ c...................................................................
           do 50 il=1,nstps
             xs=psif(pt)
             wm=wm+step2sww*(xs-x2)/(x3-x2)/sqrt(1.-sinn(i,l_)**2*xs)
+              !YuP[2021-03] For CQL3D, sinn(i,l_) corr. to 
+              !pitch angle at midplane, for each given flux surf l_.
+              !For CQLP, baviorbto is called with l_=lmdpln_=1 only,
+              !which is the first point on field line,
+              !so again it is sin(theta0) at the midplane.
             pt=pt+step2sww
  50       continue
           dtau(i,l+1,lr_)=wm
           tau(i,lr_)=tau(i,lr_)+dtau(i,l+1,lr_)
  60     continue
- 70   continue
+ 70   continue !  l=1,ilzhfs-1
 
 c...................................................................
 c     Reassign the bounce point for for particles at pass/trapped
@@ -668,14 +688,43 @@ c...................................................................
 
 CDIR$ IVDEP
       do 120 i=1,iyh
-        tau(iy+1-i,lr_)=tau(i,lr_)
+        tau(iy_(l_)+1-i,lr_)=tau(i,lr_) ! YuP[2021-03-11] iy->iy_(l_)
+        !For CQLP, l_ is at s=0 during this call. 
+        !In CQLP, baviorbto is called with l_=1 only
  120  continue
 
       do 131 l=1,ilzhfs
-        do 130 i=1,iyh
-          dtau(iy+1-i,l,lr_)=dtau(i,l,lr_)
- 130    continue
+        if(cqlpmod.ne."enabled")then !YuP[2021-03-09] added
+           ll=l_ !CQL3D: l_ is radial index
+        else
+           ll=l  !CQLP: ll will be used in such arrays as iy_(ll)
+        endif
+        do i=1,iyh_(ll) !!YuP[2021-03-09] iyh--> iyh_(ll)
+          dtau(iy_(ll)+1-i,l,lr_)=dtau(i,l,lr_) !YuP[2021-03-09] iy--> iy_(ll)
+        !YuP: note that for meshy="fixed_mu", iy_(ll) can be smaller than iy
+        ! ll=l_ !CQL3D: l_ is radial index (fixed during call_baviorbto)
+        ! ll=l  !CQLP: ll will be used in such arrays as iy_(ll)
+        enddo
  131  continue
+ 
+      if(cqlpmod.eq."enabled")then !YuP[2021-03-09] added
+        !In case of CQLP, we need to define dtau for the whole range
+        !of l=1:lz (1:ls).  In the above, it could be only half range.
+        ! Example: ls=40, then points that lie at the midplane are 
+        ! 1 and ilzhfs=ls/2+1 =21.
+        ! Equivalent points (same R, but opposite Z):
+        ! 2 and 40, 3 and 39, ..., 20 and 22
+        ! In general, l and (ls-l+2)
+        if (numclas .eq. 1)then !in this case ilzhfs=lz/2+1 !CQLP here
+        do l=2,ilzhfs-1
+           l1= lz-l+2 ! Corresponds to other hemi-circle
+           do i=1,iy_(l1) 
+            dtau(i,l1,lr_)=dtau(i,l,lr_)
+            !now values of dtau at l and l1 are same
+           enddo           
+        enddo
+        endif
+      endif
 
 c..................................................................
 c     Determine bounce time in trapped/passing sliver region.
@@ -735,7 +784,8 @@ c
 c     Trapped and transiting particles are treated separately.
 c     See BH notes: 090821.
 
-
+      if(cqlpmod.eq."enabled") STOP 'deltar is NA for CQLP' !YuP[2021-03]
+      
       write(*,*)'deltar: Beginning of deltarho orbit-shift calc'
       k=1  !ONLY setup for one species, ngen=1
 
@@ -743,7 +793,7 @@ c......................................................................
       do lr=1,lrzmax
 c......................................................................
 
-      iyy=iy_(lr) !-YuP-101215: Don't use iy=; it's in common /params/
+      iyy=iy_(lr) !-YuP-101215: Don't use iy=; it's in common /params/ Here: deltar
       itl=itl_(lr)
       iyh=iyh_(lr)
       call bcast(deltarho(1,1,lr),zero,iy*lrzmax) ! YuP: is iy*lrzmax correct?

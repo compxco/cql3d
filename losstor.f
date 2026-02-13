@@ -50,7 +50,7 @@ c..................................................................
 
 
       do 50 j=1,jx
-         do i=1,iy
+         do i=1,iymax !YuP[2021-03-11] iy-->iymax
             taulos(i,j,indxlr_)=ep90
          enddo
  50   continue
@@ -67,11 +67,12 @@ c..................................................................
       if (torloss(k) .eq. "velocity") then
         do 10 j=1,jx
           if (j .eq. 1) then
-             do i=1,iy  !YuP[2019-07-03] Was i=i,iy  BUG?
+             do i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
+                !YuP[2019-07-03] Was i=i,iy  BUG?
                 taulos(i,j,indxlr_)=tauloss(1,k)
              enddo
           else
-             do i=1,iy
+             do i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
                 taulos(i,j,indxlr_)=tauloss(1,k)*(1.+tauloss(2,k)
      1               *(x(j)*vnorm)**tauloss(3,k))
              enddo
@@ -81,17 +82,17 @@ c..................................................................
      +           torloss(k).eq."flutter1") then
         do 12 j=1,jx
           if (j .eq. 1) then
-             do i=1,iy
+             do i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
                 taulos(i,j,indxlr_)=tauloss(1,k)
              enddo
           else
-             do i=1,iy
+             do i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
                 taulos(i,j,indxlr_)=tauloss(1,k)/(1.+tauloss(2,k)
      1               *(x(j)*vnorm)**tauloss(3,k))
              enddo
           endif
           if (torloss(k).eq."flutter1") then
-             do i=1,iy
+             do i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
                 taulos(i,j,indxlr_)=taulos(i,j,indxlr_)
      +               *gamcub(j)*gamsqr(j)
              enddo
@@ -146,7 +147,8 @@ c     These flutter losses apply only to transiting particles:
                taulos(i,j,indxlr_)=ep90
             enddo
             do i=1,iyh
-               taulos(iy+1-i,j,indxlr_)=taulos(i,j,indxlr_)
+               taulos(iy_(l_)+1-i,j,indxlr_)=taulos(i,j,indxlr_)
+               !YuP[2021-03-11] iy-->iy_(l_)
             enddo
          enddo
 
@@ -154,25 +156,25 @@ c     These flutter losses apply only to transiting particles:
 
       elseif (torloss(k) .eq. "relativ") then
         do 20 j=1,jx
-           do i=1,iy
+           do i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
               taulos(i,j,indxlr_)=tauloss(1,k)*gamcub(j)
            enddo
  20     continue
       elseif (torloss(k) .eq. "energy") then
         do 30 j=1,jx
           if (fions(k)*tcsgm1(j) .le. enloss(k)) then
-             do i=1,iy
+             do i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
                 taulos(i,j,indxlr_)=tauloss(1,k)
              enddo
           else
-             do i=1,iy
+             do i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
                 taulos(i,j,indxlr_)=ep90
              enddo
           endif
  30     continue
       elseif (torloss(k) .eq. "shell") then
         do 40 j=1,jx
-           do i=1,iy
+           do i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
               ej=fions(k)*tcsgm1(j)
               if (ej .le. enloss(k)) then
                  taulos(i,j,indxlr_)=tauloss(1,k)

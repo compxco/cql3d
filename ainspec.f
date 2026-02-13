@@ -115,6 +115,18 @@ c     Electron mass is 9.1e-28 grams. Use this to distinguish ions.
           nionm=nionm+1
           kionm(nionm)=k
         endif
+        if(fmass(k).eq.1.e-29)then !YuP[2022-05-31] added warning
+          !Note that fmass(k)=1.e-29 is set in aindflt
+          !It is possible that user sets nmax=2 (and ngen=1, for example),
+          !while the intention is to use only one Maxw.species,
+          !and then the values are not set for fmass(k=3)
+CMPIINSERT_IF_RANK_EQ_0
+          WRITE(*,*)
+          WRITE(*,*)'WARNING: fmass/bnumb not set in cqlinput for k=',k
+CMPIINSERT_ENDIF_RANK
+          !Maybe better stop the run? 
+          STOP 'fmass/bnumb not set in cqlinput for this k; check nmax'
+        endif
  1012 continue
 
 cBHTemp      if (kionn.eq.0) call diagwrng(9)
@@ -133,11 +145,73 @@ CMPIINSERT_IF_RANK_EQ_0
       WRITE(*,*)'ainspec: kelecg,kelecm,kelec',
      +                    kelecg,kelecm,kelec
       WRITE(*,*)'ainspec: niong,kiong(1:niong)',niong,kiong(1:niong)
-      WRITE(*,*)'ainspec: nionm,kionm(1:nionm)',nionm,kionm(1:nionm)
+      if(nionm.gt.0)then ![2022-05-26] added nionm condition
+        WRITE(*,*)'ainspec: nionm,kionm(1:nionm)',nionm,kionm(1:nionm)
+      else
+        WRITE(*,*)'ainspec: nionm=',nionm !Can be no Maxw.ions (only general)
+      endif
       WRITE(*,*)'ainspec: nionm/kionm may be adjusted upwards when'
       WRITE(*,*)'ainspec:   iprozeff.ne."disabled"; see cqlinput_help'
       WRITE(*,*)
 CMPIINSERT_ENDIF_RANK
+
+
+      !YuP[2022-05-31] Added more verification for species.
+      !In the list of kg (general sp.) and list of km (Maxw.sp.)
+      !identify same species (in km list, the species 
+      !can be repeated in case of colmodl=3 runs)
+      if(.NOT.ASSOCIATED(km_same)) then
+         allocate(km_same(1:ntotal),STAT=istat) ![2022-05]
+         km_same=0
+         allocate(kg_same(1:ntotal),STAT=istat) ![2022-05]
+         kg_same=0
+      endif
+      do kg=1,ngen ! General species list
+      do km=ngen+1,ntotal ! Maxwellian list
+         if(bnumb(kg).eq.bnumb(km))then
+         if(abs(fmass(kg)-fmass(km)).lt.1d-3*(fmass(kg)+fmass(km)))then
+              ! 'kg' and 'km' are same species.
+              km_same(kg)=km ! pointing from kg to km
+              kg_same(km)=kg ! pointing from km to kg
+         endif
+         endif
+      enddo
+      enddo
+      !If none of same-species are found, km_same and kg_same remain =0
+      
+      if(colmodl.eq.0)then !Fully non-linear: there should be no duplicates
+        ! of general species in km list (Maxwellian list).
+        if( sum(km_same).ne.0 ) then ! or sum(kg_same).ne.0
+CMPIINSERT_IF_RANK_EQ_0
+          WRITE(*,*)'For colmodl=0, no duplicate species are allowed.'
+          WRITE(*,*)'Remove duplicate species from Maxwellian list,'
+          WRITE(*,*)' or set kfield(k) to "disabled" '
+CMPIINSERT_ENDIF_RANK
+          !stop 'ainspec: colmodl=0'
+          do kg=1,ngen ! General species list
+             km=km_same(kg) !Duplicate species in Maxwellian list
+             kfield(km)='disabled'
+CMPIINSERT_IF_RANK_EQ_0
+             WRITE(*,*)'For km=',km,' resetting kfield(km) to disabled'
+CMPIINSERT_ENDIF_RANK
+          enddo
+        endif 
+      endif
+
+      if(colmodl.eq.3)then !Using P0 from Maxwellian duplicate.
+        !Must have EACH general species duplicated in Maxw.list
+        ![presently, colmodl is NOT a func. of species number].
+        do kg=1,ngen
+          if (km_same(kg).eq.0) then
+CMPIINSERT_IF_RANK_EQ_0
+            WRITE(*,*)'For colmodl=3 '
+            WRITE(*,*)'add Maxwellian duplicate for general species=',kg
+CMPIINSERT_ENDIF_RANK
+            stop 'ainspec: Add duplicate species to Maxwellian list'
+          endif
+        enddo
+      endif
+      !YuP[2022-01-12] Done/Added more verification for species.
 
       return
       end

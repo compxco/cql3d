@@ -21,7 +21,7 @@ cBH180527: to handle possible situation in netcdfrw2.
 c
 c     tam1(jx) --> tam30(jx)
 c     temc1(iy) --> temc4(iy)
-c     tz1(lza) --> tz2(lza)
+c     tz1(lz) --> tz2(lz)
 c     tr(0:lrza)
 c     tr1(0:lrza) --> tr5(0:lrza)
 c     itemc1(iy) --> itemc2(iy)
@@ -62,75 +62,138 @@ c     VECTORS
 c
 c**********************************************************************
 c
-      common /diskx/
+      !YuP[2021-03] Rearranged, to collect lrorsa arrays together
+      !(those are used in both CQL3D and CQLP, 
+      !but with different meaning of l_ index)
+      !For future CQL4D development: need to "split" l_ index into two.
+      !Made some of them into pointers (over lrors)
+      
+      integer, dimension(:), pointer ::
+     1  itl_,itu_,
+     1  iy_,iyh_,iyjx_,
+     1  inew_,inewjx_,
+     1  ieq_,   !!!(lrors+1),
+     1  n_,nch
+      
+      real*8,  dimension(:), pointer ::
+     1  consn,consn0,
+     1  currmtp,currmt,rovsloc,sptzr,sgaint1,
+     1  thb,time_,twoint
+      
+      common /diskx_lrors/
+     1  itl_,itu_,
+     1  iy_,iyh_,iyjx_,
+     1  inew_,inewjx_,ieq_,
+     1  n_,nch,
+     1  consn,consn0,
+     1  currmtp,currmt,rovsloc,
+     1  sptzr,sgaint1,
+     1  thb,time_,twoint
+     
+      integer indxlr(0:lrorsa),indxls(0:lrorsa)
+      common /diskx_lrorsa/ indxlr,indxls
+     
+      common /diskx_lrza/
      1  bmod0(lrza),btor0(lrza),bthr(lrza),btoru(lrza),bthr0(lrza),
-     1  consn(lrorsa),consn0(lrorsa),currt(lrza),currxj0(0:lrza),
-     1  currtp(lrza),currmtp(lrorsa),currmt(lrorsa),currxj(0:lrza),
+     1  currt(lrza),currxj0(0:lrza),
+     1  currtp(lrza),
+     1  currxj(0:lrza),
      1  currpar(lrza),curreq(lrza),
      1  zreshin(lrza),zreskim(lrza),rovsc(lrza),rovsc_hi(lrza),
      1  curtor(lrza),curpol(lrza),ccurtor(0:lrza),ccurpol(0:lrza),
      1  deltapsi(lrza),
      1  eps(lrza),etll0(lrza),
-     1  itl_(lrorsa),itu_(lrorsa),
-     1  iy_(lrorsa),iyh_(lrorsa),iyjx_(lrorsa),
-     1  inew_(lrorsa),inewjx_(lrorsa),ieq_(lrorsa+1),
-     1  indxlr(0:lrorsa),indxls(0:lrorsa),
-     1  lorbit(lrza),lmdpln(0:lrza),
-     1  n_(lrorsa),nch(lrorsa),
-     1  nefiter_(lrza),  ! counts iterations of el.field for each flux surface     
+     1  lorbit(lrza),lmdpln(0:lrorsa),  !YuP[2022-02-11] changed lmdpln size to lrorsa
      1  psimx(lrza),pibzmax(lrza),psidz(lrza),
      1  qsafety(lrza),
      1  r0geom(lrza), r0drdz(0:lrza),rgeom(lrza), zgeom(lrza),
-     1  rovs(lrza),rovsn(lrza),rovsloc(lrorsa)
+     1  rovs(lrza),rovsn(lrza)
+     
+      integer,dimension(:),pointer :: nefiter_ !(lrors)! counts iterations of el.field for each flux surface 
+      !YuP[2021-04-09] Now pointer
+      common /e_iterations/ nefiter_ !(lrors)
+
       common /diskx/
-     1  sptzr(lrorsa),sgaint1(lrorsa),starnue(lrorsa),
-     1  thb(lrorsa),tauee(lrza),taueeh(lrorsa),time_(lrorsa),
-     1  twoint(lrorsa),
      1  vthe(lrza),
      1  xlbnd(lrza),xlndn0(lrza),
      1  zmaxpsi(0:lrza),zmaxi(0:lrza),
-     1  zmaxpsii(0:lrza),zeff(lrza),zeff4(lrza),
+     1  zmaxpsii(0:lrza),
      1  vphipl(lrza),
      1  srckotot(lrza),elecr(lrza),
      1  denfl(lrza),denfl1(lrza),denfl2(lrza),
-     1  den_of_s(lza),den_of_s1(lza),den_of_s2(lza),
      1  tauii(lrza),tau_neo(lrza),drr_gs(lrza),
      1  rhol(lrza),rhol_pol(lrza)
       common /diskx/
      1  taubi(lrza),tau_neo_b(lrza),drr_gs_b(lrza),
      1  rhol_b(lrza),rhol_pol_b(lrza)
 
+      !YuP[2021-04-14] Remaining arrays related to lz are pointers now:
+      real*8, dimension(:), pointer :: den_of_s,den_of_s1,den_of_s2,
+     1  tz1,tz2 !(lz)
+      common /den_lz/ den_of_s, den_of_s1, den_of_s2, tz1, tz2 !(lz)
+     
+      real*8, dimension(:), pointer :: tauee,taueeh,starnue,zeff,zeff4
+      common /tauee_starnue/ tauee,taueeh,starnue ! lsmax or lrzmax
+      common /zeff_/ zeff,zeff4  ! lsmax or lrzmax
+      !YuP[2021-03-17] Collected tauee,taueeh,starnue  here,
+      !and made as pointers.
+      !It seems the only reason why we need them 
+      !over full grid (lrzmax or lsmax) is because of printout in tdoutput.
+      !Anyway, they are set over full grid in the CQL3D or CQLP, 
+      !see, e.g. starnue(lr_) or starnue(ls_)
+        
 c..................................................................
 c     2-D ARRAYS
 c..................................................................
 
-      common /diskx/
+      !YuP[2021-03] Rearranged, to collect lrorsa arrays together
+      !(those are used in both CQL3D and CQLP, 
+      !but with different meaning of l_ index),
+      !and made them into pointers.
+      !For future CQL4D development: need to "split" l_ index into two.
+
+      integer, dimension(:,:), pointer :: jchang !(ngen,lrors)
+      real*8,  dimension(:,:), pointer :: currm,energym !(ngen,lrors)
+      common /diskx_lrors/
+     1  jchang,
+     1  currm,
+     1  energym
+      
+      common /diskx_lrza/
      1  energy(ntotala,lrza),
-     1  vth(ntotala,lrza)
-
-
-      common /diskx/
+     1  vth(ntotala,lrza),
      1  den_fsa(ngena,lrza), 
      1  den_fsa_t0(ngena,lrza), 
      &  reden_t0(ngena,lrza),temp_t0(ngena,lrza),
      &  reden_wk(lrza),temp_wk(lrza),
-     1  currm(ngena,lrorsa),curr(ngena,lrza),
+     1  curr(ngena,lrza),
      1  hnis(ngena,lrza),
      1  ratio(ngena,lrza),
      1  wpar(ngena,lrza),wperp(ngena,lrza),
      1  xlndn00(ngena,lrza),xlncur(ngena,lrza),
-     1  xlndn(ngena,lrza),energym(ngena,lrorsa),
+     1  xlndn(ngena,lrza),
      1  xlndnr(ntotala,lrza),energyr(ntotala,lrza),
      1  currr(ngena,lrza),xlndnv(ntotala,lrza),
      1  energyv(ntotala,lrza),currv_(ngena,lrza),eoe0(ngena,lrza),
-     1  ucrit(ngena,lrza),jxcrit(ngena,lrza),     
-     1  jchang(ngena,lrorsa),
-     1  denra(ngena,lrza),curra(ngena,lrza),
-     1  fdenra(ngena,lrza),fcurra(ngena,lrza),enn(lrza,npaproca)
-      common /diskx/
+     &  enn(lrza,npaproca)
+     
+      !YuP[2021-04-09] collected RE-related arrays, made them into pointers
+      integer,dimension(:,:),pointer :: jxcrit    !(ngen,lrors)
+      real*8,dimension(:,:),pointer :: ucrit,denra,curra,fdenra,fcurra   !(ngen,lrors)
+      common / RE_related / jxcrit, ucrit,
+     1  denra,curra, fdenra,fcurra
+     
+     
+      common /diskx_0/
      1  alm(0:mbeta,lrza),
-     1  betta(0:mbeta,lrza),
-     1  entrintr(ngena,-1:15)
+     1  betta(0:mbeta,lrza)
+     
+      pointer entrintr
+      real*8 entrintr(:,:)    !!!(ngen,-1:15)
+      common /diskx_1/ entrintr  ![2023-01] was entrintr(ngena,-1:15)
+      !YuP[2023-01-03] Made it a pointer. 
+      !Previously - static array, it was causing floating-point exception
+      !and other issues.
 
 c..................................................................
 c     Next follow variables and arrays not dimensioned by lrza.
@@ -161,6 +224,11 @@ c..................................................................
      1  kionm(nmaxa),
      1  l_,lr_,indxlr_,indxls_,lmdpln_,ls_,
      1  miyjx,ibeampon,ibeamponp
+     
+      !YuP[2022-05-31] Added, for handling species
+      integer, pointer :: km_same(:), kg_same(:) !(ntotal)
+      common/arrays_species_int/ km_same,kg_same
+      !YuP[2022-05-31]
 
       common
      1  ipad1,r0geomp, rgeomp, zgeomp, rgeom1, rgeom2,
@@ -195,16 +263,15 @@ cBH111124     1  iota(0:750),realiota(0:750),
      1  i1p(2),itab(3),ipad4,tab(3),
      1  imsh(20),
      1  frbuf(1024),
-     1  ws2d(2500),
-     1  work(tlfld1a)
+     1  ws2d(2500)
+
       common
      1  ekev(ngena),
      1  engain(ngena),
      1  tnorm(ngena)
       common
      1  fions(ntotala),
-     1  gama0(ntotala),
-     1  tz1(lza),tz2(lza)
+     1  gama0(ntotala)
      
       common
      1  wkbc(3*nbctimea),iopbc(2)
@@ -275,9 +342,9 @@ cBH_YP090809  First dimension of choose should be larger of 2*mx,mx+2
       pointer egylosa
       dimension egylosa(:,:,:,:)
       common /dptr95/ egylosa
-      pointer i0tran
-      dimension i0tran(:,:,:)
-      common /dptr95/ i0tran
+!      pointer i0tran !YuP[2021-04] moved to subr.sourceko [used locally only]
+!      dimension i0tran(:,:,:)
+!      common /dptr95/ i0tran
       pointer cal
       dimension cal(:,:,:,:)
       common /dptr95/ cal
@@ -458,14 +525,14 @@ cBH_YP090809  First dimension of choose should be larger of 2*mx,mx+2
       pointer solzz
       dimension solzz(:,:)
       common /dptr95/ solzz
-      pointer bpolz, btorz ! Equil.field at pol.angle grid (lza)
-      dimension bpolz(:,:), btorz(:,:)  ! (lza,lrzmax)
+      pointer bpolz, btorz ! Equil.field at pol.angle grid (lz)
+      dimension bpolz(:,:), btorz(:,:)  ! (lz,lrzmax)
       common /dptr95/ bpolz, btorz
       
 c YuP: [added Apr/2014] area and volume of a cell associated with each
 c                     (R,Z) point on flux surface, (R,Z)==(solrz,solzz)
       pointer ddarea, ddvol
-      dimension ddarea(:,:), ddvol(:,:)  !  (lza,lrzmax)
+      dimension ddarea(:,:), ddvol(:,:)  !  (lz,lrzmax)
       common /dptr95/ ddarea, ddvol
    
       pointer thtab
@@ -813,8 +880,7 @@ c                     (R,Z) point on flux surface, (R,Z)==(solrz,solzz)
       pointer gamefac
       dimension gamefac(:,:) !YuP[2019-07-26] k index added, so now gamefac(jx,ntotal)
       common /dptr95/ gamefac
-      pointer ident
-      dimension ident(:)
+      integer, dimension(:), pointer :: ident
       common /dptr95/ ident
       pointer temc1
       dimension temc1(:)
@@ -828,19 +894,15 @@ c                     (R,Z) point on flux surface, (R,Z)==(solrz,solzz)
       pointer temc4
       dimension temc4(:)
       common /dptr95/ temc4
-      pointer itemc1
-      dimension itemc1(:)
+      integer, dimension(:), pointer :: itemc1
       common /dptr95/ itemc1
-      pointer itemc2
-      dimension itemc2(:)
+      integer, dimension(:), pointer :: itemc2
       common /dptr95/ itemc2
-      pointer l_lower
-      dimension l_lower(:)
+      integer, dimension(:), pointer :: l_lower
       common /dptr95/ l_lower
-      pointer lpt
-      dimension lpt(:)
+      integer, dimension(:), pointer :: lpt
       common /dptr95/ lpt
-      pointer mun
+      pointer mun !real*8
       dimension mun(:)
       common /dptr95/ mun
       pointer fll
@@ -864,8 +926,7 @@ c                     (R,Z) point on flux surface, (R,Z)==(solrz,solzz)
       pointer xl
       dimension xl(:)
       common /dptr95/ xl
-      pointer jmaxxl
-      dimension jmaxxl(:)
+      integer, dimension(:), pointer :: jmaxxl
       common /dptr95/ jmaxxl
       pointer xlm
       dimension xlm(:)
@@ -874,7 +935,7 @@ c                     (R,Z) point on flux surface, (R,Z)==(solrz,solzz)
       dimension dxl(:)
       common /dptr95/ dxl
       pointer fl
-      dimension fl(:)
+      dimension fl(:,:) ![2022-03-19] Added 2nd dim: 1:lrors
       common /dptr95/ fl
       pointer fl1
       dimension fl1(:)
@@ -993,9 +1054,9 @@ c     NB:  rhs set up here for full 3d set of eqns (BH070525)
       pointer entr
       dimension entr(:,:,:)    !!!(ngen,-1:15,lrors)
       pointer xlndnz
-      dimension xlndnz(:,:)    !!!(ngen+1,negyrga)
+      dimension xlndnz(:,:)    !!!(ngen+1,negyrg)
       pointer sounor
-      dimension sounor(:,:,:,:)   !!!(ngen,nsoa,lz,lrz)
+      dimension sounor(:,:,:,:)   !!!(ngen,nso,lz,lrz)
       common /dptr95/ sgaint,entr,xlndnz,sounor
 
       
@@ -1177,7 +1238,7 @@ c*****************************************************************
      1  bdre(lrza),bdrep(lrza),
      1  sorpwt(lrza),sorpwti(0:lrza),
      1  sorpw_nbii(1:ngena,0:lrza),sorpw_rfi(1:ngena,0:lrza),
-     1  xlncurt(lrza)
+     1  xlncurt(lrorsa)  !YuP[2022-02-11] now lrorsa (was lrza)
 
       common /diskx/
      1  sorpw_rf(1:ngena,lrza),sorpw_nbi(1:ngena,lrza)
@@ -1237,18 +1298,31 @@ c     all arrays used only in CQL3D
 c..................................................................
 
       real*8 jparb,jparbt,jparbp,mun
-      common/ar3d/ rrz(0:lrza),
+
+      !YuP[2021-03] Rearranged, to collect lrorsa arrays together
+      !(those are used in both CQL3D and CQLP, 
+      !but with different meaning of l_ index)
+      !and converted to pointers.
+      !For future CQL4D development: need to "split" l_ index into two.
+      integer, dimension(:), pointer :: iytr  !(lrors)
+      real*8,  dimension(:), pointer :: currmtz,currmtpz,vfluxz !(lrors)
+      common/ar3d_lrors/ 
+     1  iytr,
+     1  currmtz,
+     1  currmtpz,
+     1  vfluxz
+      
+      common/ar3d_lrza/ rrz(0:lrza),
      1  tr(0:lrza),tr1(0:lrza),tr2(0:lrza),
      1  tr3(0:lrza),tr4(0:lrza),tr5(0:lrza),drp5(0:lrza),
      1  dpsi(0:lrza),dpsidrho(lrza),
-     1  iytr(lrorsa),h_r(0:lrza),
+     1  h_r(0:lrza),
      1  area(0:lrza),equilpsp(0:lrza),equilpsi(0:lrza),
      1  areamid(0:lrza),volmid(0:lrza),
      1  psivalm(lrza),rpconz(lrza),rmconz(lrza),rpmconz(0:lrza),
      1  bpolsqaz(0:lrza),aspin(lrza),trapfrac(lrza),
      1  currz(ngena,lrza),currtpz(lrza),currtz(lrza),
      1  currza(ngena),currtzi(0:lrza),currtpzi(0:lrza),
-     1  currmtz(lrorsa),currmtpz(lrorsa),
      1  totcurzi(0:lrza),totcurz(lrza),
      1  fpsiz2(0:lrza),fpsiz(lrza),ffpsiz(lrza),
      1  jparb(lrza),jparbt(lrza),jparbp(lrza),
@@ -1265,7 +1339,7 @@ c..................................................................
      1  rfpwrt(ngena),
      1  gkpwrt(ngena),energyt(ntotala),
      1  rz(0:lrza),
-     1  vfluxz(lrorsa),vol(0:lrza),
+     1  vol(0:lrza),
      1  onovrpz(lrza,2),
      1  tplt3d(nplota),
      1  bscurma(2,2),bscurm(0:lrza,2,2),bscurmi(0:lrza,2,2)
@@ -1291,10 +1365,19 @@ c..................................................................
      1  enk(nena),en_(nena),jval_(nena),
      1  inegsxr(nva),lensxr(nva)
 
+      !YuP[2021-03] Rearranged, to collect lrorsa arrays together
+      !(those are used in both CQL3D and CQLP, 
+      !but with different meaning of l_ index)
+      !and converted to pointers.
+      !For future CQL4D development: need to "split" l_ index into two.
+      real*8, dimension(:,:), pointer :: sigm,sigf,fuspwrv,fuspwrm  !(4,lrors)
+      !YuP[2021-03-18] Need to check usage of these 4 arrays: change lr_ to l_ ?
+      
       common /csigma/ mtab,msig,jxis,elmin,delegy,
      1  imaxwln(2,4),igenrl(2,4),
-     1  sigm(4,lrorsa),sigf(4,lrorsa),sigmt(4),sigft(4),
-     1  fuspwrv(4,lrorsa),fuspwrvt(4),fuspwrm(4,lrorsa),fuspwrmt(4)
+     1  sigmt(4),sigft(4),
+     1  fuspwrvt(4),fuspwrmt(4)
+      common /csigma_lrors/ sigm,sigf,fuspwrv,fuspwrm
 
       pointer tamm1
       dimension tamm1(:)
@@ -1346,6 +1429,17 @@ c..............................................................
       pointer d_r
       dimension d_r(:,:,:,:)
       common /dptr95/ d_r
+      
+      real*8, pointer :: ryain_t(:,:)  !(njene,nbctime)
+      common /data_ryain/ ryain_t      !(njene,nbctime)
+      real*8, pointer :: dbb2in_t(:,:) !(njene,nbctime)
+      real*8, pointer :: dbb2(:) !lrz
+      common /data_deltabb/ dbb2in_t   !(njene,nbctime)  !=(deltaB/B)^2 from data
+      common /data_deltabb/ dbb2 !(lrz) !=(deltaB/B)^2 at each time step
+      ![2021-08] Added, For NIMROD coupling 
+      !(reading deltaB/B data and forming Drr(u,theta,r,t) coeff)
+      !See subr. read_data_files()
+      
       pointer f_lm
       dimension f_lm(:,:,:)
       common /dptr95/ f_lm
@@ -1432,8 +1526,7 @@ c******************************************************************
      1  fpsiar(nnra),ffpar(nnra),d2ffpar(nnra),qar(nnra),d2qar(nnra),
      1  prar(nnra),d2prar(nnra),ppar(nnra),d2ppar(nnra),psiar(nnra),
      1  er(nnra),dummyar(nnra),
-     1  wkepsi(nrz3p1a),
-     1  tlorb1(lfielda),tlorb2(lfielda)
+     1  wkepsi(nrz3p1a)
 
       common
      1  epsi(nnra,nnza),epsirr(nnra,nnza),
@@ -1443,9 +1536,19 @@ c******************************************************************
       common/output/ lorbit_,ialign14,rmcon_,rpcon_,zmcon_,zpcon_,
      1  bthr_,btoru_,eqdells_,fpsi_,fppsi_,zmax_,btor0_,bthr0_,
      1  es_bmax_,bpsi_max_,bpsi_min_,lbpsi_max_,lbpsi_min_,
-     1  bmidplne_,solr_(lfielda),solz_(lfielda),es_(lfielda),
-     1  eqbpol_(lfielda),bpsi_(lfielda),thtpol_(lfielda),
-     1  eqdell_(lfielda)
+     1  bmidplne_
+     
+      !YuP[2021-04] collected arrays related to field line tracing,
+      !made them into pointers:
+      real*8,dimension(:), pointer :: solr_,solz_,es_,eqbpol_,bpsi_,
+     1   thtpol_,eqdell_,tlorb1,tlorb2 ! (lfield)
+      real*8,dimension(:), pointer :: work !(was tlfld1a, now 3*lfield+1)
+      common/eq_line/ solr_,solz_,es_,
+     1  eqbpol_,bpsi_,thtpol_,
+     1  eqdell_,
+     1  tlorb1,tlorb2,
+     1  work !used in micxiniz, eqorbit, as input in coeff1()
+!Careful - there are other 'work' arrays defined locally in other subroutines
 
 c..................................................................
 c     Allocatable arrays allocated in subroutine eqalloc
@@ -1581,17 +1684,13 @@ c..................................................................
       pointer alfa
       dimension alfa(:)
       common /dptr95/ alfa
-      pointer ilim1
-      dimension ilim1(:)
+      integer, dimension(:), pointer :: ilim1
       common /dptr95/ ilim1
-      pointer ilim2
-      dimension ilim2(:)
+      integer, dimension(:), pointer :: ilim2
       common /dptr95/ ilim2
-      pointer ifct1
-      dimension ifct1(:)
+      integer, dimension(:), pointer :: ifct1
       common /dptr95/ ifct1
-      pointer ifct2
-      dimension ifct2(:)
+      integer, dimension(:), pointer :: ifct2
       common /dptr95/ ifct2
       pointer urftmp
       dimension urftmp(:)
@@ -1811,18 +1910,39 @@ c-----------------------------------------------------------------------
      1  iymax,
      1  nsleft,nsrigt,numclas,numindx
 
+      !YuP[2021-02-26] I think lsbptopr,...,sz,...,elparol,elparnw,flux1,flux2 
+      !could be dimensioned over 0:ls+1 grid (FPE grid). 
+      !See below, now in /wp_ls/
+      !The other arrays in /wpvec/ are over full lsmax grid (can be larger than ls)
       common /wpvec/
-     1  cofdfds(0:lsa1,2,ntrmdera),
+!YuP     1  cofdfds(0:lsa1,2,ntrmdera),  !cofdfds is not used
      1  enrgypa(ntotala,0:lsa1),
-     1  vthpar(ntotala,0:lsa1),
-     1  lsbtopr(0:lsa1),lsprtob(0:lsa1),lpm1eff(0:lsa1,-1:+1),
-     1  sz(0:lsa1),dsz(0:lsa1),dszm5(0:lsa1),dszp5(0:lsa1),
-     1  eszm5(0:lsa1),eszp5(0:lsa1),
-     1  psis(0:lsa1),psisp(0:lsa1),psipols(0:lsa1),
-     1  solrs(0:lsa1),solzs(0:lsa1),
-     1  elparol(0:lsa1),elparnw(0:lsa1),
-     1  flux1(0:lsa1),flux2(0:lsa1)
-
+     1  vthpar(ntotala,0:lsa1)
+     
+      !YuP: other arrays over full grid (over 1:lsmax or over 1:lrzmax):
+      !  tauee,taueeh,starnue, zeff, zeff4, etc.
+     
+      !YuP[2021-03-18] Made these arrays into pointers 
+      !(main reason: more chances to detect out-of-bounds errors)
+      ! All these arrays are allocated with (0:ls+1) [ls is FPE grid]
+      integer, dimension(:), pointer :: lsbtopr,lsprtob
+      real*8,  dimension(:), pointer ::
+     1  sz,dsz,dszm5,dszp5,
+     1  eszm5,eszp5,
+     1  psis,psisp,psipols,
+     1  solrs,solzs,
+     1  elparol,elparnw,
+     1  flux1,flux2
+      integer, dimension(:,:), pointer :: lpm1eff !(0:ls+1,-1:+1)
+      common /wp_ls/ 
+     1  lsbtopr,lsprtob,lpm1eff,
+     1  sz,dsz,dszm5,dszp5,
+     1  eszm5,eszp5,
+     1  psis,psisp,psipols,
+     1  solrs,solzs,
+     1  elparol,elparnw,
+     1  flux1,flux2
+      
 c.......................................................................
 c     Arrays allocated in subroutine wpalloc for CQLP
 c.......................................................................
@@ -1830,35 +1950,36 @@ c.......................................................................
       pointer l_upper
       dimension l_upper(:)  !!! (1:iy)
       pointer ilpm1ef
-      dimension ilpm1ef(:,:,:)  !!! (0:iy+1,0:lsa1,-1:+1)
+      dimension ilpm1ef(:,:,:)  !!! (0:iy+1,0:ls+1,-1:+1)
+      common /dptr95_wp/ l_upper,ilpm1ef      !YuP[2021-03-05] was not added
 
       pointer fnhalf
-      dimension fnhalf(:,:,:,:)
-      common /dptr95/ fnhalf
+      dimension fnhalf(:,:,:,:) !(0:iymax+1,0:jx+1,ngen,0:ls+1)
+      common /dptr95_wp/ fnhalf
       pointer fnp0
-      dimension fnp0(:,:,:,:)
-      common /dptr95/ fnp0
+      dimension fnp0(:,:,:,:)   !(0:iymax+1,0:jx+1,ngen,0:ls+1)
+      common /dptr95_wp/ fnp0
       pointer fnp1
-      dimension fnp1(:,:,:,:)
-      common /dptr95/ fnp1
+      dimension fnp1(:,:,:,:)   !(0:iymax+1,0:jx+1,ngen,0:ls+1)
+      common /dptr95_wp/ fnp1
       pointer dls
-      dimension dls(:,:,:,:)
-      common /dptr95/ dls
+      dimension dls(:,:,:,:)    !(0:iymax+1,0:jx+1,ngen,0:ls+1)
+      common /dptr95_wp/ dls
       pointer fh
-      dimension fh(:,:,:,:)
-      common /dptr95/ fh
+      dimension fh(:,:,:,:)     !(0:iymax+1,0:jx+1,ngen,0:ls+1) for CQLP
+      common /dptr95/ fh ! fh is used in CQLP and A-F
       pointer fg
-      dimension fg(:,:,:,:)
-      common /dptr95/ fg
+      dimension fg(:,:,:,:)     !(0:iymax+1,0:jx+1,ngen,0:ls+1) for CQLP
+      common /dptr95/ fg ! fg is used in CQLP and A-F
       pointer fedge
       dimension fedge(:,:,:,:)
-      common /dptr95/ fedge
+      common /dptr95_wp/ fedge
       pointer rhspar
       dimension rhspar(:,:,:)
-      common /dptr95/ rhspar
+      common /dptr95_wp/ rhspar
       pointer bndmats
       dimension bndmats(:,:,:,:)
-      common /dptr95/ bndmats
+      common /dptr95_wp/ bndmats
       pointer wcqlb
       dimension wcqlb(:,:,:,:)
       common /dptr95/ wcqlb
@@ -1962,15 +2083,17 @@ c.......................................................................
 c.......................................................................
 c     variables transferred from freya
 c.......................................................................
-      character*8 frmodp, fr_gyrop, beamplsep
-      integer mfm1p
+      character*8 frmodp, fr_gyrop, beamplsep, src_nbi_ep !YuP[2022-06-30]
+
+      integer mfm1p, nbeamsp
       real*8 beamponp, beampoffp  
       real*8 hibrzp(kz,ke,kb)  !kz=nconteqa+2, from param.h
       common /freycomm/
-     1  frmodp, fr_gyrop, beamplsep,beamponp,beampoffp,
-     1  hibrzp,mfm1p
+     1  frmodp, fr_gyrop, src_nbi_ep, beamplsep,beamponp,beampoffp,
+     1  hibrzp,mfm1p,nbeamsp
 			    !These variables are set to frmod,fr_gyro,
-			    !beamplse,beampon,beampoff from frmod namelist.
+			    !beamplse,beampon,beampoff,nbeams
+                            !from frmod namelist.
                             !The namelist is declared in frname.h and
                             !passed to the comm.h related subroutines
                             !as arguments of subroutine frnfreya

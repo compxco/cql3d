@@ -104,6 +104,10 @@ c
       integer hibr_dims(3)  !  JK
       integer sorpw_dims(2)
 c
+      integer xlm_dim     ![2022-03-19] for saving xlm() and fl()
+      integer dims_fl(3)  ![2022-03-19] for saving xlm and fl
+      integer count_fl(3) ![2022-03-19] for saving xlm and fl
+
       integer start_elecfldn(3),count_elecfldn(3),elecfldn_dims(3)
       
       !YuP[2019-09] Added, to save bnumb_imp(), dens_imp(), etc.
@@ -145,7 +149,7 @@ c
 CMPIINSERT_IF_RANK_NE_0_RETURN
 c This subroutine is only called from MPI rank=0.
 
-       WRITE(*,*) 'inside netcdfrw2.f...'
+       !WRITE(*,*) 'inside netcdfrw2.f...'
 c       WRITE(*,*) 'frmodp=',frmodp
 c       WRITE(*,*) 'hibrzp(i,1,1),hibrzp(i,2,1),hibrzp(i,3,1)'
 c       do i=1,22
@@ -157,26 +161,31 @@ c     >        hibrzp(i,1,3),hibrzp(i,2,3),hibrzp(i,3,3)
 c       enddo
 c
 
-c     Maximum iy as function of radius:
-      iyy=0  !-YuP-101215: Don't use iy=; it's in common /params/
+c     Maximum of iy_() as function of radius:
+      iymx=0  !-YuP-101215: Don't use iy=; it's in common /params/
              ! Don't let overwrite the cqlinput value!
-      do l=1,lrz
-         iyy=max(iyy,iy_(l))
+      do l=1,lrors !YuP[2021-03-11] was lrz  (in CQLP runs: 1:ls, CQL3D 1:lrz)
+         iymx=max(iymx,iy_(l))
       enddo
-      if(iyy.gt.iy) stop 'netcdfrw2: iy_(l) should not exceed iy' 
+      if(iymx.gt.iymax) stop 'netcdfrw2: iy_(l) should not exceed iy' 
+      !Now All arrays are saved over iymax, not iy_(ll)
 
       if (.NOT.ALLOCATED(wkpack)) then ! allocate working array for pack21
-         nwkpack=max(iyjx2, iy*lrors, ntotala*(lrza+1), 
-     +               lza*lrzmax, iy*lz, nena*nva, 
-     +               iy*lrzmax, lrza*npaproca) +10 ! +10 just in case
+         nwkpack=max(iyjx2, iymax*lrors, ntotala*(lrza+1), 
+     +               lz*lrzmax, iymax*lz, nena*nva, 
+     +               iymax*lrzmax, lrza*npaproca) +10 ! +10 just in case
+            !YuP[2021-03-11] Changed iy-->iymax 
+            !(just in case if iy is changed by iy=iy_(l_) somewhere)
          allocate(wkpack(nwkpack),STAT=istat)
          call bcast(wkpack,zero,SIZE(wkpack))
       endif
 
       if (.NOT.ALLOCATED(iwkpack)) then ! allocate working array for ipack21
-         nwkpack=max(iyjx2, iy*lrors, ntotala*(lrza+1), 
-     &               lza*lrzmax, iy*lz, nena*nva, 
-     &               iy*lrzmax, lrza*npaproca) +10 ! +10 just in case
+         nwkpack=max(iyjx2, iymax*lrors, ntotala*(lrza+1), 
+     &               lz*lrzmax, iymax*lz, nena*nva, 
+     &               iymax*lrzmax, lrza*npaproca) +10 ! +10 just in case
+            !YuP[2021-03-11] Changed iy-->iymax 
+            !(just in case if iy is changed by iy=iy_(l_) somewhere)
          allocate(iwkpack(nwkpack),STAT=istat)
          call ibcast(iwkpack,0,SIZE(iwkpack))
       endif
@@ -185,8 +194,8 @@ c      if (iy*lrors.gt.iyjx2)
 c     +    stop '1: in netcdfrw2: Need to set jx>lrza'
 c      if (ntotala*(lrza+1).gt.iyjx2) 
 c     +    stop '2: in netcdfrw2: Need ntotala*(lrza+1)<(iy+2)*(jx+2)'
-c      if (lza*lrzmax.gt.iyjx2) 
-c     +    stop '3: in netcdfrw2: Need lza*lrza<(iy+2)*(jx+2)'
+c      if (lz*lrzmax.gt.iyjx2) 
+c     +    stop '3: in netcdfrw2: Need lz*lrza<(iy+2)*(jx+2)'
 c      if (iy*lz.gt.iyjx2)
 c     +    stop '4: in netcdfrw2: Need iy*lz<(iy+2)*(jx+2)'
 c      if (nena*nva.gt.iyjx2)
@@ -209,10 +218,12 @@ cBH110320      endif
 
 cdir$ master
 
-      count(1)=iy
+      count(1)=iymax
       count(2)=jx
       count(3)=lrz
       count(4)=1
+            !YuP[2021-03-11] Changed iy-->iymax 
+            !(just in case if iy is changed by iy=iy_(l_) somewhere)
 
       
       !For recording of 'f', when ngen=1   
@@ -220,7 +231,7 @@ cdir$ master
       startf(2)=1 
       startf(3)=1 ! will be changed
       startf(4)=1 ! will be changed
-      countf(1)=iy 
+      countf(1)=iymax
       countf(2)=jx 
       countf(3)=1  !radial index  ! will be changed
       countf(4)=1  !record number ! will be changed
@@ -231,7 +242,7 @@ cdir$ master
       startg(3)=1 ! will be changed
       startg(4)=1 ! will be changed
       startg(5)=1 ! will be changed
-      countg(1)=iy 
+      countg(1)=iymax
       countg(2)=jx 
       countg(3)=1  !radial index  ! will be changed
       countg(4)=1  !species index ! will be changed
@@ -291,23 +302,30 @@ cdir$ master
       r00_count(1)=lrzmax+1
       r00_count(2)=1
 
-      y_count(1)=iy
-      y_count(2)=lrz
+      if(cqlpmod.ne."enabled")then ! CQL3D
+      y_count(1)=iymax 
+      y_count(2)=lrz ! for CQL3D
+      else ! CQLP  !YuP[2022-02-09] added
+      y_count(1)=iymax 
+      y_count(2)=lz ! for CQLP
+      endif
 
       species_count(1)=ntotal
       species_count(2)=lrzmax
       species_count(3)=1
 
-      tau_count(1)=iy
+      tau_count(1)=iymax
       tau_count(2)=lrzmax
 
-      z_count(1)=iy
+      z_count(1)=iymax
       z_count(2)=lz
       z_count(3)=lrzmax
 
-      z_count1(1)=iy
+      z_count1(1)=iymax
       z_count1(2)=lz
       z_count1(3)=1
+            !YuP[2021-03-11] Changed iy-->iymax 
+            !(just in case if iy is changed by iy=iy_(l_) somewhere)
 
       delta_count(1)=nr_delta
       delta_count(2)=nz_delta
@@ -339,7 +357,7 @@ cl    1. Initialize part, creating new netcdf file
 c
 
 c --- begin if ---
-      WRITE(*,*)'netcdfrw2 initialize, kopt=',kopt,'n=',n
+      WRITE(*,*)'netcdfrw2: kopt=',kopt,'  n=',n
       if ((kopt.eq.0) .and. (n.eq.0)) then !endif at l 3282
 
 C-----------------------------------------------------------------------
@@ -363,11 +381,11 @@ cl    1.1.2 define dimensions
 c     p. 43 of netcdf-3 manual
       
       istatus= NF_DEF_DIM(ncid, 'xdim',     jx,       xdim)
-      istatus= NF_DEF_DIM(ncid, 'ydim',     iy,       ydim)
+      istatus= NF_DEF_DIM(ncid, 'ydim',     iymax,    ydim)
       
       ! for 'f', corresp. to (1:iy),(1:jx):
       istatus= NF_DEF_DIM(ncid, 'xdimf',    jx,     xdimf)
-      istatus= NF_DEF_DIM(ncid, 'ydimf',    iy,     ydimf)
+      istatus= NF_DEF_DIM(ncid, 'ydimf',    iymax,  ydimf)
 
       istatus= NF_DEF_DIM(ncid, 'rdim',     lrz,      rdim)
       istatus= NF_DEF_DIM(ncid, 'r0dim',    lrzmax,   r0dim)
@@ -420,8 +438,10 @@ c      stop
       istatus= NF_DEF_DIM(ncid,'nampfmax_dim',nampfmax+1,nampfmax_dim)
       istatus= NF_DEF_DIM(ncid,'nonch_dim',   nstop+1,   nonch_dim) 
       istatus= NF_DEF_DIM(ncid,'nrho_dim',    lrz+1,     nrho_dim) 
-      istatus= NF_DEF_DIM(ncid,'nrho_dim1',    lrz+2,     nrho_dim1) 
+      istatus= NF_DEF_DIM(ncid,'nrho_dim1',   lrz+2,     nrho_dim1) 
       endif
+
+      istatus= NF_DEF_DIM(ncid,'xlm_dim',jfl,xlm_dim) ![2022-03-19] For fl(jfl,lrors)
 
 c     unlimited dimension for time, dimension name= 'tdim'
       !istatus= NF_DEF_DIM(ncid, 'tdim',NF_UNLIMITED,tdim) 
@@ -445,14 +465,22 @@ c     define vector of dimensions, unlimited last
       !dimsg() are used for saving of 'f'==f(), in case of ngen>1
       dimsg(1)=ydimf
       dimsg(2)=xdimf
-      dimsg(3)=rdim
+      if(cqlpmod.ne."enabled")then ! CQL3D
+      dimsg(3)=rdim !CQL3D
+      else ! CQLP  !YuP[2022-02-09] added
+      dimsg(3)=zdim !CQLP
+      endif
       dimsg(4)=gdim
       dimsg(5)=tdim ! can be re-defined, see below
 
       !dimsf() are used for saving of 'f'==f(), in case of ngen=1
       dimsf(1)=ydimf
       dimsf(2)=xdimf
-      dimsf(3)=rdim
+      if(cqlpmod.ne."enabled")then ! CQL3D
+      dimsf(3)=rdim !CQL3D
+      else ! CQLP  !YuP[2022-02-09] added
+      dimsf(3)=zdim !CQLP
+      endif
       ! Now define the remaining dimsf(4:5)
       if (netcdfshort.eq.'enabled') then
          !Do nothing: no storage defined.
@@ -479,6 +507,18 @@ c     define vector of dimensions, unlimited last
          endif  !on ngen
       endif  !on netcdfshort : storage defined
 
+      dims_fl(1)=xlm_dim  !=jfl [2022-03-19] for saving xlm and fl()
+      count_fl(1)=jfl
+      if(cqlpmod.ne."enabled")then ! CQL3D
+      dims_fl(2)=rdim !CQL3D
+      count_fl(2)=lrz
+      else ! CQLP 
+      dims_fl(2)=zdim !CQLP
+      count_fl(2)=lz
+      endif
+      dims_fl(3)=tdim
+      count_fl(3)=1 ! time dimension
+      ![2022-03-19] saving fl() - for one species only, for now.
 
       r_dims(1)=rdim
       r_dims(2)=tdim
@@ -496,9 +536,14 @@ c     define vector of dimensions, unlimited last
 
       r00_dims(1)=r00dim
       r00_dims(2)=tdim
-
+      
+      if(cqlpmod.ne."enabled")then !CQL3D
       y_dims(1)=ydim
-      y_dims(2)=rdim
+      y_dims(2)=rdim ! for CQL3D
+      else ! cqlpmod.eq."enabled" CQLP  !YuP[2022-02-09]added
+      y_dims(1)=ydim
+      y_dims(2)=zdim ! for CQLP
+      endif
 
       species_dims(1)=kdim
       species_dims(2)=r0dim
@@ -672,10 +717,10 @@ c.......................................................................
       call ncaptc2(ncid,vid,'long_name',NCCHAR,44,
      +          'Indicates output for 4D distn/ separate file',istatus)
 
-cBH181025:  Not used
-c      vid=ncvdef2(ncid,'f3d_out',NCCHAR,1,chardim,istatus)
-c      call ncaptc2(ncid,vid,'long_name',NCCHAR,44,
-c     +          'Indicates output for 3D distn/ separate file',istatus)
+cBH181025:  Not used !YuP[2023-09-26] revived
+      vid=ncvdef2(ncid,'f3d_out',NCCHAR,1,chardim,istatus)
+      call ncaptc2(ncid,vid,'long_name',NCCHAR,44,
+     +          'Indicates output for 3D distn/ separate file',istatus)
 
       vid=ncvdef2(ncid,'netcdfshort',NCCHAR,1,chardim,istatus)
       call ncaptc2(ncid,vid,'long_name',NCCHAR,46,
@@ -920,6 +965,10 @@ c     Output current calculated from eqdsk:
       vid=ncvdef2(ncid,'x',NCDOUBLE,1,xdim,istatus)
       call ncaptc2(ncid,vid,'long_name',NCCHAR,28,
      +           'normalized momentum-per-mass',istatus)
+     
+      vid=ncvdef2(ncid,'xl',NCDOUBLE,1,xlm_dim,istatus) ![2022-03-19] for saving fl()
+      call ncaptc2(ncid,vid,'long_name',NCCHAR,37,
+     +           'normalized parallel momentum-per-mass',istatus)
 
       vid=ncvdef2(ncid,'enerkev',NCDOUBLE,1,xdim,istatus)
       call ncaptc2(ncid,vid,'long_name',NCCHAR,31,
@@ -968,7 +1017,9 @@ c     Output current calculated from eqdsk:
       call ncaptc2(ncid,vid,'long_name',NCCHAR,14,
      +           '2*pi*sin(y)*dy',istatus)
 
-      vid=ncvdef2(ncid,'iy_',NCLONG,1,rdim,istatus)
+      vid=ncvdef2(ncid,'iy_',NCLONG,1,y_dims(2),istatus) 
+      ![2022-02-09] changed to y_dims(2) which can be either lrzmax or lz
+      !depending on cqlpmod
       call ncaptc2(ncid,vid,'long_name',NCCHAR,41,
      +            'Pitch angle dimension at each r (le ydim)',istatus)
       call check_err(istatus)
@@ -1688,24 +1739,34 @@ c     Knockon electron data
      +      'Knockon src of high energy elec is en-/disabled' ,istatus)
 
       if (knockon.ne."disabled") then
-      vid=ncvdef2(ncid,'eoe0',NCDOUBLE,2,r_dims,istatus)
+         vid=ncvdef2(ncid,'eoe0',NCDOUBLE,2,r_dims,istatus)
          call ncaptc2(ncid,vid,'long_name0',NCCHAR,39,
      +        'Elecfld/Critical knockon electric field',istatus)
          call ncaptc2(ncid,vid,'units',NCCHAR,8,
      +        'Unitless',istatus)
          
-      vid=ncvdef2(ncid,'srckotot',NCDOUBLE,2,r_dims,istatus)
+         vid=ncvdef2(ncid,'srckotot',NCDOUBLE,2,r_dims,istatus)
          call ncaptc2(ncid,vid,'long_name0',NCCHAR,31,
      +        'FSA Knockon source density rate',istatus)
          call ncaptc2(ncid,vid,'units',NCCHAR,11,
      +        '#/cm**3*sec',istatus)
          
-      vid=ncvdef2(ncid,'denfl',NCDOUBLE,2,r_dims,istatus)
+         vid=ncvdef2(ncid,'denfl',NCDOUBLE,2,r_dims,istatus)
          call ncaptc2(ncid,vid,'long_name0',NCCHAR,38,
      +        'FSA Elec Density from KO Reduced Distn',istatus)
          call ncaptc2(ncid,vid,'units',NCCHAR,7,
      +        '#/cm**3',istatus)
       endif  ! on knockon
+      
+      !if(transp.eq."enabled")then !could add this condition later.
+      if(read_data.eq.'nimrod')then
+         vid=ncvdef2(ncid,'dbb2',NCDOUBLE,2,dims(3:4),istatus) !(lrz,time)
+         call ncaptc2(ncid,vid,'long_name0',NCCHAR,28,
+     +        '(deltaB/B)^2 from data files',istatus)
+      endif
+      !endif !transp
+      
+      
 c     In this section: we assume not both rdcmod and urfmod.ne.disabled
 c     mrfn=number of modes =1, in subroutine rdc_multi.
       if (rdcmod.ne."disabled") then
@@ -2125,6 +2186,15 @@ cBH100912:  Option to output specific curr and rf pwr at each time step
      
       endif  !on ngen
 
+      !YuP[2022-03-19] Added fl()==F_par reduced distr.func.
+      vid=ncvdef2(ncid,'fl',NCDOUBLE,3,dims_fl(1:3),istatus) !netcdfshort='long_jp'
+      call ncaptc2(ncid,vid,'long_name',NCCHAR,34,
+     &  'Reduced distr function Fpar(v_par)',istatus)
+      call ncaptc2(ncid,vid,'units',NCCHAR,26,
+     &  'vnorm*Fpar_cgs(v_parallel)',istatus)
+      call ncaptc2(ncid,vid,'comment',NCCHAR,50,
+     &  'Facility set up for single species. EACH time step',istatus)
+     
       else !(netcdfshort.ne.'long_jp')  ! Setup for last time step only
 
       if (ngen.eq.1) then
@@ -2183,7 +2253,15 @@ cBH100912:  Option to output specific curr and rf pwr at each time step
 
       endif  !on ngen
       
-
+      !YuP[2022-03-19] Added fl()==F_par reduced distr.func.
+      vid=ncvdef2(ncid,'fl',NCDOUBLE,2,dims_fl(1:2),istatus)
+      call ncaptc2(ncid,vid,'long_name',NCCHAR,34,
+     &  'Reduced distr function Fpar(v_par)',istatus)
+      call ncaptc2(ncid,vid,'units',NCCHAR,26,
+     &  'vnorm*Fpar_cgs(v_parallel)',istatus)
+      call ncaptc2(ncid,vid,'comment',NCCHAR,50,
+     &  'Facility set up for single species. Last time step',istatus)
+     
       endif  !  On netcdfshort.eq.'long_jp'
 
 
@@ -2309,6 +2387,11 @@ c      call ncvptc2(ncid,vid,1,64,mnemonic,64,istatus)
       istatus= NF_INQ_VARID(ncid,'f4d_out',vid)
       ll=length_char(f4d_out)
       call ncvptc2(ncid,vid,1,ll,f4d_out,ll,istatus)
+
+      istatus= NF_INQ_VARID(ncid,'f3d_out',vid)
+      ll=length_char(f3d_out)
+      call ncvptc2(ncid,vid,1,ll,f3d_out,ll,istatus)
+
 
       istatus= NF_INQ_VARID(ncid,'netcdfshort',vid)
       ll=length_char(netcdfshort)
@@ -2477,6 +2560,9 @@ c-YuP:      vid=ncvid(ncid,'x',istatus)
       istatus= NF_INQ_VARID(ncid,'x',vid)  
       call ncvpt_doubl2(ncid,vid,1,jx,x,istatus)
 
+      istatus= NF_INQ_VARID(ncid,'xl',vid)  ![2022-03-19] for saving fl()
+      call ncvpt_doubl2(ncid,vid,1,jfl,xlm,istatus)
+
       istatus= NF_INQ_VARID(ncid,'enerkev',vid) 
       call ncvpt_doubl2(ncid,vid,1,jx,enerkev(1:jx,1),istatus) ![2020-10-20] For k=1 species
 
@@ -2501,26 +2587,26 @@ c-YuP:      vid=ncvid(ncid,'enorm',istatus)
 
 c-YuP:      vid=ncvid(ncid,'iy',istatus)
       istatus= NF_INQ_VARID(ncid,'iy',vid)  
-      call ncvpt_int2(ncid,vid,1,1,iy,istatus)
+      call ncvpt_int2(ncid,vid,1,1,iymax,istatus)
+            !YuP[2021-03-11] Changed iy-->iymax 
+            !(just in case if iy is changed by iy=iy_(l_) somewhere)
 
-      call pack21(y,1,iy,1,lrors,wkpack,iy,lrors)
-c-YuP:      vid=ncvid(ncid,'y',istatus)
+      call pack21(y,1,iymax,1,lrors,wkpack,iymax,lrors)
       istatus= NF_INQ_VARID(ncid,'y',vid)  
       call ncvpt_doubl2(ncid,vid,start,y_count,wkpack,istatus)
 
-      call pack21(dy,1,iy,1,lrors,wkpack,iy,lrors)
-c-YuP:      vid=ncvid(ncid,'dy',istatus)
+      call pack21(dy,1,iymax,1,lrors,wkpack,iymax,lrors)
       istatus= NF_INQ_VARID(ncid,'dy',vid)  
       call ncvpt_doubl2(ncid,vid,start,y_count,wkpack,istatus)
 
-      call pack21(cynt2,1,iy,1,lrors,wkpack,iy,lrors)
-c-YuP:      vid=ncvid(ncid,'cynt2',istatus)
+      call pack21(cynt2,1,iymax,1,lrors,wkpack,iymax,lrors)
       istatus= NF_INQ_VARID(ncid,'cynt2',vid)  
       call ncvpt_doubl2(ncid,vid,start,y_count,wkpack,istatus)
 
-c-YuP:      vid=ncvid(ncid,'iy_',istatus)
       istatus= NF_INQ_VARID(ncid,'iy_',vid)  
-      call ncvpt_int2(ncid,vid,1,lrz,iy_,istatus)
+      call ncvpt_int2(ncid,vid,1,y_count(2),iy_,istatus)
+      !changed to y_count(2) which can be either lrz or lz
+      !depending on cqlpmod
 
 c-YuP:      vid=ncvid(ncid,'itl',istatus)
       istatus= NF_INQ_VARID(ncid,'itl',vid)  
@@ -2534,48 +2620,48 @@ c-YuP:      vid=ncvid(ncid,'lz',istatus)
       istatus= NF_INQ_VARID(ncid,'lz',vid)  
       call ncvpt_int2(ncid,vid,1,1,lz,istatus)
 
-      call pack21(z,1,lza,1,lrzmax,wkpack,lz,lrzmax)
+      call pack21(z,1,lz,1,lrzmax,wkpack,lz,lrzmax)
 c-YuP:      vid=ncvid(ncid,'z',istatus)
       istatus= NF_INQ_VARID(ncid,'z',vid)  
       call ncvpt_doubl2(ncid,vid,start(2:3),z_count(2:3),wkpack,istatus)
 
-      call pack21(dz,1,lza,1,lrzmax,wkpack,lz,lrzmax)
+      call pack21(dz,1,lz,1,lrzmax,wkpack,lz,lrzmax)
 c-YuP:      vid=ncvid(ncid,'dz',istatus)
       istatus= NF_INQ_VARID(ncid,'dz',vid)  
       call ncvpt_doubl2(ncid,vid,start(2:3),z_count(2:3),wkpack,istatus)
 
-      call pack21(solrz,1,lza,1,lrzmax,wkpack,lz,lrzmax)
+      call pack21(solrz,1,lz,1,lrzmax,wkpack,lz,lrzmax)
 c-YuP:      vid=ncvid(ncid,'solrz',istatus)
       istatus= NF_INQ_VARID(ncid,'solrz',vid)  
       call ncvpt_doubl2(ncid,vid,start(2:3),z_count(2:3),wkpack,istatus)
 
-      call pack21(solzz,1,lza,1,lrzmax,wkpack,lz,lrzmax)
+      call pack21(solzz,1,lz,1,lrzmax,wkpack,lz,lrzmax)
 c-YuP:      vid=ncvid(ncid,'solzz',istatus)
       istatus= NF_INQ_VARID(ncid,'solzz',vid)  
       call ncvpt_doubl2(ncid,vid,start(2:3),z_count(2:3),wkpack,istatus)
 
-      call pack21(pol,1,lza,1,lrzmax,wkpack,lz,lrzmax)
+      call pack21(pol,1,lz,1,lrzmax,wkpack,lz,lrzmax)
 c-YuP      vid=ncvid(ncid,'pol',istatus)
       istatus= NF_INQ_VARID(ncid,'pol',vid)  
       call ncvpt_doubl2(ncid,vid,start(2:3),z_count(2:3),wkpack,istatus)
 
-      call pack21(bbpsi,1,lza,1,lrzmax,wkpack,lz,lrzmax)
+      call pack21(bbpsi,1,lz,1,lrzmax,wkpack,lz,lrzmax)
 c-YuP:      vid=ncvid(ncid,'bbpsi',istatus)
       istatus= NF_INQ_VARID(ncid,'bbpsi',vid)  
       call ncvpt_doubl2(ncid,vid,start(2:3),z_count(2:3),wkpack,istatus)
 
-      call ipack21(imax,1,lza,1,lrzmax,iwkpack,lz,lrzmax) !YuP[2019-06-19] was wkpack. BUG?
+      call ipack21(imax,1,lz,1,lrzmax,iwkpack,lz,lrzmax) !YuP[2019-06-19] was wkpack. BUG?
       istatus= NF_INQ_VARID(ncid,'imax',vid)  
       call ncvpt_int2(ncid,vid,start(2:3),z_count(2:3),iwkpack,istatus)
 ccc      call ncvpt_int2(ncid,vid,start(2:3),z_count(2:3),imax,istatus) !directly
       !YuP: the result is quite different when using pack21 or writing directly
 
-      call ipack21(lmax,1,iy,1,lrzmax,item1,iy,lrzmax)
+      call ipack21(lmax,1,iymax,1,lrzmax,item1,iymax,lrzmax)
 c-YuP:      vid=ncvid(ncid,'lmax',istatus)
       istatus= NF_INQ_VARID(ncid,'lmax',vid)  
       call ncvpt_int2(ncid,vid,start,tau_count,item1,istatus)
       
-      call pack21(zboun,1,iy,1,lrzmax,wkpack,iy,lrzmax)
+      call pack21(zboun,1,iymax,1,lrzmax,wkpack,iymax,lrzmax)
 c-YuP:      vid=ncvid(ncid,'zboun',istatus)
       istatus= NF_INQ_VARID(ncid,'zboun',vid)  
       call ncvpt_doubl2(ncid,vid,start,tau_count,wkpack,istatus)
@@ -2584,7 +2670,7 @@ c-YuP:      vid=ncvid(ncid,'zmaxpsi',istatus)
       istatus= NF_INQ_VARID(ncid,'zmaxpsi',vid)  
       call ncvpt_doubl2(ncid,vid,start,tau_count(2),zmaxpsi(1),istatus)
       
-      call pack21(tau,1,iy,1,lrzmax,wkpack,iy,lrzmax)
+      call pack21(tau,1,iymax,1,lrzmax,wkpack,iymax,lrzmax)
 c-YuP:      vid=ncvid(ncid,'tau',istatus)
       istatus= NF_INQ_VARID(ncid,'tau',vid)  
       call ncvpt_doubl2(ncid,vid,start,tau_count,wkpack,istatus)
@@ -2593,19 +2679,21 @@ c-YuP:      vid=ncvid(ncid,'dtau',istatus)
       istatus= NF_INQ_VARID(ncid,'dtau',vid)  
       do ll=1,lrzmax
 cBH         do l=1,lz
-cBH            do i=1,iy
+cBH            do i=1,iymax
 cBH               temp1(i,l)=dtau(i,l,ll)
 cBH            enddo
 cBH         enddo
-cBH         call pack21(temp1,0,iyp1,0,jxp1,wkpack,iy,lz)
+cBH         call pack21(temp1,0,iyp1,0,jxp1,wkpack,iymax,lz)
 cBH  Actually, with dynamic dimensioning to exact size, can
 cBH  leave out following step:
-cBH         call pack21(dtau(1,1,ll),1,iy,1,lz,wkpack,iy,lz)
+cBH         call pack21(dtau(1,1,ll),1,iymax,1,lz,wkpack,iymax,lz)
          start1(3)=ll
 cBH         call ncvpt_doubl2(ncid,vid,start1,z_count1,wkpack,istatus)
          call ncvpt_doubl2(ncid,vid,start1(1:3),z_count1(1:3),
-     +        dtau(1:iy,1:lz,ll),istatus)
+     +        dtau(1:iymax,1:lz,ll),istatus)
       enddo
+            !YuP[2021-03-11] Changed iy-->iymax 
+            !(just in case if iy is changed by iy=iy_(l_) somewhere)
 
       istatus= NF_INQ_VARID(ncid,'beampon',vid)
       call ncvpt_doubl2(ncid,vid,1,1,beamponp,istatus)
@@ -2631,16 +2719,16 @@ cBH         vid=ncvid(ncid,'deltarho',istatus)
          istatus= NF_INQ_VARID(ncid,'deltarho',vid)
 c$$$         do ll=1,lrzmax
 c$$$            do l=1,lz
-c$$$               do i=1,iy
+c$$$               do i=1,iymax
 c$$$                  temp1(i,l)=deltarho(i,l,ll)
 c$$$               enddo
 c$$$            enddo
-c$$$            call pack21(temp1,0,iyp1a,0,jxp1a,tem2,iy,lz)
+c$$$            call pack21(temp1,0,iyp1a,0,jxp1a,tem2,iymax,lz)
 c$$$            start1(3)=ll
 c$$$            call ncvpt(ncid,vid,start1,z_count1,tem2,istatus)
 c$$$         enddo
 c  Don't need above temp1 flail, since deltarho dynamically
-c  dimensioned to size deltarho(iy,lz,lrzmax)
+c  dimensioned to size deltarho(iymax,lz,lrzmax)
 cBH         call ncvpt(ncid,vid,start,z_count,deltarho,istatus)
          call ncvpt_doubl2(ncid,vid,start,z_count,deltarho,istatus)
 
@@ -3010,21 +3098,21 @@ c     Time-Dependent data (numrec1=1)
       call ncvpt_doubl2(ncid,vid,start(3),r_count,tr(1:lrz),istatus)
 
       tr=zero
-      do ll=1,lrz
+      do ll=1,lrors !YuP[2021-04] lrz --> lrors
          tr(ll)=denra(1,ll) !YuP[2018-09-24]
       enddo
       istatus= NF_INQ_VARID(ncid,'denra',vid)  
       call ncvpt_doubl2(ncid,vid,start(3),r_count,tr(1:lrz),istatus)
 
       tr=zero
-      do ll=1,lrz
+      do ll=1,lrors !YuP[2021-04] lrz --> lrors
          tr(ll)=curra(1,ll)/3.e9  !Scaling from statA/cm**2 ==> A/cm**2
       enddo
       istatus= NF_INQ_VARID(ncid,'curra',vid)  
       call ncvpt_doubl2(ncid,vid,start(3),r_count,tr(1:lrz),istatus)
 
       tr=zero !YuP[2019-06-08]was call bcast(tr(1),zero,lrzmax)
-      do ll=1,lrz
+      do ll=1,lrors ! !YuP[2021-04] (lrz) --> (lrors)
          tr(ll)=ucrit(1,ll) !YuP[2018-09-24]
       enddo
       istatus= NF_INQ_VARID(ncid,'ucrit',vid)  
@@ -3035,10 +3123,10 @@ c     Time-Dependent data (numrec1=1)
 
       if (knockon.ne."disabled") then
          
-      tr=zero
-      do ll=1,lrz
-         tr(ll)=eoe0(1,ll) !YuP[2018-09-24]
-      enddo
+         tr=zero
+         do ll=1,lrz
+            tr(ll)=eoe0(1,ll) !YuP[2018-09-24]
+         enddo
          istatus= NF_INQ_VARID(ncid,'eoe0',vid)  
          call ncvpt_doubl2(ncid,vid,start(3:4),r_count(1:2),tr(1:lrz),
      &     istatus)
@@ -3052,6 +3140,15 @@ c     Time-Dependent data (numrec1=1)
      &     istatus)
          
       endif                     ! on knockon
+      
+      !if(transp.eq."enabled")then !could add this condition later.
+      if(read_data.eq.'nimrod')then
+         istatus= NF_INQ_VARID(ncid,'dbb2',vid) !(deltaB/B)^2 from data files
+         call ncvpt_doubl2(ncid,vid,start(3:4),count(3:4),dbb2,
+     &     istatus)
+      endif
+      !endif !transp
+      
 c
 c...new Freya stuff
 c
@@ -3294,9 +3391,10 @@ cBH110320      if (ngen.ge.2)
 cBH110320     1     WRITE(*,*)'netcdfrw2: Tot pwrs only set up for ngen=1'
       if (13*lrz*ngen .gt. iyjx2) stop 
      &        'netcdfrw2: Need 13*lrz*ngen<(iy+2)*(jx+2)'
+      tem1=0.d0 !YuP[2023] moved zero-ing of tem1 here.
       do k=1,ngen
          kkk=(k-1)*13*lrz
-         call bcast(tem1,zero,13*lrz*ngen)
+         !call bcast(tem1,zero,13*lrz*ngen) !YuP[2023] Why here in k-loop?
          do ll=1,lrz
             kk=1
             tem1(ll+(kk-1)*lrz+kkk)=entr(k,-1,ll)
@@ -3334,9 +3432,11 @@ cBH110320      if (ngen.ge.2)
 cBH110320     1     WRITE(*,*)'netcdfrw2: Tot pwrs only set up for ngen=1'
       if (13*ngen .gt.iyjx2) stop
      &     'netcdfrw2: Need 13*ngen<(iy+2)*(jx+2)'
+      tem1=0.d0 !YuP[2022-12-16] moved zero-ing of tem1 here.
+	WRITE(*,*) '8.1.1', maxval(entrintr),minval(entrintr)
       do k=1,ngen
             kkk=(k-1)*13
-            call bcast(tem1,zero,13*ngen)
+            !call bcast(tem1,zero,13*ngen) !YuP[2022-12-16] Why here in k-loop?
             kk=1
             tem1(kk+kkk)=entrintr(k,-1)
             kk=2
@@ -3409,19 +3509,23 @@ cBH110320     1     WRITE(*,*)'netcdfrw2: Tot pwrs only set up for ngen=1'
             ! tam5 to contain pitch angle integrated distribution <f> such
             ! that integral{<f> d(gamma)} = fsa density.
             ! tam5=2*pi*x*cnorm2*gamma*int_i{sinn*dy*vptb*f_code}/zmaxpsi.
-            do ll=1,lrz
+            do ll=1,lrors !YuP[2022-02-11] was lrz
               tam4=0.d0
               tam5=0.d0
               do j=1,jx
-                do i=1,iy
+                do i=1,iymax
                   tam4(j)=tam4(j)+f(i,j,k,ll)*cynt2(i,ll) !integral over i
-                  tam5(j)=tam5(j)+f(i,j,k,ll)*cynt2(i,ll)*vptb(i,ll)
+                  tam5(j)=tam5(j)+f(i,j,k,ll)*cynt2(i,ll)
+     &                                       *vptb(i,lrindx(ll))
+                  !YuP[2021-02-26] Corrected vptb(i,ll)->vptb(i,lrindx(ll))
+                  !This is important for CQLP (when lr_=1, but l_=1:ls)
+                  !Probably should not be using vptb in CQLP version at all.
                 enddo
                 tam4(j)=tam4(j)/twoint(ll) != INTEGR{f*sin(theta0)dtheta0} /2
                 tam5(j)=tam5(j)/zmaxpsi(lrindx(ll))*x(j)*gamma(j)*cnorm2
               enddo ! j
               do j=1,jx
-                 i=j+(lrindx(ll)-1)*jx
+                 i=j+(ll-1)*jx
                  tem1(i)=tam4(j) ! Save favr_thet0(j), each ll
               enddo
             enddo ! ll
@@ -3465,19 +3569,24 @@ cBH110320     1     WRITE(*,*)'netcdfrw2: Tot pwrs only set up for ngen=1'
             ! tam5 to contain pitch angle integrated distribution <f> such
             ! that integral{<f> d(gamma)} = fsa density.
             ! tam5=2*pi*x*cnorm2*gamma*int_i{sinn*dy*vptb*f_code}/zmaxpsi.
-            do ll=1,lrz
+            do ll=1,lrors !YuP[2022-02-11] was lrz
               tam4=0.d0
               tam5=0.d0
               do j=1,jx
-                do i=1,iy
+                do i=1,iymax
                   tam4(j)=tam4(j)+f(i,j,k,ll)*cynt2(i,ll) !integral over i
-                  tam5(j)=tam5(j)+f(i,j,k,ll)*cynt2(i,ll)*vptb(i,ll)
+                  tam5(j)=tam5(j)+f(i,j,k,ll)*cynt2(i,ll)
+     &                                       *vptb(i,lrindx(ll))
+                  !YuP[2021-02-26] Corrected vptb(i,ll)->vptb(i,lrindx(ll))
+                  !This is important for CQLP (when lr_=1, but l_=1:ls)
+                  !Probably should not be using vptb in CQLP version at all.
+
                 enddo
                 tam4(j)=tam4(j)/twoint(ll) != INTEGR{f*sin(theta0)dtheta0} /2
                 tam5(j)=tam5(j)/zmaxpsi(lrindx(ll))*x(j)*gamma(j)*cnorm2
               enddo ! j
               do j=1,jx
-                 i=j+(lrindx(ll)-1)*jx
+                 i=j+(ll-1)*jx
                  tem1(i)=tam4(j) ! Save favr_thet0(j), each ll
               enddo
             enddo ! ll
@@ -3492,6 +3601,13 @@ cBH110320     1     WRITE(*,*)'netcdfrw2: Tot pwrs only set up for ngen=1'
          enddo  !  on k=1,ngen
          
          endif  !  on ngen
+         
+         !YuP[2022-03-19] Added fl()==F_par reduced distr.func.
+         !One species, for now. 
+         istatus= NF_INQ_VARID(ncid,'fl',vid) !here: 'long_jp', n=0
+         call ncvpt_doubl2(ncid,vid,start(1:2),count_fl(1:2),
+     &        fl(1:jfl,1:lrors),istatus) !count_fl={jfl; lrz or lz; 1}
+         
          start(4)=1 ! restored
          
       endif  ! on netcdfshort.eq.'long_jp'  ! Here n=0
@@ -3511,14 +3627,16 @@ cyup      if ( netcdfshort.eq.'longer_f' ) then  !endif at line 3090
             else ! 'longer_f'
               startf(4)=numrec1 ! usual (saved at every t step) Here numrec1=1
             endif
-            do ll=1,lrz
+            do ll=1,lrors !YuP[2022-02-11] was lrz
                do j=1,jx ! 0,jx+1 !1,jx
-                  do i=1,iy ! 0,iy+1 !1,iy
-                     temp1(i,j)=f(i,j,1,lrindx(ll))
+                  do i=1,iymax ! 0,iy+1 !1,iy
+                     temp1(i,j)=f(i,j,1,ll)
                   enddo
                enddo
-               call pack21(temp1(1:iy,1:jx),1,iy,1,jx,
-     &                     wkpack(1:iy*jx),iy,jx)
+               call pack21(temp1(1:iymax,1:jx),1,iymax,1,jx,
+     &                     wkpack(1:iymax*jx),iymax,jx)
+               !YuP[2021-03-11] Changed iy-->iymax 
+               !(just in case if iy is changed by iy=iy_(l_) somewhere)
                startf(3)=ll
                call ncvpt_doubl2(ncid,vid,startf(1:4),countf(1:4),
      &          wkpack,istatus)
@@ -3536,14 +3654,16 @@ cyup      if ( netcdfshort.eq.'longer_f' ) then  !endif at line 3090
               startg(5)=numrec1 ! usual (saved at every t step) here numrec1=1
             endif
             do k=1,ngen
-            do ll=1,lrz
+            do ll=1,lrors !YuP[2022-02-11] was lrz
                do j=1,jx ! 0,jx+1 !1,jx
-                  do i=1,iy ! 0,iy+1 !1,iy
-                     temp1(i,j)=f(i,j,k,lrindx(ll))
+                  do i=1,iymax ! 0,iy+1 !1,iy
+                     temp1(i,j)=f(i,j,k,ll)
                   enddo
                enddo
-               call pack21(temp1(1:iy,1:jx),1,iy,1,jx,
-     &                     wkpack(1:iy*jx),iy,jx)
+               call pack21(temp1(1:iymax,1:jx),1,iymax,1,jx,
+     &                     wkpack(1:iymax*jx),iymax,jx)
+               !YuP[2021-03-11] Changed iy-->iymax 
+               !(just in case if iy is changed by iy=iy_(l_) somewhere)
                startg(3)=ll
                startg(4)=k
                call ncvpt_doubl2(ncid,vid,startg,countg,wkpack,istatus)
@@ -3595,10 +3715,11 @@ c$$$         call ncvpt_doubl2(ncid,vid,start(2),count(2),tem1,istatus)
 cBH011221: This storage is set up for constant iy as function of radius.
 cBH011221: Needs generalizing. Should we store in reg array to max(iy_)?
 cBH011221: For now, simply stop.
-            do ll=1,lrz
-               if (iy_(ll).ne.iymax) 
-     +              stop 'netcdfrw2: Cant handle iy.ne.iymax'
-            enddo
+!            do ll=1,lrz
+!               if (iy_(ll).ne.iymax) 
+!     +              stop 'netcdfrw2: Cant handle iy.ne.iymax' 
+!                    !YuP[2021-03] Could be relaxed now?
+!            enddo
 
             if (ngen.eq.1) then
             
@@ -3608,11 +3729,11 @@ cBH011221: For now, simply stop.
                  PRINT *,'netcdfrw2 WARN:  but if time(nstop)<tavg1(1)'
                  PRINT *,'netcdfrw2 WARNING: then favg = f.'
                endif
-               do ll=1,lrz
+               do ll=1,lrors !YuP[2022-02-11] was lrz
                   if (tavg.eq."disabled") then
                      do j=1,jx ! 0,jx+1 !1,jx
-                     do i=1,iy ! 0,iy+1 !1,iy
-                        temp1(i,j)=f(i,j,k,lrindx(ll))
+                     do i=1,iymax ! 0,iy+1 !1,iy
+                        temp1(i,j)=f(i,j,k,ll)
                         !if(gone(i,j,k,lrindx(ll)).lt.-0.1) then
                         !   temp1(i,j)=em90
                         !endif
@@ -3622,18 +3743,20 @@ cBH011221: For now, simply stop.
                      ! Bob, here is the nstop=0 part, 
                      ! so how can we have favg?
                      do j=1,jx ! 0,jx+1 !1,jx
-                     do i=1,iy ! 0,iy+1 !1,iy
-                        temp1(i,j)=favg(i,j,k,lrindx(ll))
+                     do i=1,iymax ! 0,iy+1 !1,iy
+                        temp1(i,j)=favg(i,j,k,ll)
                      !if(gone(i,j,k,lrindx(ll)).lt.-0.1) temp1(i,j)=em90
                      enddo
                      enddo
                      WRITE(*,'(a,i6,2e13.4)')
      +               'nstop0.netcdfrw2/tavg=en ll,sumij(favg),sumij(f)',
-     +                 ll,sum(temp1),sum(f(:,:,k,lrindx(ll)))
+     +                 ll,sum(temp1),sum(f(:,:,k,ll))
                   endif  !On tavg
 c                 temp1 dimensnd 0:iyp1,0:jxp1. Pack in to (1:iy,1:jx)
-                  call pack21(temp1(1:iy,1:jx),1,iy,1,jx,
-     &                        wkpack(1:iy*jx),iy,jx)
+                  call pack21(temp1(1:iymax,1:jx),1,iymax,1,jx,
+     &                        wkpack(1:iymax*jx),iymax,jx)
+                  !YuP[2021-03-11] Changed iy-->iymax 
+                  !(just in case if iy is changed by iy=iy_(l_) somewhere)
                   startf(3)=ll
                   call ncvpt_doubl2(ncid,vid,startf(1:3),countf(1:3),
      +                              wkpack,istatus)
@@ -3647,14 +3770,16 @@ c                 temp1 dimensnd 0:iyp1,0:jxp1. Pack in to (1:iy,1:jx)
             
                do k=1,ngen
                if (tavg.eq."disabled") then
-               do ll=1,lrz
+               do ll=1,lrors !YuP[2022-02-11] was lrz
                   do j=1,jx ! 0,jx+1 !1,jx
-                     do i=1,iy ! 0,iy+1 !1,iy
-                        temp1(i,j)=f(i,j,k,lrindx(ll))
+                     do i=1,iymax ! 0,iy+1 !1,iy
+                        temp1(i,j)=f(i,j,k,ll)
                      enddo
                   enddo
-                  call pack21(temp1(1:iy,1:jx),1,iy,1,jx,
-     &                        wkpack(1:iy*jx),iy,jx)
+                  call pack21(temp1(1:iymax,1:jx),1,iymax,1,jx,
+     &                        wkpack(1:iymax*jx),iymax,jx)
+                  !YuP[2021-03-11] Changed iy-->iymax 
+                  !(just in case if iy is changed by iy=iy_(l_) somewhere)
                   startg(3)=ll
                   startg(4)=k
                  call ncvpt_doubl2(ncid,vid,startg(1:4),countg(1:4),
@@ -3664,14 +3789,16 @@ c                 temp1 dimensnd 0:iyp1,0:jxp1. Pack in to (1:iy,1:jx)
                !         dimsg= {ydimf,xdimf,rdim,gdim}
                enddo  ! on ll
                else  ! On tavg
-               do ll=1,lrz
+               do ll=1,lrors ! was lrz
                   do j=1,jx ! 0,jx+1 !1,jx
-                     do i=1,iy ! 0,iy+1 !1,iy
-                        temp1(i,j)=favg(i,j,k,lrindx(ll))
+                     do i=1,iymax ! 0,iy+1 !1,iy
+                        temp1(i,j)=favg(i,j,k,ll)
                      enddo
                   enddo
-                  call pack21(temp1(1:iy,1:jx),1,iy,1,jx,
-     &                        wkpack(1:iy*jx),iy,jx)
+                  call pack21(temp1(1:iymax,1:jx),1,iymax,1,jx,
+     &                        wkpack(1:iymax*jx),iymax,jx)
+                  !YuP[2021-03-11] Changed iy-->iymax 
+                  !(just in case if iy is changed by iy=iy_(l_) somewhere)
                   startg(3)=ll
                   startg(4)=k
                   call ncvpt_doubl2(ncid,vid,startg(1:4),countg(1:4),
@@ -3939,7 +4066,7 @@ cl    3.2 Variables saved at each time-step (numrec1.gt.1)
       call ncvpt_doubl2(ncid,vid,start(3),r_count,tr(1:lrz),istatus)
 
       tr=zero
-      do ll=1,lrz
+      do ll=1,lrors !YuP[2021-04] lrz --> lrors
          tr(ll)=ucrit(1,ll) !YuP[2018-09-24]
       enddo
       istatus= NF_INQ_VARID(ncid,'ucrit',vid)  
@@ -3947,21 +4074,29 @@ cl    3.2 Variables saved at each time-step (numrec1.gt.1)
 
       if (knockon.ne."disabled") then
          
-      tr=zero
-      do ll=1,lrz
-         tr(ll)=eoe0(1,ll) !YuP[2018-09-24]
-      enddo
-      istatus= NF_INQ_VARID(ncid,'eoe0',vid)  
+         tr=zero
+         do ll=1,lrz
+            tr(ll)=eoe0(1,ll) !YuP[2018-09-24]
+         enddo
+         istatus= NF_INQ_VARID(ncid,'eoe0',vid)  
          call ncvpt_doubl2(ncid,vid,start(3:4),r_count,tr(1:lrz),
      &    istatus)
          
-      istatus= NF_INQ_VARID(ncid,'srckotot',vid)  
+         istatus= NF_INQ_VARID(ncid,'srckotot',vid)  
          call ncvpt_doubl2(ncid,vid,start(3:4),r_count,srckotot,istatus)
          
-      istatus= NF_INQ_VARID(ncid,'denfl',vid)  
+         istatus= NF_INQ_VARID(ncid,'denfl',vid)  
          call ncvpt_doubl2(ncid,vid,start(3:4),r_count,denfl,istatus)
          
       endif                     ! on knockon
+
+      !if(transp.eq."enabled")then !could add this condition later.
+      if(read_data.eq.'nimrod')then
+         istatus= NF_INQ_VARID(ncid,'dbb2',vid) !(deltaB/B)^2 from data files
+         call ncvpt_doubl2(ncid,vid,start(3:4),count(3:4),dbb2,
+     &     istatus)
+      endif
+      !endif !transp
 
 c
 c...new Freya stuff
@@ -4201,9 +4336,10 @@ cBH110320c     Following only set up for ngen=1
 cBH110320      if (ngen.ge.2)
 cBH110320     1     WRITE(*,*)'netcdfrw2: Tot pwrs only set up for ngen=1'
       if (13*lrz .gt. iyjx2) stop 'netcdfrw2: Need 13*lrz<(iy+2)*(jx+2)'
+      tem1=0.d0
       do k=1,ngen
          kkk=(k-1)*13*lrz
-         call bcast(tem1,zero,13*lrz)
+         !call bcast(tem1,zero,13*lrz) !YuP[2023]
          do ll=1,lrz
             kk=1
             tem1(ll+(kk-1)*lrz+kkk)=entr(k,-1,ll)
@@ -4241,9 +4377,10 @@ cBH110320c     Following only set up for ngen=1
 cBH110320      if (ngen.ge.2)
 cBH110320    1     WRITE(*,*)'netcdfrw2: Tot pwrs only set up for ngen=1'
       if (lrz .gt. iyjx2) stop 'netcdfrw2: Need lrz<(iy+2)*(jx+2)'
+      tem1=0.d0
       do k=1,ngen
             kkk=(k-1)*13
-            call bcast(tem1,zero,13)
+            !call bcast(tem1,zero,13) YuP[2023]
             kk=1
             tem1(kk+kkk)=entrintr(k,-1)
             kk=2
@@ -4342,14 +4479,16 @@ cyup      if ( netcdfshort.eq.'longer_f' ) then
            else ! 'longer_f'
              startf(4)=numrec1 ! usual (saved at every t step)
            endif
-           do ll=1,lrz
+           do ll=1,lrors !YuP[2022-02-11] was lrz
               do j=1,jx ! 0,jx+1 !1,jx
-                do i=1,iy ! 0,iy+1 !1,iy
-                  temp1(i,j)=f(i,j,1,lrindx(ll))
+                do i=1,iymax ! 0,iy+1 !1,iy
+                  temp1(i,j)=f(i,j,1,ll)
                 enddo
               enddo
-              call pack21(temp1(1:iy,1:jx),1,iy,1,jx,
-     &                    wkpack(1:iy*jx),iy,jx)
+              call pack21(temp1(1:iymax,1:jx),1,iymax,1,jx,
+     &                    wkpack(1:iymax*jx),iymax,jx)
+              !YuP[2021-03-11] Changed iy-->iymax 
+              !(just in case if iy is changed by iy=iy_(l_) somewhere)
               startf(3)=ll
               call ncvpt_doubl2(ncid,vid,startf(1:4),countf(1:4),
      +                          wkpack,istatus)
@@ -4367,14 +4506,16 @@ cyup      if ( netcdfshort.eq.'longer_f' ) then
              startg(5)=numrec1 ! usual (saved at every t step)
            endif
            do k=1,ngen
-            do ll=1,lrz
+            do ll=1,lrors !YuP[2022-02-11] was lrz
                do j=1,jx ! 0,jx+1 !1,jx
-                  do i=1,iy ! 0,iy+1 !1,iy
-                     temp1(i,j)=f(i,j,k,lrindx(ll))
+                  do i=1,iymax ! 0,iy+1 !1,iy
+                     temp1(i,j)=f(i,j,k,ll)
                   enddo
                enddo
-               call pack21(temp1(1:iy,1:jx),1,iy,1,jx,
-     &                     wkpack(1:iy*jx),iy,jx)
+               call pack21(temp1(1:iymax,1:jx),1,iymax,1,jx,
+     &                     wkpack(1:iymax*jx),iymax,jx)
+               !YuP[2021-03-11] Changed iy-->iymax 
+               !(just in case if iy is changed by iy=iy_(l_) somewhere)
                startg(3)=ll
                startg(4)=k
                call ncvpt_doubl2(ncid,vid,startg,countg,wkpack,istatus)
@@ -4428,19 +4569,23 @@ cYuP             with either dims() or dimg(), depending on ngen.
             ! tam5 to contain pitch angle integrated distribution <f> such
             ! that integral{<f> d(gamma)} = fsa density.
             ! tam5=2*pi*x*cnorm2*gamma*int_i{sinn*dy*vptb*f_code}/zmaxpsi.
-            do ll=1,lrz
+            do ll=1,lrors !YuP[2022-02-11] was lrz
               tam4=0.d0
               tam5=0.d0
               do j=1,jx
-                do i=1,iy
+                do i=1,iymax
                   tam4(j)=tam4(j)+f(i,j,k,ll)*cynt2(i,ll) !integral over i
-                  tam5(j)=tam5(j)+f(i,j,k,ll)*cynt2(i,ll)*vptb(i,ll)
+                  tam5(j)=tam5(j)+f(i,j,k,ll)*cynt2(i,ll)
+     &                                       *vptb(i,lrindx(ll))
+                  !YuP[2021-02-26] Corrected vptb(i,ll)->vptb(i,lrindx(ll))
+                  !This is important for CQLP (when lr_=1, but l_=1:ls)
+                  !Probably should not be using vptb in CQLP version at all.
                 enddo
                 tam4(j)=tam4(j)/twoint(ll) != INTEGR{f*sin(theta0)dtheta0} /2
                 tam5(j)=tam5(j)/zmaxpsi(lrindx(ll))*x(j)*gamma(j)*cnorm2
               enddo ! j
               do j=1,jx
-                 i=j+(lrindx(ll)-1)*jx
+                 i=j+(ll-1)*jx
                  tem1(i)=tam4(j) ! Save favr_thet0(j), each ll
               enddo
             enddo ! ll
@@ -4484,19 +4629,23 @@ cYuP             with either dims() or dimg(), depending on ngen.
             ! tam5 to contain pitch angle integrated distribution <f> such
             ! that integral{<f> d(gamma)} = fsa density.
             ! tam5=2*pi*x*cnorm2*gamma*int_i{sinn*dy*vptb*f_code}/zmaxpsi.
-            do ll=1,lrz
+            do ll=1,lrors !YuP[2022-02-11] was lrz
               tam4=0.d0
               tam5=0.d0
               do j=1,jx
-                do i=1,iy
+                do i=1,iymax
                   tam4(j)=tam4(j)+f(i,j,k,ll)*cynt2(i,ll) !integral over i
-                  tam5(j)=tam5(j)+f(i,j,k,ll)*cynt2(i,ll)*vptb(i,ll)
+                  tam5(j)=tam5(j)+f(i,j,k,ll)*cynt2(i,ll)
+     &                                       *vptb(i,lrindx(ll))
+                  !YuP[2021-02-26] Corrected vptb(i,ll)->vptb(i,lrindx(ll))
+                  !This is important for CQLP (when lr_=1, but l_=1:ls)
+                  !Probably should not be using vptb in CQLP version at all.
                 enddo
                 tam4(j)=tam4(j)/twoint(ll) != INTEGR{f*sin(theta0)dtheta0} /2
                 tam5(j)=tam5(j)/zmaxpsi(lrindx(ll))*x(j)*gamma(j)*cnorm2
               enddo ! j
               do j=1,jx
-                 i=j+(lrindx(ll)-1)*jx
+                 i=j+(ll-1)*jx
                  tem1(i)=tam4(j) ! Save favr_thet0(j), each ll
               enddo
             enddo ! ll
@@ -4511,6 +4660,13 @@ cYuP             with either dims() or dimg(), depending on ngen.
          countg(3)=1 ! restore
          
          endif  !  on ngen
+
+         !YuP[2022-03-19] Added fl()==F_par reduced distr.func.
+         !One species, for now. 
+         istatus= NF_INQ_VARID(ncid,'fl',vid) !here: 'long_jp', n>0
+         call ncvpt_doubl2(ncid,vid,start(2:4),count_fl(1:3),
+     &        fl(1:jfl,1:lrors),istatus) !count_fl={jfl; lrz or lz; 1}
+                                         !start(4)=numrecl
 
       endif ! 'long_jp'  ! Here n>0   !YuP[2020-02-06]
          
@@ -4569,10 +4725,11 @@ c --- full update of data file (last time-step only) ---
 cBH011221: This storage is set up for constant iy as function of radius.
 cBH011221: Needs generalizing. Should we store in reg array to max(iy_)?
 cBH011221: For now, simply stop.
-         do ll=1,lrz
-            if (iy_(ll).ne.iymax) 
-     +           stop 'netcdfrw2: Cant handle iy.ne.iymax'
-         enddo
+!         do ll=1,lrors !YuP[2022-02-11] was lrz
+!            if (iy_(ll).ne.iymax) 
+!     +           stop 'netcdfrw2: Cant handle iy.ne.iymax'
+!                 !YuP[2021-03] Could be relaxed now?
+!         enddo
 
          if (ngen.eq.1) then
          
@@ -4588,11 +4745,11 @@ cBH011221: For now, simply stop.
      +                 SUM(f),SUM(gone)
             WRITE(*,*)'netcdfrw2_4060: For checkup MIN(f),MAX(f)=', 
      +                 MINVAL(f),MAXVAL(f)
-            do ll=1,lrz
+            do ll=1,lrors !YuP[2022-02-11] was lrz
                if (tavg.eq."disabled") then
                   do j=1,jx ! 0,jx+1 !1,jx
-                  do i=1,iy ! 0,iy+1 !1,iy
-                     temp1(i,j)=f(i,j,k,lrindx(ll))
+                  do i=1,iymax ! 0,iy+1 !1,iy
+                     temp1(i,j)=f(i,j,k,ll)
                      !YuP if(gone(i,j,k,lrindx(ll)).lt.-0.1) temp1(i,j)=em90
                      !YuP[2019-07-05] Better leave it "raw". 
                      ! The negative values will be adjusted after restart
@@ -4601,8 +4758,8 @@ cBH011221: For now, simply stop.
                   enddo
                else  !On tavg = enabled
                   do j=1,jx ! 0,jx+1 !1,jx
-                  do i=1,iy ! 0,iy+1 !1,iy
-                     temp1(i,j)=favg(i,j,k,lrindx(ll))
+                  do i=1,iymax ! 0,iy+1 !1,iy
+                     temp1(i,j)=favg(i,j,k,ll)
                      !if(gone(i,j,k,lrindx(ll)).lt.-0.1) temp1(i,j)=em90
                      !Note: because of gone, the saved favg can be 
                      !smaller than the original favg (removed loss cone).
@@ -4612,15 +4769,17 @@ cBH011221: For now, simply stop.
                   enddo
                   WRITE(*,'(a,i6,2e13.4)')
      +            'nstop.netcdfrw2/tavg=en. ll, sumij(favg), sumij(f)',
-     +             ll,sum(temp1),sum(f(:,:,k,lrindx(ll)))
+     +             ll,sum(temp1),sum(f(:,:,k,ll))
                endif  !On tavg
 !               WRITE(*,*)'netcdfrw2_4060: ll,MAX,SUM(temp1)=', 
 !     &                 ll,MAXVAL(temp1),SUM(temp1)
                startf(3)=ll
-               call pack21(temp1(1:iy,1:jx),1,iy,1,jx,
-     &                     wkpack(1:iy*jx),iy,jx)
+               call pack21(temp1(1:iymax,1:jx),1,iymax,1,jx,
+     &                     wkpack(1:iymax*jx),iymax,jx)
                call ncvpt_doubl2(ncid,vid,startf(1:3),countf(1:3),
      +                           wkpack,istatus)
+                !YuP[2021-03-11] Changed iy-->iymax 
+                !(just in case if iy is changed by iy=iy_(l_) somewhere)
 !!3               call ncvpt_doubl2(ncid,vid,startf(1:3),countf(1:3),
 !!3     +                           temp1(1:iy,1:jx),istatus)
                !So, here startf={1,   1,   ll}
@@ -4632,22 +4791,24 @@ cBH011221: For now, simply stop.
          else  !  ngen.ge.1
 
             do k=1,ngen
-            do ll=1,lrz
+            do ll=1,lrors !YuP[2022-02-11] was lrz
                if (tavg.eq."disabled") then
                do j=1,jx ! 0,jx+1 !1,jx
-                  do i=1,iy ! 0,iy+1 !1,iy
-                     temp1(i,j)=f(i,j,k,lrindx(ll))
+                  do i=1,iymax ! 0,iy+1 !1,iy
+                     temp1(i,j)=f(i,j,k,ll)
                   enddo
                enddo
                else  !On tavg
                do j=1,jx ! 0,jx+1 !1,jx
-                  do i=1,iy ! 0,iy+1 !1,iy
-                     temp1(i,j)=favg(i,j,k,lrindx(ll))
+                  do i=1,iymax ! 0,iy+1 !1,iy
+                     temp1(i,j)=favg(i,j,k,ll)
                   enddo
                enddo
                endif  !On tavg
-               call pack21(temp1(1:iy,1:jx),1,iy,1,jx,
-     &                     wkpack(1:iy*jx),iy,jx)
+               call pack21(temp1(1:iymax,1:jx),1,iymax,1,jx,
+     &                     wkpack(1:iymax*jx),iymax,jx)
+               !YuP[2021-03-11] Changed iy-->iymax 
+               !(just in case if iy is changed by iy=iy_(l_) somewhere)
                startg(3)=ll
                startg(4)=k
                call ncvpt_doubl2(ncid,vid,startg(1:4),countg(1:4),
@@ -4704,19 +4865,23 @@ cBH011221: For now, simply stop.
             ! tam5 to contain pitch angle integrated distribution <f> such
             ! that integral{<f> d(gamma)} = fsa density.
             ! tam5=2*pi*x*cnorm2*gamma*int_i{sinn*dy*vptb*f_code}/zmaxpsi.
-            do ll=1,lrz
+            do ll=1,lrors !YuP[2022-02-11] was lrz
               tam4=0.d0
               tam5=0.d0
               do j=1,jx
-                do i=1,iy
+                do i=1,iymax
                   tam4(j)=tam4(j)+f(i,j,k,ll)*cynt2(i,ll) !integral over i
-                  tam5(j)=tam5(j)+f(i,j,k,ll)*cynt2(i,ll)*vptb(i,ll)
+                  tam5(j)=tam5(j)+f(i,j,k,ll)*cynt2(i,ll)
+     &                                       *vptb(i,lrindx(ll))
+                  !YuP[2021-02-26] Corrected vptb(i,ll)->vptb(i,lrindx(ll))
+                  !This is important for CQLP (when lr_=1, but l_=1:ls)
+                  !Probably should not be using vptb in CQLP version at all.
                 enddo
                 tam4(j)=tam4(j)/twoint(ll) != INTEGR{f*sin(theta0)dtheta0} /2
                 tam5(j)=tam5(j)/zmaxpsi(lrindx(ll))*x(j)*gamma(j)*cnorm2
               enddo ! j
               do j=1,jx
-                 i=j+(lrindx(ll)-1)*jx
+                 i=j+(ll-1)*jx
                  tem1(i)=tam4(j) ! Save favr_thet0(j), each ll
               enddo
             enddo ! ll
@@ -4759,19 +4924,23 @@ cBH011221: For now, simply stop.
             ! tam5 to contain pitch angle integrated distribution <f> such
             ! that integral{<f> d(gamma)} = fsa density.
             ! tam5=2*pi*x*cnorm2*gamma*int_i{sinn*dy*vptb*f_code}/zmaxpsi.
-            do ll=1,lrz
+            do ll=1,lrors !YuP[2022-02-11] was lrz
               tam4=0.d0
               tam5=0.d0
               do j=1,jx
-                do i=1,iy
+                do i=1,iymax
                   tam4(j)=tam4(j)+f(i,j,k,ll)*cynt2(i,ll) !integral over i
-                  tam5(j)=tam5(j)+f(i,j,k,ll)*cynt2(i,ll)*vptb(i,ll)
+                  tam5(j)=tam5(j)+f(i,j,k,ll)*cynt2(i,ll)
+     &                                       *vptb(i,lrindx(ll))
+                  !YuP[2021-02-26] Corrected vptb(i,ll)->vptb(i,lrindx(ll))
+                  !This is important for CQLP (when lr_=1, but l_=1:ls)
+                  !Probably should not be using vptb in CQLP version at all.
                 enddo
                 tam4(j)=tam4(j)/twoint(ll) != INTEGR{f*sin(theta0)dtheta0} /2
                 tam5(j)=tam5(j)/zmaxpsi(lrindx(ll))*x(j)*gamma(j)*cnorm2
               enddo ! j
               do j=1,jx
-                 i=j+(lrindx(ll)-1)*jx
+                 i=j+(ll-1)*jx
                  tem1(i)=tam4(j) ! Save favr_thet0(j), each ll
               enddo
             enddo ! ll
@@ -4783,6 +4952,13 @@ cBH011221: For now, simply stop.
          enddo  !  on k=1,ngen
          endif  !  on ngen
          start(4)=1 ! restored
+         
+         !YuP[2022-03-19] Added fl()==F_par reduced distr.func.
+         !One species, for now. Here - saved at last time step only.
+         istatus= NF_INQ_VARID(ncid,'fl',vid) !here: 'ne.long_jp', n=nstop
+         call ncvpt_doubl2(ncid,vid,start(1:2),count_fl(1:2),
+     &        fl(1:jfl,1:lrors),istatus) !count_fl={jfl; lrz or lz; 1}
+         
       endif !(netcdfshort.ne.'long_jp') ! Here n=nstop !YuP[2020-02-06]
 
 c --- endif (n.eq.nstop) ---
@@ -4999,11 +5175,13 @@ c        itl_netcdf() and itu_netcdf().
          start(3)=1
          start(4)=1
 
-         count(1)=jpxy
-         count(2)=ipxy
-         count(3)=1
-         count(1)=1
-
+         count(1)=jpxy !case igrid=0
+         count(2)=ipxy !case igrid=0
+         count(3)=1    !case igrid=0
+c sgbaek 
+c         count(1)=1
+         count(4)=1
+c end of sgbaek
 
       vid=ncvdef2(ncid,'mnemonic',NCCHAR,1,char64dim,istatus)
          call ncaptc2(ncid,vid,'long_name',NCCHAR,23,
@@ -5107,18 +5285,19 @@ c        itl_netcdf() and itu_netcdf().
          else  ! igrid.ne.0 case
 
 
-c     Maximum iy as function of radius is iymax, set in ainsetpa.f:
+c     Maximum of iy_() as function of radius is iymax, set in ainsetpa.f:
 
 cBH021028: This storage is set up for constant iy as function of radius.
 cBH021028: Needs generalizing. Should we store in reg array to max(iy_)?
 cBH021028: For now, simply stop.
          do ll=1,lrz
             if (iy_(ll).ne.iymax) 
-     +           stop 'netcdfrw2: Cant handle iy.ne.iymax'
+     +           stop 'netcdfrw2/netcdfvec: Cant handle iy.ne.iymax'
+            !YuP[2021-03] Could be relaxed now?
          enddo
 
          istatus= NF_DEF_DIM(ncid, 'xdim',    jx,       xdim) 
-         istatus= NF_DEF_DIM(ncid, 'ydim',    iy,       ydim)
+         istatus= NF_DEF_DIM(ncid, 'ydim',    iymax,       ydim)
          istatus= NF_DEF_DIM(ncid, 'rdim',    n_netcdf, rdim)
          istatus= NF_DEF_DIM(ncid, 'gdim',    ngen,     gdim)
          istatus= NF_DEF_DIM(ncid, 'chardim',     8,    chardim)
@@ -5134,9 +5313,9 @@ cBH021028: For now, simply stop.
          start(3)=1
          start(4)=1
 
-         count(1)=iy
-         count(2)=jx
-         count(3)=1
+         count(1)=iymax  !case igrid.ne.0
+         count(2)=jx     !case igrid.ne.0
+         count(3)=1      !case igrid.ne.0
          
          y_dims(1)=ydim
          y_dims(2)=rdim
@@ -5144,7 +5323,7 @@ cBH021028: For now, simply stop.
          y_start(1)=1
          y_start(2)=1
          
-         y_count(1)=iy
+         y_count(1)=iymax
          y_count(2)=1
          
 
@@ -5197,7 +5376,7 @@ cBH021028: For now, simply stop.
      +        'max Pitch angle dimension (=ydim)',istatus)
          call check_err(istatus)
          
-      vid=ncvdef2(ncid,'y',NCDOUBLE,2,y_dims,istatus)
+      vid=ncvdef2(ncid,'y',NCDOUBLE,2,y_dims(1:2),istatus)
          call ncaptc2(ncid,vid,'long_name',NCCHAR,36,
      +        'pitch angle at n_netcdf flux surfaces',istatus)
          call ncaptc2(ncid,vid,'units',NCCHAR,7,
@@ -5388,7 +5567,7 @@ c          For igrid.eq.1, temp5,temp4 are x,theta components,
 c          respectively, of flux Gamma on the theta,x-mesh.
 c
          if (implct .eq. "enabled") then
-            do 140 i=2,iy-1
+            do 140 i=2,iymax-1
                do 141 j=2,jxm1
                   tam2(j)=-(gfi(i,j,k)+gfi(i,j-1,k))*.5/xsq(j)
                   tam3(j)=-(hfi(i,j)+hfi(i-1,j))*.5*xi(j)
@@ -5406,16 +5585,18 @@ c
                endif
  140        continue
          else
-            temp1(0:iy+1,0:jx+1)=f_(0:iy+1,0:jx+1,k,l_)
-            temp2(0:iy+1,0:jx+1)=fxsp(0:iy+1,0:jx+1,k,l_)
+            temp1(0:iymax+1,0:jx+1)=f_(0:iymax+1,0:jx+1,k,l_)
+            temp2(0:iymax+1,0:jx+1)=fxsp(0:iymax+1,0:jx+1,k,l_)
+            !YuP[2021-03-11] Changed iy-->iymax
+            !(just in case if iy is changed by iy=iy_(l_) somewhere)
             do 240 j=2,jxm1
-               do 241 i=2,iy-1
+               do 241 i=2,iymax-1
                   temp6(i,j)=-(gfu(i,j,k)+gfu(i,j-1,k))*.5/xsq(j)
  241           continue
  240        continue
             call dcopy(iyjx2,temp2(0,0),1,temp1(0,0),1)
             call dcopy(iyjx2,f(0,0,k,l_),1,temp2(0,0),1)
-            do 242 i=2,iy-1
+            do 242 i=2,iymax-1
                do 243 j=2,jxm1
                   tam3(j)=-(hfu(i,j)+hfu(i-1,j))*.5*xi(j)
  243           continue
@@ -5458,17 +5639,47 @@ c       (xhead(jpxy,ipxy) has temp1 ptr,
 c        yhead(jpxy,ipxy) has temp4 ptr),
 c        and these are output to the netcdf file.
 
-         call dcopy(iyjx2,temp5(0,0),1,temp3(0,0),1)
+         call dcopy(iyjx2,temp5(0,0),1,temp3(0,0),1)         
+         call prppr(target,"norm",xll,xlu,xpl,xpu) 
+c sgbaek, following Line 258 in pltvec.f, I am commenting out the following and
+c replace with the two lines
+c         call dcopy(iyjx2,temp2(0,0),1,temp1(0,0),1)
+         ipxjpx=jpxy*ipxy
+         call dcopy(ipxjpx,fpn,1,xhead,1)
          
-         call prppr(target,"norm",xll,xlu,xpl,xpu)
-         
-         call dcopy(iyjx2,temp2(0,0),1,temp1(0,0),1)
-         
-         call dcopy(iyjx2,temp4(0,0),1,temp3(0,0),1)
-         
-         call prppr(target,"norm",xll,xlu,xpl,xpu)
-         
-         call dcopy(iyjx2,temp2(0,0),1,temp4(0,0),1)
+         call dcopy(iyjx2,temp4(0,0),1,temp3(0,0),1)         
+         call prppr(target,"norm",xll,xlu,xpl,xpu)         
+c sgbaek
+c         call dcopy(iyjx2,temp2(0,0),1,temp4(0,0),1)
+         call dcopy(ipxjpx,fpn,1,yhead,1)
+
+
+c sgbaek, I am writing the following
+!         WRITE(*,*)'sgbaek pltvec: jpxy,xpar=',jpxy,(xpar(j),j=1,jpxy)
+!         WRITE(*,*)'sgbaek pltvec: ipxy,xperp=',ipxy,(xperp(i),i=1,ipxy)
+!         WRITE(*,*) 'sgbaek temp1(0,0)', temp1(0,0)
+!         WRITE(*,*) 'sgbaek temp1', temp1
+!         WRITE(*,*) 'sgbaek xhead', xhead
+!         WRITE(*,*) 'sgbaek xhead print rows  each column'
+!         do i=1,ipxy
+!            WRITE(*,*) 'i, what size', i,size(xhead),size(xhead,dim=1)
+!            WRITE(*,122) (xhead(j,i), j=1,jpxy)
+!            WRITE(*,*) '....'
+!         enddo
+!         WRITE(*,*) '....'
+ 122     format(101(1x,e17.10))
+!         WRITE(*,*) 'sgbaek temp4(0,0)', temp4(0,0)
+!         WRITE(*,*) 'sgbaek temp4', temp4
+!         WRITE(*,*) 'sgbaek yhead', yhead
+!         WRITE(*,*) 'sgbaek, size xhead, size yhead',
+!     &                  size(xhead), size(yhead)
+!         WRITE(*,*) 'sgbaek size1', size(xhead,dim=1), size(yhead,dim=1)
+!         WRITE(*,*) 'sgbaek size2', size(xhead,dim=2), size(yhead,dim=2)
+!         WRITE(*,*) 'sgbaek temp1 size1', 
+!     &                   size(temp1,dim=1), size(temp4,dim=1)
+!         WRITE(*,*) 'sgbaek temp1 size2', 
+!     &                   size(temp1,dim=2), size(temp4,dim=2)
+cc end of sgbaek write commands       
 
          endif  !end igrid.eq.0
          
@@ -5545,15 +5756,43 @@ c     (First, figure out bin number for netcdf file.)
             do ll=1,n_netcdf
                if (l_ .eq. ll_netcdf(ll)) start(3)=ll
             enddo
-            
-            call pack21(xhead,1,jpxy,1,ipxy,wkpack,jpxy,ipxy)
+
+c sgbaek to commpare the pack21 operation in the u-theta grid case            
+c           call pack21(temp5(0:iy+1,0:jx+1),0,iyp1,0,jxp1,
+c    &                  wkpack(1:iy*jx),iy,jx) ! for gamma_x
+ 
+            call pack21(xhead(1:jpxy,1:ipxy),1,jpxy,1,ipxy,
+     &                  wkpack(1:jpxy*ipxy),jpxy,ipxy)
+
+c sgbaek, I want to see the start and count variables
             istatus= NF_INQ_VARID(ncid,'gamma_par',vid)  
-            call ncvpt_doubl2(ncid,vid,start,count,wkpack,istatus)
+            call ncvpt_doubl2(ncid,vid,start,count,
+     &                      wkpack(1:jpxy*ipxy),istatus)
+!            WRITE(*,*) 'sgbaek start', start
+!            WRITE(*,*) 'sgbaek count', count
+!            WRITE(*,*) 'sgbaek ncid',ncid
+!            WRITE(*,*) 'sgbaek vid', vid
+           
+!            WRITE(*,*) 'sgbaek l_', l_
+!            WRITE(*,*) 'sgbaek pack21 xhead size',
+!     &                      size(xhead(1:jpxy,1:ipxy)),size(xhead,dim=1)
+!            WRITE(*,*) 'sgbaek size wkpack(1:jpxy*ipxy), wkpack(:)', 
+!     &                     size(wkpack(1:jpxy*ipxy)),size(wkpack)
+!            WRITE(*,*) 'sgbaek xhead(:,1)',xhead(:,1)
+!            WRITE(*,*) 'sgbaek wkpack(1:jpxy), wkpack=',
+!     &                    wkpack(1:jpxy), wkpack
             
-            call pack21(yhead,1,jpxy,1,ipxy,wkpack,jpxy,ipxy)
+     
+            call pack21(yhead(1:jpxy,1:ipxy),1,jpxy,1,ipxy,
+     &                  wkpack(1:jpxy*ipxy),jpxy,ipxy)
+
             istatus= NF_INQ_VARID(ncid,'gamma_perp',vid)  
             call ncvpt_doubl2(ncid,vid,start,count,wkpack,istatus)
-            
+!            WRITE(*,*) 'sgbaek pack21 yhead',size(wkpack)
+
+
+        
+
 
 
             else   ! igrid.ne.0 case
@@ -5589,7 +5828,7 @@ c     (First, figure out bin number for netcdf file.)
             call ncvpt_doubl2(ncid,vid,1,1,enorm,istatus)
             
             istatus= NF_INQ_VARID(ncid,'iy',vid)  
-            call ncvpt_int2(ncid,vid,1,1,iy,istatus)
+            call ncvpt_int2(ncid,vid,1,1,iymax,istatus)
              
             istatus= NF_INQ_VARID(ncid,'itl_netcdf',vid)  
             call ncvpt_int2(ncid,vid,1,n_netcdf,itl_netcdf(1),istatus)
@@ -5615,15 +5854,21 @@ c     (First, figure out bin number for netcdf file.)
             start(4)=k  !For ngen.ge.2 case.
             
             istatus= NF_INQ_VARID(ncid,'y',vid)  
-            call ncvpt_doubl2(ncid,vid,y_start,y_count,y(1,l_),istatus)
+            call ncvpt_doubl2(ncid,vid,y_start(1:2),y_count(1:2),y(1,l_)
+     &       ,istatus)
             
-            call pack21(temp5(0:iy+1,0:jx+1),0,iyp1,0,jxp1,
-     &                  wkpack(1:iy*jx),iy,jx) ! for gamma_x
+            call pack21(temp5(0:iyp1,0:jx+1),0,iyp1,0,jxp1,
+     &                  wkpack(1:iymax*jx),iymax,jx) ! for gamma_x
+            !YuP[2021-03-11] Changed iy-->iymax 
+            !(just in case if iy is changed by iy=iy_(l_) somewhere)
+
             istatus= NF_INQ_VARID(ncid,'gamma_x',vid)  
             call ncvpt_doubl2(ncid,vid,start,count,wkpack,istatus)
             
-            call pack21(temp4(0:iy+1,0:jx+1),0,iyp1,0,jxp1,
-     &                  wkpack(1:iy*jx),iy,jx) ! for gamma_theta
+            call pack21(temp4(0:iyp1,0:jx+1),0,iyp1,0,jxp1,
+     &                  wkpack(1:iymax*jx),iymax,jx) ! for gamma_theta
+            !YuP[2021-03-11] Changed iy-->iymax 
+            !(just in case if iy is changed by iy=iy_(l_) somewhere)
             istatus= NF_INQ_VARID(ncid,'gamma_theta',vid)  
             call ncvpt_doubl2(ncid,vid,start,count,wkpack,istatus)
             
@@ -5636,7 +5881,7 @@ c     (First, figure out bin number for netcdf file.)
  190  continue  ! on k=1,ngen
       
       return
-      end
+      end subroutine netcdfvec
 c     
 c     
       integer function length_char(string)
@@ -5648,7 +5893,7 @@ c     using the fortran intrinsic len().
       enddo
  20   length_char=i
       return
-      end
+      end function length_char
 
 
 
@@ -5658,7 +5903,7 @@ c     using the fortran intrinsic len().
 C=YuP=> ADDED: conversion from Netcdf-2 to Netcdf-3 or higher ==========
 C These routines/function convert old routines:
 
-      function ncvdef2(NCID,VARNAM,VARTYP,NDIMS,VDIMS,istatus)
+      integer function ncvdef2(NCID,VARNAM,VARTYP,NDIMS,VDIMS,istatus)
       ! vid=NCVDEF() is renamed to vid=ncvdef2() in *.f files
       INCLUDE 'netcdf.inc'
       CHARACTER*(*) VARNAM
@@ -5881,8 +6126,8 @@ c              If rhoin.gt.1, point is outside the LCFS.  Leave f4d=0.
                      vn=f4dv(iv)*vnorm
                      do it=1,nt_f4d
                         pitch=f4dt(it)
-                        call tdfinterp(k,vn,pitch,rhoin,polang,
-     +                              f4d(ir,iz,iv,it),tau_b)
+                        call tdfinterp(vn,pitch,rhoin,polang,
+     +                              f4d(ir,iz,iv,it)) !,tau_b)
                      enddo
                   enddo
                endif  ! On rhoin
@@ -5905,6 +6150,7 @@ c              If rhoin.gt.1, point is outside the LCFS.  Leave f4d=0.
 !            enddo ! iv
 !         enddo ! iz
 !         enddo ! ir
+         STOP 'f4dwrite: only setup for fow=disabled'
       else
          STOP 'f4dwrite: only setup for fow=disabled'
       endif ! fow
@@ -5991,6 +6237,546 @@ c.......................................................................
       return
 
       end
+
+
+
+c======================================================================
+c======================================================================
+
+      subroutine f3dwrite
+      implicit integer (i-n), real*8 (a-h,o-z)
+      save
+      include 'param.h'
+      include 'comm.h'
+
+CMPIINSERT_INCLUDE
+
+c     Write 3D distribution, f(pol.angle,vpar,mu) at fixed rho to data file.
+c     Original purpose: To be used by COGENT, as a boundary condition 
+c     at specified rho (flux surface).
+c     Work with Ron Cohen, Mikhail Dorf
+c     YuP August 2013 [based on f4dwrite, BH]
+
+c     npol_f3d is poloidal angle grid size set in namelist
+c     nvpar_f3d, nmu_f3d are (vpar,mu) grid sizes.
+c     All grids are equispaced.
+
+c     The distribution function f3d, and the grids will be allocated
+c     according to the namelist input, and will be deallocated at
+c     the end of the subroutine.
+
+      real*8,dimension(:),allocatable:: f3d_pol,f3d_b, f3d_vpar,f3d_mu
+      real*8,dimension(:,:,:),allocatable:: f3d, f3d_tau
+
+CMPIINSERT_IF_RANK_NE_0_RETURN
+
+      WRITE(*,*)
+      WRITE(*,*)'Entering subroutine f3dwrite'
+
+c     Only set up for one (the first) general species:
+      if (ngen.gt.1) then
+         WRITE(*,*)
+         WRITE(*,*)'WARNING: Output f3d dist ftn for 1st gen spec only'
+         WRITE(*,*)
+         k=1 ! First general species only, for now
+      endif
+
+c.......................................................................
+c     Allocate temporary storage, to be deallocated at end of subroutine
+c.......................................................................
+      allocate(f3d_pol(npol_f3d)) ! Pol.angle grid
+      allocate(f3d_b(npol_f3d))  ! Magnetic field at pol.angle grid points
+      allocate(f3d_vpar(nvpar_f3d)) ! Vpar
+      allocate(f3d_mu(nmu_f3d))  ! 0.5*m*Vper^2/B 
+      allocate(f3d(npol_f3d, nvpar_f3d, nmu_f3d),STAT=istat)
+      if (istat.ne.0) then
+         WRITE(*,*)'f3dwrite: allocation problem'
+         STOP
+      endif
+      allocate(f3d_tau(npol_f3d, nvpar_f3d, nmu_f3d),STAT=istat)
+      if (istat.ne.0) then
+         WRITE(*,*)'f3dwrite: allocation problem'
+         STOP
+      endif
+      
+      proton_kg= 1.672621777e-27   ! [kg]
+      e_C=       1.602176565e-19   ! [C]
+      epsvac=    8.854187817e-12   ! [F/m]
+      
+      ! Define reference units - to be used by COGENT. 
+      ! See GKModel.pdf pp.6-7
+      units_n= 1.0e20 ! [m^-3] n_tilda == units.number_density
+      units_T= 1.0e3  ! [eV]   T_tilda == units.temperature
+      units_L= 1.0    ! [m]    L_tilda == units.length
+      units_m= 1.0    ! [amu]  m_tilda == units.mass
+      units_B= 1.0    ! [T]    B_tilda == units.magnetic_field
+      
+      ! Derived reference values - for cross-check 
+      !(these values are printed out by COGENT into a log file)
+      ref_v=sqrt(units_T*e_C/(units_m*proton_kg)) ![m/s] sqrt(T_tilda/m_tilda)
+      ref_tau=units_L/ref_v               ![sec]         Transit time
+      ref_mu= units_T*e_C/(2*units_B)     ![Joule/Tesla] Magn.moment
+      ref_distfunc= units_n/(pi*ref_v**3) ![s^3/m^6]  Distribution function 
+      ref_potential=units_T               ![V] Electric potential
+      ref_gyrofreq=e_C*units_B/(units_m*proton_kg)  ![1/sec] Gyro-frequency
+      ref_debyelen=sqrt(epsvac*units_T/(units_n*e_C)) ![m] Debye length
+      ref_psi= units_B*(units_L)**2       ! [Wb] Poloidal flux
+      
+c      if (eqsource.eq."miller") then
+      !......................... local/input for Miller equilibrium:
+      delta_e=eq_miller_deltaedge ! Triangularity of LCFS (at r=radmin)
+      akappa= eq_miller_kappa  ! Vertical elongation (const for all surfaces)
+      drr0=   eq_miller_drr0   ! dR0/dr  See REF: describes Shafranov shift
+      fpsieq= btor*radmaj      ! B*R assumed constant (not dep. on r)
+      !......................... 
+c      endif
+
+      rhoin=f3d_rho ! Values of f are evaluated at this rho (coupling rho)
+      
+
+      !===> Form grids:  
+      dpol=    twopi/(npol_f3d-1)
+      v_parallel_max= vnorm
+      dvpar= 2*v_parallel_max/(nvpar_f3d-1)
+      do ipol=1,npol_f3d
+         f3d_pol(ipol)= (ipol-1)*dpol ! [0;2*pi]
+      enddo
+      do iv=1,nvpar_f3d
+         f3d_vpar(iv)= -vnorm +(iv-1)*dvpar ! [-vnorm; +vnorm]  (cm/sec)
+      enddo
+
+      ! Find the Nearest flux surf. ir-index:
+      !Careful with use of lookup_tdf:  last argument is index
+      !of the array element just ABOVE the first argument. 
+      call lookup_tdf(rhoin,rovera,lrzmax,rweightr,rweightl,ir)
+      ir=ir-1 ! now, rhoin is between rovera(ir) and rovera(ir+1)
+      ! rweightr,rweightl are weight coeffs for interpolation.
+      
+      !===> First, Find min(B) at this rhoin, and form mu-grid
+      polang=0.d0 ! Midplane, outer-most point (largest R)
+      ip=1 ! Nearest index in cql3d-poloidal grid "pol"
+      !-> Find the local (R,Z)-coord by interpolation:
+      rloc= rweightl*solrz(ip,ir)+rweightr*solrz(ip,ir+1)
+      zloc= rweightl*solzz(ip,ir)+rweightr*solzz(ip,ir+1)
+      ! For a given (rloc,zloc), determine components of B:
+              ! Convert (R,Z)->(r,polang)
+              call eq_miller_RZ_to_rpol(rmag,zmag, delta_e,akappa,drr0,
+     +             rloc,zloc, rminor,polang) 
+              ! Get PSI, BR, BPHI, BZ values:
+              call eq_miller(rminor, polang, 
+     +             rmag, zmag, cursign, bsign, radmin, psimag,psilim,
+     +             delta_e, akappa, drr0, fpsieq,
+     +             dpsidr, Rs,Zs, PSI_tmp, BR0, BPHI0, BZ0)
+      Rmax=rloc  ! major radius, outermost point at this flux surface 
+      Bmin=sqrt(BR0**2+BZ0**2+BPHI0**2)  !-> |B| found
+      ! Define max(mu)= 0.5*m*Vmax^2/Bmin and grid step dmu at this rhoin:
+      amu_max= 0.5*fmass(k)*vnorm2/Bmin
+      dmu= amu_max/(nmu_f3d-1)
+      ! Also get the value of dpsi/dr (physics value) at given r:
+      dpsidr0= -cursign*abs(dpsidr) !When cursign<0 -> physics dpsi/dr>0
+
+      ! Form grid for mu:
+      do imu=1,nmu_f3d
+         f3d_mu(imu)= (imu-1)*dmu ! [0; 0.5*fmass(k)*vnorm2/Bmin]  (cgs)
+      enddo
+      
+      !===> Find values of magnetic field at pol.angle grid points.
+      Rmin=Rmax ! Rmin will be found (innermost major radius)
+      do ipol=1,npol_f3d
+         polang=f3d_pol(ipol) 
+         ! polang is NOT the theta angle as in Miller definitions of 
+         ! flux surfaces. The Miller theta is polang_miller below.
+         ! But: for COGENT, we need such f3d_pol, as in 
+         ! polrz= atan2(zloc-zmag,rloc-rmag), see below.
+         ! In COGENT, the polang will be defined as polrz, 
+         ! to find the nearest grid point and to get the distr.function.
+         zzmag=1.d0 ! changed to -1 when eqsym.ne."none" and polang>pi
+         if (eqsym.ne."none" .and. polang.gt.pi) then
+           polang=2*pi-polang   !assumes up-down symm
+           zzmag=-1.d0 ! sign of (z-zmag) for this point
+           ! The grids pol(l,lr),solrr(l,lr),solzz(l,lr)
+           ! are defined only in one half of poloidal plane.
+           ! The zzmag value indicates - which half.
+         endif
+         ! Find the Nearest index in cql3d-poloidal grid "pol":
+         call lookup_tdf(polang,pol(1,ir),lz,pweightr,pweightl,ip)
+         ip=ip-1 ! now, polang is between pol(ip,ir) and pol(ip+1,ir)
+         !-> Find the local (R,Z)-coord by interpolation:
+         rloc= 
+     +      rweightl*(pweightl*solrz(ip,ir)  +pweightr*solrz(ip+1,ir))
+     +     +rweightr*(pweightl*solrz(ip,ir+1)+pweightr*solrz(ip+1,ir+1))
+         zloc= 
+     +      rweightl*(pweightl*solzz(ip,ir)  +pweightr*solzz(ip+1,ir))
+     +     +rweightr*(pweightl*solzz(ip,ir+1)+pweightr*solzz(ip+1,ir+1))
+         zloc=zloc*zzmag ! zzmag=-1 when eqsym.ne."none" and polang>pi
+         polrz= atan2(zloc-zmag,rloc-rmag)
+         if(polrz.lt.0.d0) polrz=polrz+twopi
+         Rmin=min(Rmin,rloc)
+         ! For a given (rloc,zloc), determine components of B:
+c         if (eqsource.eq."miller") then
+               ! Convert (R,Z)->(r,polang_miller)
+               call eq_miller_RZ_to_rpol(rmag,zmag, delta_e,akappa,drr0,
+     +              rloc,zloc, rminor,polang_miller) 
+               ! Get PSI, BR, BPHI, BZ values:
+               call eq_miller(rminor, polang_miller, 
+     +              rmag, zmag, cursign, bsign, radmin, psimag,psilim,
+     +              delta_e, akappa, drr0, fpsieq,
+     +              dpsidr, Rs,Zs, PSI_tmp, BR0, BPHI0, BZ0)
+c         endif          
+         if (eqsource.eq."eqdsk"   .or.
+     +           eqsource.eq."topeol"  .or.
+     +           eqsource.eq."tsc"   ) then
+              if(eqmod.eq."enabled")then
+               call equilib(rloc,zloc,1,PSI_tmpe,BRe,BPHIe,BZe)
+               ! Call with index=1 for PSI,BR,BPHI,BZ return (cgs units)           
+               !                   for a given Requil,Zequil coordinate.
+              else ! eqmod.eq."disabled" (circular-shaped plasma eq. model)
+                STOP 'f3dwrite: not set for eqmod.eq."disabled" '
+              endif
+      WRITE(*,'(a,2f12.3,7f11.3)')
+     +'R,Z,polrz,f3d_pol,pol_miller,  BR0,BRe,BZ0,BZe',
+     + rloc,zloc, polrz*180/pi, polang*180/pi, polang_miller*180/pi,
+     + BR0,BRe,BZ0,BZe
+c         else
+c               WRITE(*,*)'fow_setb: wrong eqsource? eqsource=',eqsource
+c               stop
+         endif
+         f3d_b(ipol)=sqrt(BR0**2+BZ0**2+BPHI0**2)  !-> |B| found
+      enddo ! ipol
+      !---> COUPLING minor radius (for coupling of CQL3D with COGENT):
+      rcoupling= 0.5*(Rmax-Rmin)
+      ! Also evaluate triangularity delta at r=rcoupling:
+      delta_c= delta_e*(rcoupling/radmin) !Be sure it's same as in sub.eq_miller
+      s_delta= delta_c/sqrt(1.d0-delta_c**2)
+      ! Characteristic of change of elongation:
+      s_kappa= 0.d0 !always 0 (kappa=const in r), see sub.eq_miller
+      !-----------------------------------
+      WRITE(*,*)'f3d_rho,rcoupling=',f3d_rho,rcoupling
+      WRITE(*,*)'radmaj,fpsieq,dpsidr0=',radmaj,fpsieq,dpsidr0
+      !pause
+      
+
+      !===> Find and save distribution function at given rhoin.
+      call bcast(f3d, zero, npol_f3d*nvpar_f3d*nmu_f3d) ! initialize
+      ! tau_bounce [sec]
+      call bcast(f3d_tau, zero, npol_f3d*nvpar_f3d*nmu_f3d) ! initialize
+
+c.......................................................................
+c     For a given f3d_rho, and each pol.angle, use tdfinterp to find f.
+c     Coding is similar to that in tdnpa0.
+c     Only set up for eqsource="eqdsk".  Easy to generalize.
+c.......................................................................
+
+      if (eqsource.ne."eqdsk") then
+         WRITE(*,*)
+         WRITE(*,*) 'f3dwrite only set up for eqsource=eqdsk'
+         WRITE(*,*) 'Easy to generalize, if useful'
+         STOP
+      endif
+
+      if(fow.eq.'disabled')then ! .or. fow.eq.'hybrid')then
+         
+         ! For tests only:
+         fpeak= f(2,1,1,ir) ! Peak value of distr.func, for reference.
+         dvpeak=0.01 ! Width of a peak in vel.space, norm-ed by vnorm
+         ! end test
+         do ipol=1,npol_f3d
+            polang=f3d_pol(ipol)
+            bmag=f3d_b(ipol)  ! |B| [gauss]
+            do ivpar=1,nvpar_f3d
+            v_par= f3d_vpar(ivpar)*bsign !to make Vpar=(V.b), for COGENT
+            !NOTE: v_par (or cospitch) definition is different in COGENT!
+            v_par2= v_par*v_par
+            do imu=1,nmu_f3d ! over adiabatic inv. 0.5*m*Vper^2/B [cgs]
+               umu= f3d_mu(imu)
+               v_per2= umu*2.0*bmag/fmass(k)
+               v_per=sqrt(v_per2)
+               vn=sqrt(v_par2+v_per2) !momentum-per-rest-mass (cm/sec)
+               cospitch= v_par/vn
+               cospitch=max(cospitch,-1.d0) ! to be sure cos>=-1
+               cospitch=min(cospitch,+1.d0) ! to be sure cos<=+1
+               pitch=acos(cospitch) !acos() is in [0,pi]
+               polang=f3d_pol(ipol)
+               call tdfinterp(vn,pitch,rhoin,polang,
+     +              f3d(ipol,ivpar,imu)) !, f3d_tau(ipol,ivpar,imu) )
+               ! For tests only:
+               polang=f3d_pol(ipol)
+               if (abs(polang -280.*pi/180.).lt.(dpol*0.5)
+     +            .and. abs(pitch-pi*0.45).lt.0.02 ) then
+                   WRITE(*,*)'ipol,polang=', ipol,polang*180/pi
+                  ! zero every pol.angle, except selected point (ipol=..)
+                  ! In vel.space, set it as a ring distribution at high v
+                  ! (no thermal part)
+                  fsource=fpeak*exp( -((vn/vnorm -0.78)/dvpeak)**2 )
+                  if (fsource.ge.fpeak*1e-8 )then
+                    call tdfinterp(vn,pitch,rhoin,polang,
+     +                   f3d(ipol,ivpar,imu)) !, f3d_tau(ipol,ivpar,imu) )
+                    polang=f3d_pol(ipol)
+                  else
+                    f3d_tau(ipol,ivpar,imu)= 0.d0
+                  endif
+                  f3d(ipol,ivpar,imu)= fsource
+               else
+                  f3d(ipol,ivpar,imu)= 0.d0
+                  f3d_tau(ipol,ivpar,imu)= 0.d0
+               endif
+               ! end test
+            enddo
+            enddo
+         enddo ! ipol
+             
+      else
+         STOP 'f3dwrite: only setup for fow=disabled' ! or hybrid'
+      endif ! fow
+
+      if (eqsym.eq."none") then
+         WRITE(*,*)
+         WRITE(*,*)'************************************************'
+         WRITE(*,*)'WARNING:  f3dwrite ASSUMING UP-DOWN SYMM'
+         WRITE(*,*)'          and eqsym=none.  Need to check coding'
+         WRITE(*,*)'************************************************'
+         WRITE(*,*)
+      endif
+
+c.......................................................................
+c     Write data into a file - normalization/units data for COGENT:
+      if(f3d_format.eq.'ascii') then
+        iunit=33
+        open(unit=iunit,file='cql3d_cogent_units.txt',STATUS='UNKNOWN')
+        write(iunit,'(A)')'--- Normalization/units data for COGENT ---'
+        write(iunit,'(A,1pe16.7)')
+     +   'units_n== units.number_density [m^-3]=',units_n
+        write(iunit,'(A,1pe16.7)')
+     +   'units_T== units.temperature    [eV]  =',units_T
+        write(iunit,'(A,1pe16.7)')
+     +   'units_L== units.length         [m]   =',units_L
+        write(iunit,'(A,1pe16.7)')
+     +   'units_m== units.mass           [amu] =',units_m
+        write(iunit,'(A,1pe16.7)')
+     +   'units_B== units.magnetic_field [T]   =',units_B
+        write(iunit,'(A)')'  '
+        write(iunit,'(A)')'--- Derived reference values --------------'
+        
+        write(iunit,'(A,1pe16.7)')
+     +   'ref_v [m/s] = sqrt(units_T*e[C]/(units_m*proton[kg])) =',ref_v
+
+        write(iunit,'(A,1pe16.7)')
+     +   'Transit time [sec] = units_L/ref_v   =', ref_tau
+
+        write(iunit,'(A,1pe16.7)')
+     +   'Magn.moment [Joule/Tesla] = units_T*e[C]/(2*units_B) =',ref_mu
+
+        write(iunit,'(A,1pe16.7)')
+     +   'Distr.func.[sec^3/m^6] = units_n/(pi*ref_v**3)=',ref_distfunc
+
+         write(iunit,'(A,1pe16.7)')
+     +   'Electric potential [V] = units_T=', ref_potential
+     
+        write(iunit,'(A,1pe16.7)')
+     +   'Gyro-frequency [1/sec] = e[C]*units_B/(units_m*proton[kg])=',
+     +   ref_gyrofreq
+     
+        write(iunit,'(A,1pe16.7)')
+     +   'Gyro-radius [m] = ref_v/ref_gyrofreq=',
+     +   ref_v/ref_gyrofreq
+
+        write(iunit,'(A,1pe16.7)')
+     +   'Debye length [m] = sqrt(eps0*units_T/(units_n*e[C]))=',
+     +   ref_debyelen
+
+        write(iunit,'(A,1pe16.7)')
+     +   'Pol.flux [Wb] = units_B*(units_L)^2 =',ref_psi
+
+        write(iunit,'(A)')'  '
+        write(iunit,'(A)')'--- CONSTANTS USED IN THE ABOVE ------------'
+        write(iunit,'(A)')'proton[kg]= 1.672621777e-27'
+        write(iunit,'(A)')'e[C]=       1.602176565e-19'
+        write(iunit,'(A)')'eps0[F/m]=  8.854187817e-12'
+        write(iunit,'(A)')'  '
+        write(iunit,'(A)')'--- INPUT values for Miller equilibrium ----'
+        !  Note conversion factors from cgs to mks
+        write(iunit,'(A,1pe16.7)')'rmag[m]/units_L =', rmag/100/units_L
+        write(iunit,'(A,1pe16.7)')'zmag[m]/units_L =', zmag/100/units_L
+        write(iunit,'(A,1pe16.7)')
+     +  'major R at Geom.center of LCFS: radmaj[m]/units_L =',
+     +   radmaj/100/units_L
+        write(iunit,'(A,1pe16.7)')
+     +  'minor r at LCFS: radmin[m]/units_L =', radmin/100/units_L
+        write(iunit,'(A,1pe16.7)')
+     +  'minor r at coupling surface: rcoupling[m]/units_L =',
+     +   rcoupling/100/units_L
+        write(iunit,'(A)')'  '
+        write(iunit,'(A,1pe16.7)')
+     +  '|Btor*R|[T*m]/(units_B*units_L) =', 
+     +   fpsieq*1.e-6/(units_B*units_L)
+        write(iunit,'(A,f3.0)')
+     +  'sign of Btor:  bsign=', bsign
+        write(iunit,'(A)')'  '
+        write(iunit,'(A,1pe16.7)')
+     +  '(d(psi)/dr)[Wb/m]/(units_B*units_L) at coupling surface',
+     +  dpsidr0/1.e6/(units_B*units_L)
+        write(iunit,'(A)')'  '
+        write(iunit,'(A,1pe16.7)')
+     +  'Pol.flux at mag.axis: psimag[Wb]/ref_psi =',psimag/1.e8/ref_psi
+        write(iunit,'(A)')'  '
+        write(iunit,'(A,1pe16.7)')
+     +  'Pol.flux at LCFS:     psilim[Wb]/ref_psi =',psilim/1.e8/ref_psi
+        write(iunit,'(A)')'  '
+        write(iunit,'(A,f3.0)')
+     +  'sign of plasma current in tor.direction cursign=', cursign
+        write(iunit,'(A)')'  '
+        write(iunit,'(A,1pe16.7)')'Vertical Elongation kappa=', akappa
+        write(iunit,'(A,1pe16.7)')'S_kappa=', s_kappa
+        write(iunit,'(A,1pe16.7)')
+     +  'Triangularity delta (at r=rcoupling):', delta_c
+        write(iunit,'(A,1pe16.7)')'S_delta=', s_delta
+        write(iunit,'(A,1pe16.7)')'dR0/dr for Shafranov shift:',drr0
+        write(iunit,'(A,1pe16.7)')
+     +  'R at geom.center of coupling surf. 
+     +   Rc= Rmag+drr0*rcoupling [m]/units_L',
+     +   (Rmag+drr0*rcoupling)/100/units_L
+        write(iunit,'(A)')'  '
+        write(iunit,'(A,1pe16.7)')
+     +  'Dist.func at polang=0,vpar=0,mu=0:  
+     +   (fcql/vnorm**3)*10^12/ref_distfunc =',
+     +   (f3d(1,nvpar_f3d/2,1)/vnorm3)*1.e12/ref_distfunc
+        write(iunit,'(A)')'  '
+        write(iunit,'(A,1pe16.7)')
+     +  'v_parallel_max[m/s]/ref_v:', v_parallel_max/100/ref_v
+        write(iunit,'(A)')'  '
+        write(iunit,'(A,1pe16.7)')
+     +  'mu_max[Joule/Tesla]/ref_mu:', amu_max*1.e-3/ref_mu
+        write(iunit,'(A)')'  '
+
+        write(iunit,'(A)')'Species name,type  mass/proton[kg]  Charge 
+     +         T[eV]/units_T  n[m^-3]/units_n'
+        do k=1,ntotal ! over all species
+          ! Local temperature and density:
+          temp_loc= rweightl*temp(k,ir) +rweightr*temp(k,ir+1)  ! keV
+          den_loc=  rweightl*reden(k,ir)+rweightr*reden(k,ir+1) ! cm^-3
+          write(iunit,'(2A, 2(1pe16.7), 2(1pe16.7))')
+     +    kspeci(1,k),kspeci(2,k),
+     +    fmass(k)*1.e-3/proton_kg/units_m,   bnumb(k),  
+     +    temp_loc*1.e3/units_T,    den_loc*1.e6/units_n
+        enddo
+        
+        write(iunit,'(A)')'  '
+        close(iunit)
+        
+      endif
+
+      renorm= (1.e12/vnorm3)/ref_distfunc
+      do ipol=1,npol_f3d
+      do ivpar=1,nvpar_f3d
+      do imu=1,nmu_f3d
+       f3d_norm= f3d(ipol,ivpar,imu)*renorm
+       f3d_norm= max(f3d_norm,1.d-99)
+       f3d(ipol,ivpar,imu)= f3d_norm
+      enddo
+      enddo
+      enddo
+
+c     Write data into a file
+      if(f3d_format.eq.'ascii') then
+        iunit=33
+        open(unit=iunit,file='cql3d_f3d.txt',STATUS='UNKNOWN')
+        
+        write(iunit,'(A)')'Contains distr.func. calculated by CQL3D:' 
+        write(iunit,'(A)')'f(pol.angle,vpar,mu) at fixed rho==f3d_rho'
+        write(iunit,'(A)')'To be used as a boundary condition by COGENT'
+        write(iunit,'(A)')'Grids and distr.function are expressed  '
+        write(iunit,'(A)')'  in mks units and normalized by ref.values.'
+        write(iunit,'(A)')'Example for magnetic field: [Tesla]/units_B'
+        write(iunit,'(A)')'Example for f: [m^-3 (m/s)^-3]/ref_distfunc'
+        write(iunit,'(A)')'radcoord=',radcoord
+        write(iunit,'(A)')
+     +  'See cql3d_cogent_units.txt for definition of
+     +   units_B, ref_v, ref_mu, ref_distfunc'
+        write(iunit,'(A)')'  Scalars in this file:'
+        write(iunit,'(A)')'npol_f3d  = number of poloidal angle points'
+        write(iunit,'(A)')'nvpar_f3d = number of Vpar points'
+        write(iunit,'(A)')'nmu_f3d = number of mu=0.5*m*Vper^2/B points'
+        write(iunit,'(A)')'f3d_rho   = rho value'
+        write(iunit,'(A)')'(definition of rho is according to radcoord)'
+        write(iunit,'(A)')'vnorm= max.velocity of CQL3D v-grid [m/s]'
+        write(iunit,'(A)')'mass(1)/proton[kg] = Mass of species#1'
+        write(iunit,'(A)')'  1D grids [format: (1pe16.7)]:'
+        write(iunit,'(A)')
+     +      'f3d_pol(ipol=1,npol_f3d)      [rad]'
+        write(iunit,'(A)')
+     +      'f3d_vpar(ivpar=1,nvpar_f3d)   [m/s]/ref_v'
+        write(iunit,'(A)')
+     +      'f3d_mu(imu=1,nmu_f3d)         [Joule/Tesla]/ref_mu'
+        write(iunit,'(A)')'  1D array magn.field [format: (1pe16.7)]:'
+        write(iunit,'(A)')
+     +      'f3d_b(ipol=1,npol_f3d)        [T]/units_B'
+        write(iunit,'(A)')'  3D array dist.func. [format: 5(1pe16.7)]:'
+        write(iunit,'(A)')
+     +      'f3d(ipol,ivpar,imu)           [m^-3 (m/s)^-3]/ref_distfunc'
+        write(iunit,'(A)')'--------------------------------------------'
+        write(iunit, '(i5)') npol_f3d   !number of poloidal angle points
+        write(iunit, '(i5)') nvpar_f3d  !number of Vpar points
+        write(iunit, '(i5)') nmu_f3d    !number of mu=0.5*m*Vper^2/B points
+        write(iunit, '(1pe16.7)') f3d_rho      ! rho value (rcoupling/a)
+        write(iunit, '(1pe16.7)') vnorm/100    ! [m/s]
+        write(iunit, '(1pe16.7)') fmass(k)*1.e-3/proton_kg ! Mass of species#1
+        ! Grids:
+        write(iunit,'(1pe16.7)') 
+     +       ( f3d_pol(ipol),              ipol= 1,npol_f3d )
+        write(iunit,'(1pe16.7)') 
+     +       ( f3d_vpar(ivpar)/100/ref_v,  ivpar=1,nvpar_f3d )
+        write(iunit,'(1pe16.7)') 
+     +       ( f3d_mu(imu)*1.e-3/ref_mu,   imu=  1,nmu_f3d )
+        ! Magnetic field at pol.angle grid points, [T]/units_B:
+        write(iunit,'(1pe16.7)') 
+     +       ( f3d_b(ipol)*1.e-4/units_B,  ipol= 1,npol_f3d ) 
+        ! 3D distribution function, [m^-3 (m/s)^-3]/ref_distfunc
+        write(iunit,1000) ( (( 
+     +         f3d(ipol,ivpar,imu),
+     +                                     ipol= 1,npol_f3d  ),
+     +                                     ivpar=1,nvpar_f3d ),
+     +                                     imu=  1,nmu_f3d   )
+     
+        close(iunit)
+
+        open(unit=iunit,file='cql3d_f3d_taub.txt',STATUS='UNKNOWN')
+        write(iunit,'(A)')'tau_bounce [sec] over (ipol,ivpar,imu) grid.'
+        write(iunit,'(A)')'Other data - in cql3d_f3d.txt (for COGENT)'
+        write(iunit,'(A)')'--------------------------------------------'
+        write(iunit, '(i5)') npol_f3d   !number of poloidal angle points
+        write(iunit, '(i5)') nvpar_f3d  !number of Vpar points
+        write(iunit, '(i5)') nmu_f3d    !number of mu=0.5*m*Vper^2/B points
+        write(iunit, '(1pe16.7)') f3d_rho      ! rho value (rcoupling/a)
+        write(iunit, '(1pe16.7)') vnorm/100    ! [m/s]
+        write(iunit, '(1pe16.7)') fmass(k)*1.e-3/proton_kg ! Mass of species#1
+        ! Grids:
+        write(iunit,'(1pe16.7)') 
+     +       ( f3d_pol(ipol),              ipol= 1,npol_f3d )
+        write(iunit,'(1pe16.7)') 
+     +       ( f3d_vpar(ivpar)/100/ref_v,  ivpar=1,nvpar_f3d )
+        write(iunit,'(1pe16.7)') 
+     +       ( f3d_mu(imu)*1.e-3/ref_mu,   imu=  1,nmu_f3d )
+        write(iunit,1000) ( (( 
+     +         f3d_tau(ipol,ivpar,imu),
+     +                                     ipol= 1,npol_f3d  ),
+     +                                     ivpar=1,nvpar_f3d ),
+     +                                     imu=  1,nmu_f3d   )
+        close(iunit)
+        
+
+      else
+        STOP 'f3dwrite: only ready for f3d_format=ascii'
+      endif
+
+ 1000 format(5(1pe16.7))
+
+c.......................................................................
+
+      deallocate(f3d,f3d_tau, f3d_pol, f3d_b, f3d_vpar, f3d_mu)
+
+      return
+
+      end ! f3dwrite
 
 c======================================================================
 c======================================================================

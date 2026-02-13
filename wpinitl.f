@@ -86,7 +86,8 @@ cl    3.1 Define l_lower(i); the lowest index l for which pitch angle
 c     index i is defined on the local transport pitch angle mesh.
 c.......................................................................
 
-      call ibcast(l_lower,1,iymax)
+      !call ibcast(l_lower,1,iymax)
+      l_lower(:)=1 !YuP[2021]
       if (iy_(1).ne.iy_(ls) .or. iy_(1).ne.iy_(ls/2)) then
 c     cannot have periodic mesh and not full l mesh
 c%OS  if (sbdry .eq. "periodic") call wpwrng(2)
@@ -95,7 +96,8 @@ c%OS  if (sbdry .eq. "periodic") call wpwrng(2)
         do 310 l=2,illend
           do 311 i=iyh_(l-1)+1,iyh_(l)
             l_lower(i)=l
-            l_lower(iymax+1-i)=l
+            !l_lower(iy_(l)+1-i)=l !  !YuP[2021-03-11] iymax-->iy_(l) ?
+            l_lower(iymax+1-i)=l 
  311      continue
  310    continue
       endif
@@ -104,7 +106,6 @@ c.......................................................................
 cl    3.2 Define l_upper(i); the highest index l for which pitch angle
 c     index i is defined on the local transport pitch angle mesh.
 c.......................................................................
-
       call ibcast(l_upper,ls,iymax)
       if (iy_(1).ne.iy_(ls) .or. iy_(1).ne.iy_(ls/2)) then
         illend=lrors
@@ -112,6 +113,7 @@ c.......................................................................
         do 320 l=illend-1,1,-1
           do 321 i=iyh_(l+1)+1,iyh_(l)
             l_upper(i)=l
+            !l_upper(iy_(l)+1-i)=l ! !YuP[2021-03-11] iymax-->iy_(l) ?
             l_upper(iymax+1-i)=l
  321      continue
  320    continue
@@ -127,18 +129,29 @@ c.......................................................................
 
       if (iymax .ne. iy_(1)) call wpwrng(11)
       do 330 i=1,iymax
-        if (l_lower(i) .ne. 1) call wpwrng(12)
+        if (l_lower(i) .ne. 1) call wpwrng(12) !all l_lower(i)=1 for all i
  330  continue
 
-      do 335 i=1,itl_(1)
+      do 335 i=1,itl_(1) ! it is "one" in (1)
         if (l_upper(i) .ne. ls) call wpwrng(13)
-        if (l_upper(iymax+1-i) .ne. ls) call wpwrng(13)
+        if (l_upper(iy_(1)+1-i) .ne. ls) call wpwrng(13)
+           !YuP[2021-03-11] iymax-->iy_(1)
+           ![actually, it is verified above that iymax=iy_(1) ] 
  335  continue
-      do 336 i=itl_(1)+1,iyh_(1)
+      do 336 i=itl_(1)+1,iyh_(1) ! it is "one" in (1)
         if (l_upper(min(i+1,iyh_(1))) .ne. l_upper(i)) then
-          if (i .ne. iyh_(l_upper(i))) call wpwrng(14)
-          if (iy_(l_upper(i))+1-i .ne. iyh_(l_upper(iymax+1-i))+1) 
-     1      call wpwrng(14)
+          if (i .ne. iyh_(l_upper(i))) then
+            write(*,*)'wpinitl: i, iyh_(l_upper(i))=',i,iyh_(l_upper(i))
+            call wpwrng(14)
+          endif
+          if (iy_(l_upper(i))+1-i .ne. iyh_(l_upper(iy_(1)+1-i))+1) then
+             write(*,*)
+     *       'wpinitl iy_(l_upper(i))+1-i, iyh_(l_upper(iy_(1)+1-i))+1',
+     *                iy_(l_upper(i))+1-i, iyh_(l_upper(iy_(1)+1-i))+1
+             call wpwrng(14)
+          endif
+           !YuP[2021-03-11] iymax-->iy_(1) 
+           ![actually, it is verified above that iymax=iy_(1) ] 
         endif
  336  continue
 
@@ -207,7 +220,10 @@ c     Mainly for fixed_mu case when following the i=cst line for i>iyh.
 c     Set value to -999 if mesh point does not exist.
 c.......................................................................
 
-      dp999=-999
+      dp999=999 !YuP[2021-04-02] was -999, but below we use '-dp999'
+      ! so here the sign should be + .
+      !In the original 1997 version, the usage was
+      ! ilpm1ef(i,l,-1)=cvmgt(i,-999,i.le.iyh_(lpm1eff(l,-1)))
       do 440 l=0,ls+1
         do 441 i=1,iyh_(lpm1eff(l,0))
           dpi=i 

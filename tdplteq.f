@@ -12,7 +12,9 @@ CMPIINSERT_INCLUDE
       character*8 plteq
 
       REAL*4 rbot,zbot,rtop,ztop
-      REAL*4 RTAB1(LFIELDA),RTAB2(LFIELDA)
+      REAL*4 RTAB1(LFIELD),RTAB2(LFIELD) !local
+            !YuP[2021-04] Changed to lfield
+            
       REAL*4 PGER1,PGERNNR,PGZERO,PGZMIN,PGZMAX,PGEZNNZ
       REAL*4 wk_ray_r(nrayelts), wk_ray_z(nrayelts)
 
@@ -57,6 +59,19 @@ c     it isn't done at the moment....
       ! YuP: min and max value of Z-coord over all flux surfaces:
       solz_min=MINVAL(solz) 
       solz_max=MAXVAL(solz)
+      
+      if(cqlpmod.eq."enabled")then !YuP[2021-03-05] Added 
+        !Plot {solrs(1:ls); solzs(1:ls)} which go over 2*pi in pol.angle,
+        !even when eqsym.ne."none"
+        ztop=.95
+        solz_min=MINVAL(solzs) 
+        solz_max=MAXVAL(solzs)
+        write(*,*)'tdplteq: solzs_min,solzs_max [cm]=', 
+     &      solz_min,  solz_max
+        write(*,*)'tdplteq: solrs_min,solrs_max [cm]=', 
+     &      MINVAL(solrs(1:ls)),  MAXVAL(solrs(1:ls))
+      endif 
+      
       PGZMIN=real(solz_min) 
       PGZMAX=real(solz_max) 
       
@@ -70,17 +85,21 @@ c     it isn't done at the moment....
       !In case of eqmod='disabled' solr() and solz() could be empty.
       !write(*,*)'tdplteq:',PGER1,PGERNNR,PGZMIN,PGZMAX 
       !Actually, with psimodel='spline', they are set now !YuP[2020-01-29]
-      if( (eqsym.ne."none") .and.
+      if(cqlpmod.eq."enabled")then !YuP[2021-03-05] Added 
+        ! plot upper and lower halves, for any case of eqsym
+        CALL PGSWIN(PGER1,PGERNNR,-PGEZNNZ,PGEZNNZ)
+        CALL PGWNAD(PGER1,PGERNNR,-PGEZNNZ,PGEZNNZ)
+      else ! CQL3D case
+        if( (eqsym.ne."none") .and.
      +    (urfmod.eq."disabled" .or. pltrays.eq.'disabled') ) then 
          !plot half only
-c-YuP         CALL PGSWIN(PGER1,PGERNNR,PGZERO,PGEZNNZ)
-c-YuP         CALL PGWNAD(PGER1,PGERNNR,PGZERO,PGEZNNZ)
          CALL PGSWIN(PGER1,PGERNNR,PGZMIN,PGZMAX)
          CALL PGWNAD(PGER1,PGERNNR,PGZMIN,PGZMAX)
-      else !eqsym=none; and/or urfmod='enabled',
+        else !eqsym=none; and/or urfmod='enabled',
          ! plot upper and lower halves:
          CALL PGSWIN(PGER1,PGERNNR,-PGEZNNZ,PGEZNNZ)
          CALL PGWNAD(PGER1,PGERNNR,-PGEZNNZ,PGEZNNZ)
+        endif
       endif
      
       CALL PGBOX('BCNST',R40,0,'BCNST',R40,0)
@@ -93,34 +112,52 @@ c-YuP         CALL PGWNAD(PGER1,PGERNNR,PGZERO,PGEZNNZ)
      +        'Fokker-Planck Flux Surfaces')
       endif
 
-      IF (LRZMAX.GT.200) STOP 'TDPLTEQ: CHECK DIM OF TEXTT'
+      IF (LRZMAX.GT.200) then
+        !STOP 'TDPLTEQ: CHECK DIM OF TEXTT'
+        !YuP[2021]Do not stop, just use textt(min(l,200)) below.
+        write(*,*)
+     &  'TDPLTEQ/WARNING: DIM OF TEXTT(200) is smaller than lrzmax'
+      endif
 
       do 10 l=1,lrzmax
-         IF (LORBIT(L).GT.LFIELDA) STOP'TDPLTEQ: CHECK DIM OF RTAB1/2'
-        do 20 j=1,lorbit(l)
-           RTAB1(j)=solr(lorbit(l)+1-j,l)
-           RTAB2(j)=solz(lorbit(l)+1-j,l)
- 20     continue
-        text(1)=textt(l)
-        CALL PGLINE(LORBIT(L),RTAB1,RTAB2)
-        ! YuP[03-2016] Added plotting rays in cross-sectional view
-        if ( (urfmod.ne."disabled") .and. (pltrays.eq.'enabled')
+        IF (LORBIT(L).GT.LFIELD) STOP'TDPLTEQ: CHECK DIM OF RTAB1/2'
+        if(cqlpmod.eq."enabled")then !YuP[2021-03-05] Added 
+          do j=1,ls !CQLP: FPE points at field line
+            RTAB1(j)=solrs(j)
+            RTAB2(j)=solzs(j)
+            CALL PGPT1(RTAB1(j),RTAB2(j),21) !Marker at each FPE point.
+            ! 4='o', 20=very_small_circle, 21=next_larger_circle
+          enddo
+          CALL PGLINE(ls,RTAB1,RTAB2) !Also note: lrzmax=1 in CQLP run
+        else ! CQL3D case
+          do j=1,lorbit(l)
+            RTAB1(j)=solr(lorbit(l)+1-j,l)
+            RTAB2(j)=solz(lorbit(l)+1-j,l)
+          enddo
+          CALL PGLINE(LORBIT(L),RTAB1,RTAB2)
+          ! YuP[03-2016] Added plotting rays in cross-sectional view
+          if ( (urfmod.ne."disabled") .and. (pltrays.eq.'enabled')
      +       .and. (eqsym.ne.'none')) then 
-         ! Add surfaces in whole cross-section.
-         ! For up-dn symmetrical case only half of surfaces are plotted
-         ! but rays could be in the other hemisphere, 
-         ! so plot the other half:
-         CALL PGLINE(LORBIT(L),RTAB1,-RTAB2)
-        endif
+           ! Add surfaces in whole cross-section.
+           ! For up-dn symmetrical case only half of surfaces are plotted
+           ! but rays could be in the other hemisphere, 
+           ! so plot the other half:
+           CALL PGLINE(LORBIT(L),RTAB1,-RTAB2)
+          endif
+        endif ! cqlpmod
+        text(1)=textt(min(l,200)) !YuP[2021-03] Added limit 200 (size of textt)
  10   continue
+      RTAB1(1)=sngl(rmag)
+      RTAB2(1)=sngl(zmag)
+      CALL PGPT1(RTAB1(1),RTAB2(1),2) !'+' Marker at magnetic axis
 
       !if(eqmod.eq."enabled")then
-      if((eqsym.eq.'none').or. 
+      if((eqsym.eq.'none').or.(cqlpmod.eq."enabled") .or.
      + ((urfmod.ne."disabled") .and. (pltrays.eq.'enabled')) ) then
      
         if(ncontr.gt.1) then
           ! YuP[2015/05/03] Add LCFS, if available
-          ncontr_= min(ncontr,LFIELDA)
+          ncontr_= min(ncontr,LFIELD)
           do ilim=1,ncontr_
              RTAB1(ilim)=rcontr(ilim)
              RTAB2(ilim)=zcontr(ilim)
@@ -132,7 +169,7 @@ c-YuP         CALL PGWNAD(PGER1,PGERNNR,PGZERO,PGEZNNZ)
       
         if(nlimiter.gt.1) then
           ! YuP[2019-02-22] Add "last surface" (plasma border), if available
-          nline= min(nlimiter,LFIELDA)
+          nline= min(nlimiter,LFIELD)
           do ilim=1,nline
              RTAB1(ilim)=rlimiter(ilim)
              RTAB2(ilim)=zlimiter(ilim)
@@ -170,6 +207,7 @@ c YuP[03-2016] Added plotting rays in cross-sectional view
         !where irfn(krf=1)=1 and irfn(krf=2)=4 in our example,
         !irfn(krf) is pointing to beginning harmonic of each wave type
         !== index (in 1:mrfn) of the lowest harmonic for each wave type 
+        CALL PGSCI(2) !red color for rays
         do iray=1,nray_krf  !Loop over rays, for a given wave type krf
            nrayelt00=nrayelt(iray,irfn(krf))
 c           write(*,*)'tdplteq: krf, iray, nrayelt00=',
@@ -187,10 +225,11 @@ c           write(*,*)'tdplteq: krf, minval(wk_ray_r),maxval(wk_ray_r)=',
 c     +                         krf, minval(wk_ray_r),maxval(wk_ray_r)
            CALL PGLINE(nrayelt00,wk_ray_r,wk_ray_z)
         enddo  ! iray 
+        CALL PGSCI(1) !restore black color
         !Add some info on rays:
-        write(t_,'(a,i3, a,2i3, a,e12.5)') 'krf type=',krf, 
+        write(t_,'(a,i3, a,2i3, a,1pe8.2)') 'krf type=',krf, 
      +                      '  nharm1,nharms=', nharm1(krf),nharms(krf),
-     +                      '    f[Hz]=', freqcy(irfn(krf))
+     +                      ', f[Hz]=', freqcy(irfn(krf))
         !YuP: Careful! nharm1() and nharms() were not duplicated into each mode,
         !so they are still a function of krf (wave type); 
         !But freqcy was duplicated, so use irfn(krf).

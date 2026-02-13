@@ -17,7 +17,8 @@ c..................................................................
          if(gone(i,j,k,lr_).eq.zero)then !YuP[2017-11-21] added.
           !YuP: added gone() check: ONLY COUNT not-lost particles.
           !YuP: This is similar to the CQL3D-FOW version (added on 03/23/2015)
-          tam1(j)=tam1(j)+source(i,j,k,indxlr_)*cynt2(i,l_)*vptb(i,lr_)
+          !tam1(j)=tam1(j)+source(i,j,k,indxlr_)*cynt2(i,l_)*vptb(i,lr_) !before[2022-02-11]
+          tam1(j)=tam1(j)+source(i,j,k,l_)*cynt2(i,l_)*vptb(i,lr_) !after[2022-02-11]
           !Note: tam1 is needed for sorpw_nbi below, which is only used 
           !for plots and NetCDF file. 
           !It has no effect on the source operator or solution.
@@ -38,7 +39,7 @@ c..................................................................
 c..................................................................
 c     Source power of species k in Watts/cc averaged over the flux surface
 c..................................................................
-
+      !YuP[2022-02-11] Could make a func of l_ (in CQLP - along field line)
       sorpw_nbi(k,lr_)=s*fions(k)*one_*1.6022e-16*zmaxpsii(lr_) !NBI(or KO) source
       !Note: fions(k)=.5*fmass(k)*vnorm**2/ergtkev   [for all k]
       !so "fions" could refer to electron, too.

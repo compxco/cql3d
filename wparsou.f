@@ -11,9 +11,10 @@ c.......................................................................
 
       include 'param.h'
       include 'comm.h'
-      dimension zdns(lrorsa)
-      dimension zdnspa(lrorsa),zdnvel(lrorsa),zdnp1(lrorsa)
-      dimension zdnspa2(iy),zdnvel2(iy),zspa2i(iy/2),zvel2i(iy/2)
+      dimension zdns(lrors) !local, changed to lrors (YuP) 
+      dimension zdnspa(lrors),zdnvel(lrors),zdnp1(lrors) !local, changed to lrors (YuP)
+      dimension zdnspa2(iymax),zdnvel2(iymax)
+      dimension zspa2i(iymax/2),zvel2i(iymax/2)
       dimension zdnuspa(jx),zdnuvel(jx)
 
       include 'wpadvnc.h'
@@ -282,7 +283,8 @@ c     check spasou and velsou total densities
               zdnvel(l)=zdnvel(l)+velsou(i,j,k,l)*cynt2(i,l)*cint2(j)
  503        continue
             do 504 i=1,iyh_(l)
-              ii=iymax+1-i
+              ii=iymax+1-i !YuP[2021-03-11] why not iymax-->iy_(l) ? Not sure
+              !ii=iy_(l)+1-i !YuP/test
               ief=iy_(l)+1-i
               zdnspa2(i)=zdnspa2(i)+spasou(i,j,k,l)*cynt2(i,l)*cint2(j)
      !          *dsz(l)/dsz(1)/lrors

@@ -204,9 +204,10 @@ c     integer function nccre(filename,overwrite?,error_code)
 c     Ref to page 46 of NetCDF-2 manual.
 c     CLOBber old file, if it exists.
 c     istatus is 0, if no errors.
-
+      !NF_CLOBBER means overwrite old file
       istatus = NF_CREATE(t_, NF_CLOBBER, ncid) !-YuP: NetCDF-f77
       call check_err(istatus)
+      WRITE(*,*)' netcdfrf 1.After NF_CREATE istatus=',istatus
 
 c.......................................................................
 cl    1.1.2 define dimensions
@@ -233,9 +234,9 @@ c-YuP:      cdim=ncddef(ncid,'cdim',8,istatus)
       istatus= NF_DEF_DIM(ncid, 'cdim',   8,        cdim)  !-YuP: NetCDF-f77
 
 c     unlimited dimension for time, dimension name= 'time'
-c     ncddef(ncid,'time',NF_UNLIMITED,error_code)
-c-YuP:      tdim=ncddef(ncid,'time',NCUNLIM,istatus)
       istatus= NF_DEF_DIM(ncid, 'time',NF_UNLIMITED,tdim) !-YuP: NetCDF-f77
+      call check_err(istatus)
+      WRITE(*,*)' netcdfrf 2.After NF_DEF_DIM/time istatus=',istatus
 
 c     define vector of dimensions [for urfb(1:iy,1:jx,1:lrz,irfn(krf))], unlimited last
       dims(1)=ydim
@@ -411,7 +412,7 @@ c     Added 3rd dimension equal to 2 accomodates complex data.
       call ncaptc2(ncid,vid,'long_name',NCCHAR,23,
      +           'Magnetic field strength',istatus)
       call ncaptc2(ncid,vid,'units',NCCHAR,5,
-     +           'guass',istatus)
+     +           'gauss',istatus)
 
       vid=ncvdef2(ncid,'sene',NCDOUBLE,2,ray_dims,istatus)
       call ncaptc2(ncid,vid,'long_name',NCCHAR,17,
@@ -534,7 +535,6 @@ c--------------------------
       call ncaptc2(ncid,vid,'units',NCCHAR,7,
      +                     'seconds',istatus)
 
-
       if (netcdfshort.eq.'enabled') then
 c         Do nothing: no storage defined.
       elseif (netcdfshort.eq.'longer_b') then
@@ -576,6 +576,8 @@ c     +        'cgs/vnorm**2',istatus)
          call ncaptc2(ncid,vid,'units',NCCHAR,25,
      +        'code units:  cgs/vnorm**4',istatus)
       endif
+      call check_err(istatus)
+      WRITE(*,*)' netcdfrf 3.After NF_DEF_DIM/urfb istatus=',istatus
 
 
 c.......................................................................
@@ -584,6 +586,7 @@ c     p. 51-2 of netcdf manual
 
       istatus= NF_ENDDEF(ncid) !-YuP: NetCDF-f77
       call check_err(istatus)
+      WRITE(*,*)' netcdfrf 4.After NF_ENDDEF istatus=',istatus
 
 c.......................................................................
 

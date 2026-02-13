@@ -109,7 +109,7 @@ c     f(i,j,l_)=egg(i,j)*f(i,j+1,l_)+fgg(i,j)
 c..................................................................
 
 cdir$ ivdep
-        do 20 i=1,iy
+        do 20 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
 
 c..................................................................
 c     da(i,0)=db(i,0)=dc(i,0)=0 forces G(i,0)=0. Thus the equation at
@@ -130,7 +130,7 @@ c..................................................................
 
         do 50 j=2,jxm1
 cdir$ ivdep
-          do 40 i=1,iy
+          do 40 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
             egg(i,j)=alpx(i,j)/(betx(i,j)-gamx(i,j)*egg(i,j-1))
             fgg(i,j)=(delx(i,j)+gamx(i,j)*fgg(i,j-1))/
      1        (betx(i,j)-gamx(i,j)*egg(i,j-1))
@@ -156,7 +156,7 @@ c     f(i,jx,l_)=temc1(i)*f(i,jx-1,l_)+temc2(i)
 c..................................................................
 
 cdir$ ivdep
-        do 60 i=1,iy
+        do 60 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
           temc1(i)=gamx(i,jx)/betx(i,jx)
           temc2(i)=delx(i,jx)/betx(i,jx)
  60     continue
@@ -166,7 +166,7 @@ c     Solve for f(i,jx,l_)=temp2 using the coefficients for the equation
 c     developed in do loops 60 and 40.
 c..................................................................
 
-        do 70 i=1,iy
+        do 70 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
           temp2(i,jx)=(temc1(i)*fgg(i,jx-1)+temc2(i))
      1      /(1.-temc1(i)*egg(i,jx-1))
  70     continue
@@ -177,7 +177,7 @@ c..................................................................
 
         do 90 jj=1,jxm1
           j=jx-jj
-          do 80 i=1,iy
+          do 80 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
             temp2(i,j)=egg(i,j)*temp2(i,j+1)+fgg(i,j)
  80       continue
  90     continue
@@ -215,10 +215,10 @@ cdir$ ivdep
         do 110 j=2,jx
           egg(1,j)=alpy(1,j)/bety(1,j)
           egg(iyh,j)=gamy(iyh,j)/bety(iyh,j)
-          egg(iy,j)=gamy(iy,j)/bety(iy,j)
+          egg(iy_(l_),j)=gamy(iy_(l_),j)/bety(iy_(l_),j)
           fgg(1,j)=dely(1,j)/bety(1,j)
           fgg(iyh,j)=dely(iyh,j)/bety(iyh,j)
-          fgg(iy,j)=dely(iy,j)/bety(iy,j)
+          fgg(iy_(l_),j)=dely(iy_(l_),j)/bety(iy_(l_),j)
  110    continue
 
 c..................................................................
@@ -233,7 +233,7 @@ cdir$ ivdep
      1        -gamy(i,j)*egg(i-1,j))
  120      continue
  130    continue
-        do 150 i=iy-1,iy+2-itl,-1
+        do 150 i=iy_(l_)-1,iy_(l_)+2-itl,-1
           do 140 j=2,jx
             egg(i,j)=gamy(i,j)/(bety(i,j)-alpy(i,j)*egg(i+1,j))
             fgg(i,j)=(dely(i,j)+alpy(i,j)*fgg(i+1,j))/(bety(i,j)
@@ -283,9 +283,9 @@ c..................................................................
 
         do 190 j=2,jx
           tam6(j)=tam2(j)-tam1(j)*egg(itl+1,j)-tam3(j)*egg(itl-1,j)-
-     1      tam4(j)*egg(iy+2-itl,j)
+     1      tam4(j)*egg(iy_(l_)+2-itl,j)
           tam7(j)=tam5(j)+tam1(j)*fgg(itl+1,j)+tam3(j)*fgg(itl-1,j)+
-     1      tam4(j)*fgg(iy+2-itl,j)
+     1      tam4(j)*fgg(iy_(l_)+2-itl,j)
           temp2(itl,j)=tam7(j)/tam6(j)
           temp2(itu,j)=temp2(itl,j)
  190    continue
@@ -306,7 +306,7 @@ cdir$ ivdep
             temp2(i,j)=egg(i,j)*temp2(i-1,j)+fgg(i,j)
  220      continue
  230    continue
-        do 250 i=iy+2-itl,iy
+        do 250 i=iy_(l_)+2-itl,iy_(l_)
 cdir$ ivdep
           do 240 j=2,jx
             temp2(i,j)=egg(i,j)*temp2(i-1,j)+fgg(i,j)
@@ -319,7 +319,7 @@ c     At x=0 f is clearly isotropic and will be averaged
 c     over theta below.
 c..................................................................
 
-        do 260 i=1,iy
+        do 260 i=1,iy_(l_)
           temc1(i)=.5*so(i,1)+temp1(i,1)*rbgn
           temc2(i)=rbgn-.5*cah(i,1)
           temp2(i,1)=temc1(i)/temc2(i)
@@ -332,7 +332,7 @@ c..................................................................
         do 270 j=1,jx
 cdir$ ivdep
           do 271 i=itl+1,iyh
-            temp2(iy+1-i,j)=temp2(i,j)
+            temp2(iy_(l_)+1-i,j)=temp2(i,j) !!YuP[2021-03-11] iy-->iy_(l_)
  271      continue
  270    continue
 
@@ -354,11 +354,11 @@ c..................................................................
 
         s=0.
         t=0.
-        do 280 i=1,iy
+        do 280 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
           s=s+vptb(i,lr_)*cynt2(i,l_)
           t=t+vptb(i,lr_)*cynt2(i,l_)*temp2(i,1)
  280    continue
-        do 512 i=1,iy
+        do 512 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
           temp1(i,1)=t/s
  512    continue
 

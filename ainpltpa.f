@@ -49,7 +49,7 @@ CMPIINSERT_IF_RANK_NE_0_RETURN
 
       write(t_,13000)
 13000 format("ngena is the max. # of general (time advanced) species")
-      RILIN=RILIN+1.
+      RILIN=RILIN+2.
       CALL PGMTXT('T',-RILIN,R40,R40,t_)
 
       write(t_,13001) ngena
@@ -69,59 +69,50 @@ CMPIINSERT_IF_RANK_NE_0_RETURN
 
 c      write(t_,13006) 
 13006 format("jx is the number of velocity mesh points")
-      RILIN=RILIN+1.
+!      RILIN=RILIN+1.
 c      CALL PGMTXT('T',-RILIN,R40,R40,t_)
 
 c      write(t_,13007) jx
 13007 format("====> jx = ",i5)
-      RILIN=RILIN+1.
+!      RILIN=RILIN+1.
 c      CALL PGMTXT('T',-RILIN,R40,R40,t_)
 
 c      write(t_,13008)
 13008 format("iy is the number of theta mesh points")
-      RILIN=RILIN+1.
+!      RILIN=RILIN+1.
 c      CALL PGMTXT('T',-RILIN,R40,R40,t_)
 
 c      write(t_,13009) iy
 13009 format("====> iy = ",i5)
-      RILIN=RILIN+1.
+!      RILIN=RILIN+1.
 c      CALL PGMTXT('T',-RILIN,R40,R40,t_)
 
       write(t_,13010) 
-13010 format("lza is the maximum number of z mesh points")
+      !YuP[2021-04-14] lza not used anymore; print lrza instead
+13010 format("lrza is the max # of radial mesh points (for profiles)") 
       RILIN=RILIN+1.
       CALL PGMTXT('T',-RILIN,R40,R40,t_)
 
-      write(t_,13011) lza
-13011 format("====> lza = ",i5)
+      write(t_,13011) lrza 
+      !YuP[2021-04-14] lza not used anymore; print lrza instead
+13011 format("====> lrza = ",i5)
       RILIN=RILIN+1.
       CALL PGMTXT('T',-RILIN,R40,R40,t_)
 
 c      write(t_,13012) 
 13012 format("mx is the highest order legendre polynomial employable")
-      RILIN=RILIN+1.
+!      RILIN=RILIN+1.
 c      CALL PGMTXT('T',-RILIN,R40,R40,t_)
 
 c      write(t_,13013) mx
 13013 format("====> mx = ",i5)
-      RILIN=RILIN+1.
+!      RILIN=RILIN+1.
 c      CALL PGMTXT('T',-RILIN,R40,R40,t_)
 
-      if (lrzmax .gt. 1) then
-
-         write(t_,13014)
-13014    format("lrza is the maximum number of radial flux surfaces")
-         RILIN=RILIN+1.
-         CALL PGMTXT('T',-RILIN,R40,R40,t_)
-         
-         write(t_,13015) lrza
-13015    format("====> lrza = ",i5)
-         RILIN=RILIN+1.
-         CALL PGMTXT('T',-RILIN,R40,R40,t_)
-         
+!      if (lrzmax .gt. 1) then !YuP: print in any case, why not?
          write(t_,13016)
-13016    format("analytic source routine parameters")
-         RILIN=RILIN+1.
+13016    format("analytic source routine parameters:")
+         RILIN=RILIN+2.
          CALL PGMTXT('T',-RILIN,R40,R40,t_)
          
          write(t_,13017)
@@ -133,28 +124,26 @@ c      CALL PGMTXT('T',-RILIN,R40,R40,t_)
 13018    format("====> nsoa = ",i5)
          RILIN=RILIN+1.
          CALL PGMTXT('T',-RILIN,R40,R40,t_)
-         
-         
-      endif
+!      endif
 
 c      write(t_,13019)
 13019 format("noncha is the number of elements in arrays carrying time")
-      RILIN=RILIN+1.
+!      RILIN=RILIN+1.
 c      CALL PGMTXT('T',-RILIN,R40,R40,t_)
 
 c      write(t_,13020)
 13020 format("plot information: last noncha time steps are remembered.")
-      RILIN=RILIN+1.
+!      RILIN=RILIN+1.
 c      CALL PGMTXT('T',-RILIN,R40,R40,t_)
 
 c      write(t_,13021) noncha
 13021 format("====> noncha = ",i5)
-      RILIN=RILIN+1.
+!      RILIN=RILIN+1.
 c      CALL PGMTXT('T',-RILIN,R40,R40,t_)
 
       write(t_,13022)
 13022 format("nplota is max number of plot times for 2d and 3d plots.")
-      RILIN=RILIN+1.
+      RILIN=RILIN+2.
       CALL PGMTXT('T',-RILIN,R40,R40,t_)
 
       write(t_,13023) nplota
@@ -205,23 +194,23 @@ c      CALL PGMTXT('T',-RILIN,R40,R40,t_)
 
 c      write(t_,13032)
 13032 format("f(vpar,vperp) for reduced distn F(vpar)")
-      RILIN=RILIN+1.
+!      RILIN=RILIN+1.
 c      CALL PGMTXT('T',-RILIN,R40,R40,t_)
 
 c      write(t_,13033) ipxy,jpxy
 13033 format("====> ipxy = ",i5,"      jpxy = ",i5)
-      RILIN=RILIN+1.
+!      RILIN=RILIN+1.
 c      CALL PGMTXT('T',-RILIN,R40,R40,t_)
 
       if (frmodp.eq."enabled") then
 c         write(t_,13034)
 13034    format("npart is the number of ions launched by NFREYA")
-         RILIN=RILIN+1.
+!         RILIN=RILIN+1.
 c         CALL PGMTXT('T',-RILIN,R40,R40,t_)
          
 c         write(t_,13035) npart
 13035    format("====> npart = ",i5)
-         RILIN=RILIN+1.
+!         RILIN=RILIN+1.
 c         CALL PGMTXT('T',-RILIN,R40,R40,t_)
       endif
 

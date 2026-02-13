@@ -21,7 +21,8 @@ c..................................................................
       call bcast(tam2,zero,jx)
       call bcast(tam1,zero,jx)
       do 10 j=1,jx
-        do 11 i=1,iy
+        do 11 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
+          !Note that for meshy="fixed_mu" iy_(l_) can be less than iy
           tam2(j)=tam2(j)+temp4(i,j)*cynt2(i,l_)*vptb(i,lr_)
           tam1(j)=tam1(j)+temp4(i,j)*cynt2(i,l_)
  11     continue

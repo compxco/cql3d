@@ -14,7 +14,7 @@ c..................................................................
 
       do 1 k=1,ngen
         do 2 i=1,iyh
-          ii=iy+1-i
+          ii=iy_(l_)+1-i !!YuP[2021-03-11] iy-->iy_(l_)
           do 3 j=1,jx
             cal(ii,j,k,l_)=cal(i,j,k,l_)
             cbl(ii,j,k,l_)=cbl(i,j,k,l_)

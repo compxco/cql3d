@@ -1,0 +1,95 @@
+2023-01 tests for updated CQL3D/GitHub version,
+after transferring FREYA-related fixes from CQL3D-m.
+===================================================
+
+1./tmp_NSTX_HHFW_cql3d2023rerun_iexcit_m1/
+Results are almost identical to the [04/11/2022] run in 
+/tmp_NSTX_HHFW_cql3d2022rerun/
+(and very similar to 
+/tmp_NSTX_HHFW_short/plots_cql3d/nstx_130608.00352.0_rerun190405_short.pdf
+but they use slightly different genray files?)
+
+Notice that these runs use
+  iexcit=-1 (Stearn's average cross sections:otw. like =0)
+  In this case zfreya.f uses subr. crsecs,
+  which may have a bug in usage of sgxn() array
+  (could be still ok if only one beam is used.)  
+P_nbi=0.735MW
+
+---> Rerun same case, now with iexcit=5 
+(ADAS, most recent; does not use crsecs).
+/tmp_NSTX_HHFW_cql3d2023rerun_iexcit5/
+NBI deposition is somewhat different from iexcit=-1 run,
+and P_nbi is 48% larger (1.094MW; was 0.735MW).
+
+---> Rerun same case, now with iexcit=0 (uses crsecs)
+/tmp_NSTX_HHFW_cql3d2023rerun_iexcit0/
+P_nbi=1.111MW. Profile of p_nbi(rho) is very close to 
+that in iexcit=5 run (except rho~0 - now the peak is lower).
+
+
+---------------------
+2. "test5" from /00_Cql3d_Regression_Tests/
+test_multiURF_multiSpecies: A DIII-D test case.
+			    Two general species: D, H. NB injection. 
+                            Two FW input file, operating separately on D and H.
+cqlinput_H0.short_mmsv8_adjust.4
+Uses eqdsk file g122080.03100, and RF genray data from genrayfw_18rays.nc.
+An extensive test with two general species of ions, H and D. This is for a 
+DIIID case where primarily there was a D NB into D plasma.  Also, FW
+ICRF heating.  But, a small amount of H was also present in the discharges.
+The consequent heating of H and D is to be examined.
+This is a shortened run from the actual study cases, so full runs would
+use larger lrz,iy,jx,nstop,nplot,nplt3d.
+cpu=12.6sec.
+(Ref run in: D3D_ngen2_urf_NBI_H.short_rerun_201018)
+
+---> YuP/rerun2023:
+[USES iexcit=0, i.e. uses subr.crsecs -- may have bugs.]
+Uses kfrsou=2, !Species number of beam source 
+    (kfrsou=2 is pointing to k=2 which is D_gen, i.e. NBI-D)
+NEED to set kfrsou() for each beam.
+We have two D-beams (nbeams=2):
+ ebkev(1)=74.7885
+ ebkev(2)=80.9770
+Then, kfrsou(1)=2 and kfrsou(2)=2, both pointing to k=2, i.e., D_gen.
+Results: FI deposition is exactly same.
+URFB plots - same.
+Printout of powers (NBI,RF) - almost same (4th digit or better).
+
+
+----------------------------------------------------------------
+Other tests from /00_Cql3d_Regression_Tests/
+(tests 1-4 do not involve NBI)
+----------------------------------------------------------------
+1. test1.0/test1.1   Dreicer runaway electron rates.
+test1.0 gives some time evolution of the distn.  (cpu 3.2s)
+test1.1 gives final result, using very large time step.  (cpu=1.3s)
+---> YuP/Rerun2023 - results look same.
+Vector plot of fluxes in u-space  - larger arrows now; better?
+Distr.func in u-space - colormap has lin.scale now
+(but log scale of RCONT). The type of colormap
+can be changed by 2nd argument in 
+call pltcont(k,2,t_,itype) !2 gives lin.scale.
+The plot of F_parallel looks good now (was blanc).
+
+2. test2. Ohmic resistivity
+---> YuP/Rerun2023 - results look same, to 4th digit or better.
+
+3. test3.  One ray DIII-D test case, D3D_96143_one_ray.
+Some changes in artificial imurity - 
+was bnumb=50, now bnumb=100.
+---> YuP/Rerun2023 - URFB plots and printout (RF pwr) look same.
+     Current from delta_sigma*E is slightly different.
+
+4. test4. EBW test case with disk-to_disk launch or rays.
+Not clear which genray.nc to use.
+Copied from my
+ /GENRAY_wk/test10/
+(and renamed to genray_test4.nc)
+---> YuP/Rerun2023 - Plots of prf(rho) are very similar,
+but not exactly same, especially at rho~0.08.
+
+
+
+ 

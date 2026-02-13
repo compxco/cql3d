@@ -478,7 +478,9 @@ CMPIINSERT_ENDIF_RANK
       include 'param.h'
       include 'comm.h'
       
-      do l=1,lrzmax
+      if(cqlpmod.ne."enabled")then
+       do l=1,lrzmax ! tauee,taueeh,starnue,vth are over full grid 
+         call tdnflxs(lmdpln(l)) ! determine l_,lr_, etc.
          call cfpgamma !YuP[2020-01-07]Added, To get gama(k,kk) for each lr_
          !vth is the thermal velocity = sqrt(T/m)
          vth(kelec,l)=(temp(kelec,l)*ergtkev/fmass(kelec))**.5
@@ -496,22 +498,231 @@ CMPIINSERT_ENDIF_RANK
          !Thus: taueeh=3 sqrt(pi/2) / Zeff * tauee
          !Note: taueeh and nuestar same as ONETWO 4.2-20 and 4.2-30
          !(Eq. 4.2-28 and 4.2-39, in GA-A16178, Pfeiffer, Davidson, Miller, Waltz)
-         if (cqlpmod .ne. "enabled") then
            taueeh(l)=tauee(l)*3.*sqrt(pi/2.)/zeff(l)
            starnue(l)=rgeom(l)*bmod0(l)/bthr0(l)/
      &            vth(kelec,l)/taueeh(l)/eps(l)**1.5
            !formula should be 0.5064*N(Z)*me/taueeh/ne/e**2, with N(Z=1)=1
            !Thus one should use game(e,e) as in taueeh, but as it is not
            !clear which to use we take the average between game(e,e) and game(e,i)
-           !This expression for sptzr is given by Eq. 4.2-77 if ONETWO manual,
+           !This expression for sptzr is given by Eq. 4.2-77 in ONETWO manual,
            !GA-A16178, the same as Eq. 5.66 of Hinton-Hazeltine, Rev. Mod. Phys.
-           sptzr(l)=zeff(l)*(0.29+0.46/(1.08+zeff(l)))
+       enddo ! l=1,lrzmax 
+       do ll=1,lrors ! sptzr is not over full grid, it is over FPE grid
+          call tdnflxs(ll)
+          call cfpgamma !To get gama(k,kk) for each ll
+          sptzr(ll)=zeff(lrindx(ll))*(0.29+0.46/(1.08+zeff(lrindx(ll))))
      &       *4.*sqrt(2.*pi)/3.*charge**2
      &       *0.5*(gama(kelec,kelec)+gama(kelec,kionn))
-     &       *sqrt(fmass(kelec))/(temp(kelec,l)*ergtkev)**1.5
-         endif ! cqlpmod .ne. "enabled"
-      enddo ! l=1,lrzmax 
+     &       *sqrt(fmass(kelec))/(temp(kelec,lrindx(ll))*ergtkev)**1.5
+          write(*,'(a,2i3,2f7.2,1pe12.3)')
+     &    'starnue_sptz: n,lr,Lee,Zeff,sptzr',
+     &     n,ll,gama(kelec,kelec),zeff(lrindx(ll)),sptzr(ll)
+       enddo ! l=1,lrzmax 
       !----------------- YuP[2019-12-18] Got starnue(),tauee(l),taueeh(l),sptzr(l)
+
+      else !(cqlpmod.eq."enabled"): !YuP[2021-02-24] Added a separate branch
+           ! change temp()-->temppar();  reden()--> denpar(), vth()-->vthpar()
+       do l=1,lsmax ! tauee,taueeh,starnue,vthpar are over full grid 
+         call tdnflxs(lmdpln(l)) !??? NEED TO CHECK
+         call cfpgamma !YuP[2020-01-07]Added, To get gama(k,kk) for each ls_
+         !vth is the thermal velocity = sqrt(T/m)
+         vthpar(kelec,l)=(temppar(kelec,l)*ergtkev/fmass(kelec))**.5
+         !tauee(l) is the electron-electron slowing down time at midplane
+         !tauee = 0.532/nu^{ee}_s, where nu^{ee}_s is the low velocity
+         !expression for ee-slowing in Book's NRL Plasma Formulary p.32,
+         !0.532=2**(3/2)/(3*pi**0.5). As nu(ee)_s = 2/taueeh/Zeff, we
+         !have tauee = 2**(3/2)/3/sqrt(pi)/2*taueeh*Zeff, thus
+         !taueeh = (3*sqrt(pi/2)/Zeff)*tauee. 
+         !Note taueeh = taue(NRL p.33)=2.9E-06*...
+          tauee(l)=vthpar(kelec,l)**3*fmass(kelec)**2
+     &     /(4.*pi*denpar(kelec,l)*charge**4*gama(kelec,kelec))
+         !Hinton-Hazeltine definition, Eq.(5.4), for e-i collisions.
+         !1./taueeh = 4/3 sqrt(2*pi) ne*zeff*charge**4*gamma/(sqrt(me)*Te**1.5)
+         !Thus: taueeh=3 sqrt(pi/2) / Zeff * tauee
+         !Note: taueeh and nuestar same as ONETWO 4.2-20 and 4.2-30
+         !(Eq. 4.2-28 and 4.2-39, in GA-A16178, Pfeiffer, Davidson, Miller, Waltz)
+           taueeh(l)=tauee(l)*3.*sqrt(pi/2.)/zeff(l)
+           starnue(l)=rgeom(lrindx(l))*bmod0(lrindx(l))/bthr0(lrindx(l))
+     &            /vthpar(kelec,l)/taueeh(l)/eps(lrindx(l))**1.5
+         !---- YuP: In case of CQLP, lrz=1, 
+         !---- so we use rgeom(lrz),bmod0(lrz),bthr0(lrz),eps(lrz)
+           !formula should be 0.5064*N(Z)*me/taueeh/ne/e**2, with N(Z=1)=1
+           !Thus one should use game(e,e) as in taueeh, but as it is not
+           !clear which to use we take the average between game(e,e) and game(e,i)
+           !This expression for sptzr is given by Eq. 4.2-77 in ONETWO manual,
+           !GA-A16178, the same as Eq. 5.66 of Hinton-Hazeltine, Rev. Mod. Phys.
+c           write(*,'(a,i3,1p2e12.3)')
+c     &       ' starnue_sptz: l,gama(e,e),starnue(l)=',
+c     &                       l,gama(kelec,kelec),starnue(l)
+       enddo ! l=1,lsmax 
+       do ll=1,lrors ! sptzr is not over full grid, it is over FPE grid
+          call tdnflxs(ll)
+          call cfpgamma !To get gama(k,kk) for each ll
+          sptzr(ll)=zeff(lsindx(ll))*(0.29+0.46/(1.08+zeff(lsindx(ll))))
+     &     *4.*sqrt(2.*pi)/3.*charge**2
+     &     *0.5*(gama(kelec,kelec)+gama(kelec,kionn))
+     &     *sqrt(fmass(kelec))/(temppar(kelec,lsindx(ll))*ergtkev)**1.5
+       enddo ! l=1,lrors
+      endif ! (cqlpmod.eq."enabled")
       
       return
       end subroutine starnue_sptz
+
+
+!=======================================================================
+!=======================================================================
+      subroutine sptz(tempe,tempi, redene,redeni, fmassi, zeff,
+     &                rbb,eps,trapfrac,  sptzr,pressau1,pressau2)
+      !YuP[2021-02-08] Spitzer resistivity [cgs] sptzr
+      ! and Sauter corrections pressau1,pressau2 
+      ! for a given Te, Ti, ne,ni, Zeff;  rbb,eps,trapfrac.
+      !
+      !INPUT (no comm.h here, only through argument list): 
+      ! tempe = Te [keV]  electron temp.
+      ! tempi = Ti [keV]  ion temp. (needed for Coulomb log definition)
+      ! redene= electron density [cm^-3]
+      ! redeni= main-ion density [cm^-3] (for Coulomb log definition)
+      ! fmassi= main-ion mass [g]   (needed for Coulomb log definition)
+      ! zeff  = Zeff
+      ! rbb== rgeom*(bmod0/bthr0) == r*B0/Bpol0  
+      !       where r= minor radius [cm], 
+      !       B0= total magn.field at outboard-midplane,
+      !       Bpol0= poloidal magnetic field at outboard-midplane. 
+      !       see corresponding arrays rgeom(lr),bmod0(lr),bthr0(lr)
+      !       Note: rgeom(lr) = 0.5*(rpcon(lr) - rmcon(lr))
+      !       is minor radius [cm], where 
+      !       rpcon(lr)= major R at outboard-midplane, for surface lr,
+      !       rmcon(lr)= major R at  inboard-midplane, for surface lr.
+      !       The combination rgeom*(bmod0/bthr0) is a slowly changing
+      !       function of minor radius (it is part of safety factor).
+      ! eps= inverse aspect ratio r/R. See corresponding array eps(lr)
+      ! trapfrac= trapped particle fraction (see corr.array trapfrac(lr))
+      !(see e.g., Hirshman and Sigmar, Nucl.Fus.21,1079 (1981),Eq.4.54)
+      ! Also see relevant paper 
+      ! O. Sauter, C. Angioni and Y.R. Lin-Liu, Phys. of Plasmas 6, 
+      !        2834 (1999).
+      !BH210210: It would be good to give an approximate trapfrac.
+      !BH210210: From ONETWO manual, Eqs 4.2-47 to 4.2-63, and
+      !BH210210: assuming elliptical flux surfaces, one can get
+      !BH210210: relatively simple expressions.  
+      !BH210210: Approx result is f_trap=sqrt(1-Bmin/Bmax)
+      !YuP: From printout for DIII-D equilibrium:
+      !eps, sqrt(1.-Bmin/Bmax), trapfrac(exact) = 8.078E-03 1.266E-01 1.302E-01
+      !eps, sqrt(1.-Bmin/Bmax), trapfrac(exact) = 1.053E-01 4.351E-01 4.512E-01
+      !eps, sqrt(1.-Bmin/Bmax), trapfrac(exact) = 2.042E-01 5.785E-01 5.931E-01
+      !eps, sqrt(1.-Bmin/Bmax), trapfrac(exact) = 3.599E-01 7.239E-01 6.733E-01
+      !The 1st line is for plasma center, the last line is for plasma edge
+      !
+      !OUTPUT [cgs units]:
+      ! sptzr = Spitzer resistivity, with dep. on Zeff
+      ! pressau1= correction factor (as in Sauter1, starnue=0) low-coll. neoclassical
+      ! pressau2= correction factor (as in Sauter2, starnue>0) with collisionality
+      !     so that 
+      !     sig_starnue0= 1/(pressau1*sptzr) ! sigma_nocollis (no-coll. neoclassical) [cgs]
+      !     sig_starnue=  1/(pressau2*sptzr) ! sigma_collis  [cgs]
+      ! What we probably need for NIMROD: 
+      ! eta= sptzr*pressau2*9.e9 !Resistivity converted to [SI], 
+      !      with neoclass.correction, collisional version 
+      ! (see the end of this subr. on pressau1 and pressau2) 
+      implicit none
+      
+      real*8 tempe,tempi,redene,redeni,fmassi,zeff,rbb,eps,trapfrac !INPUT
+      real*8 sptzr,pressau1,pressau2 ! OUTPUT
+      real*8 te_ev,ti_ev, vthe, taueeh, fmemi,fmimp, gamaee, gamaei  !local
+      real*8 fmasse,proton,charge,ergtkev,pi !local
+      real*8 const1,const2,zk033,za33,zb33,zc33,zg,zfcol,starnue !local
+      real*8 starnue_s !local, for test
+      
+      fmasse= 9.1095d-28     !(e) [g]
+      proton= 1.67262158d-24 !    [g] 
+      charge= 4.8032d-10 !(e) [StatCoulomb]
+      ergtkev=1.6022d-09 !energy(ergs) associated with 1 keV
+      pi=3.141592653589793d0
+      
+      ! For Coulomb log definition, 
+      ! use expressions from NRL_FORMULARY_2016, p.34
+      ! (Be sure to set gamaset=-1. in cqlinput, which means: Use NRL definition)
+      te_ev= tempe*1.d3 ! in eV
+      ti_ev= tempi*1.d3 ! in eV
+      fmemi= fmasse/fmassi ! me/mi ratio
+      fmimp= fmassi/proton ! mi/m_proton ratio
+      
+      ! Thermal e-e collisions (no energy-dependence here):
+      gamaee= 23.5 -log(sqrt(redene) * te_ev**(-1.25))  
+     &             -sqrt( 1d-5  +(1./16.)*(log(te_ev)-2.)**2 )
+      ! For e-i collisions:
+      if(te_ev .lt. ti_ev*fmemi)then  !very low Te
+         gamaei=16.d0 -log(sqrt(redeni)/ti_ev**1.5 *zeff**2*fmimp)
+      elseif(te_ev .lt. 10*zeff**2)then   !medium Te
+         gamaei=23.d0 -log(sqrt(redene)/te_ev**1.5 *zeff)  
+      else !(te_ev .gt. 10*zeff**2)
+         gamaei=24.d0 -log(sqrt(redene)/te_ev) !high Te range
+      endif
+      !write(*,*)'zeff,CL=',zeff,0.5*(gamaee+gamaei)
+      
+      !vth is the thermal velocity = sqrt(T/m), T is in keV
+      vthe=  sqrt(tempe*ergtkev/fmasse)
+      !tauee(l) is the electron-electron slowing down time at midplane
+      !tauee = 0.532/nu^{ee}_s, where nu^{ee}_s is the low velocity
+      !expression for ee-slowing in Book's NRL Plasma Formulary p.32,
+      !0.532=2**(3/2)/(3*pi**0.5). As nu(ee)_s = 2/taueeh/Zeff, we
+      !have tauee = 2**(3/2)/3/sqrt(pi)/2*taueeh*Zeff, thus
+      !taueeh = (3*sqrt(pi/2)/Zeff)*tauee. 
+      !Note taueeh = taue(NRL p.33)=2.9E-06*...
+      taueeh= 3.*sqrt(pi/2.)*vthe**3*fmasse**2 / 
+     &        (zeff*4.*pi*redene*charge**4*gamaee)
+      !Hinton-Hazeltine definition, Eq.(5.4), for e-i collisions.
+      !1./taueeh = 4/3 sqrt(2*pi) ne*zeff*charge**4*gamma/(sqrt(me)*Te**1.5)
+      !Thus: taueeh=3 sqrt(pi/2) / Zeff * tauee
+      !Note: taueeh and nuestar same as ONETWO 4.2-20 and 4.2-30
+      !(Eq. 4.2-28 and 4.2-39, in GA-A16178, Pfeiffer, Davidson, Miller, Waltz)
+      ! starnue(l)=rgeom(l)*bmod0(l)/bthr0(l)/vth(kelec,l)/taueeh(l)/eps(l)**1.5
+      !formula should be 0.5064*N(Z)*me/taueeh/ne/e**2, with N(Z=1)=1
+      !Thus one should use gamaee as in taueeh, but as it is not
+      !clear which to use we take the average between gamaee and gamaei
+      !This expression for sptzr is given by Eq. 4.2-77 in ONETWO manual,
+      !GA-A16178, the same as Eq. 5.66 of Hinton-Hazeltine, Rev. Mod. Phys.
+      sptzr= zeff*(0.29+0.46/(1.08+zeff))
+     &      * (4.*sqrt(2.*pi)/3.) * charge**2
+     &      * 0.5*(gamaee+gamaei)*sqrt(fmasse)/(tempe*ergtkev)**1.5 !OUTPUT
+     
+      !Now define corrections to Spitzer formula.
+      
+      !Based on subr.resthks() :
+      zk033= 1.46+(1.83-1.46)/zeff ! BH210210: See ONETWO manual,
+      !      Eq 4.2-49, which reduces to this formula.
+      const1= (4.d0/3.d0)*(1.d0 -1.d0/zeff)
+      const2= (1.d0/3.d0)*(4.d0/zeff -1.d0)
+      za33= const1*0.47 + const2*0.68   !Table 4.2-2 of ONETWO Manual.
+      zb33= const1*0.20 + const2*0.32
+      zc33= const1*0.51 + const2*0.66 
+      ! za33,zb33,zc33 are only needed for pressau2
+      
+      !Using 1.-xconn = trapfrac
+      zg= trapfrac/(1.d0-trapfrac) !==(1.-xconn)/xconn
+
+      starnue= rbb/(vthe*taueeh*eps**1.5) !only needed for pressau2
+      !where rbb== rgeom*(bmod0/bthr0)
+      
+      !TEST:  From Sauter-1999 paper, under Eq.12:
+      !starnue_s= 0.012*ne20*Zeff*qR/(Tkev^2 * eps^1.5)
+      ! I guess R is in meters.
+!      starnue_s= 
+!     &    0.012*(redene*1.d-14)*zeff*(rbb/100)/(tempe**2 *eps**1.5)
+!      write(*,'(a,1p4e11.3)')'eps, tempe, starnue, starnue_s= ',
+!     & eps, tempe, starnue, starnue_s
+      !From this test: When starnue and starnue_s are small (0.2--10),
+      !they match well. When they are large (starnue~8000 [at low Te]),
+      ! the value of starnue_s is ~2x larger (~17000). 
+      ! Probably because of definition of Coulomb log.
+
+      zfcol= zk033/(1.d0+za33*sqrt(starnue)+zb33*starnue)
+     &            /(1.d0+zc33*starnue*eps**1.5)
+
+      pressau1= (1.d0 + 1.24*zg) !OUTPUT: Collisionless limit
+
+      pressau2= (1.d0 + 1.24*zg*(zfcol/zk033)) !OUTPUT: collisional
+      !Note that pressau2 becomes pressau1 if starnue is set to 0.
+      
+      return
+      end subroutine sptz

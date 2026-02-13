@@ -1,6 +1,6 @@
 c
 c
-      subroutine wptrafx
+      subroutine wptrafx ! for meshy="fixed_y" (constant pitch-mesh)
       implicit integer (i-n), real*8 (a-h,o-z)
 c..............................................................
 c     Time advancement for parallel transport.

@@ -21,9 +21,13 @@ cBH081106:  equilibria.
       if (eqmod.ne.'enabled') then
          if (radcoord.ne.'sqtorflx')
      +      write(*,*)'tdsxray: WARNING, check our radial coord further'
-         call tdsxr0(rrz,tr1(1),icall,iplotsxr)
+         call tdsxr0(rrz(0:lrzmax),tr1(1:lrzmax),icall,iplotsxr)
+         !YuP[2021-11-03] added (0:lrz)
       else
-         call tdsxr0(rpmconz,tr1(1),icall,iplotsxr)
+         !Typically lrza, lrzmax,lrz=  128, 20,20(whatever is set for lrz)
+         call tdsxr0(rpmconz(0:lrzmax),tr1(1:lrzmax),icall,iplotsxr)
+         !YuP[2021-11-03] added (0:lrzmax)
+         !Note: rpmconz(0:lrza),tr1(0:lrza) in comm.h
       endif
       return
       end

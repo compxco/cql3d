@@ -1,7 +1,12 @@
 c
 c
-      subroutine soup0
+      subroutine soup0(l)
       implicit integer (i-n), real*8 (a-h,o-z)
+      integer l !INPUT
+         !soup0(l) defines sovt(j,kk,m,lr_) array,
+         !based on xem1,2(*,lr) input for src localization in energy
+         !Presently xem1, xem2 do not depend on l index along field line,
+         !but maybe in future - they will, so added l index to soup0(l)
       save
       include 'param.h'
       include 'comm.h'

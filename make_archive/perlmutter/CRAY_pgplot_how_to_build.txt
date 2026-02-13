@@ -1,0 +1,53 @@
+
+
+
+========== BUILDING PGPLOT ====================================
+Take source from: 
+  /global/u2/y/ypetrov/pgplot/pgplot.tar.gz
+or
+  /global/project/projectdirs/m77/CompX/pgplot/pgplot.tar.gz
+(Note: The original distribution is from http://www.astro.caltech.edu/~tjp/pgplot/
+ It is configured by NERSC consulters, so that a user can start with "make", 
+ as described below.)
+
+---------------------------------------------------------------
+Go to home directory:
+   cd ~/
+Create a target directory for pgplot-intel build:
+   mkdir pgplot.intel
+  [ For GNU: mkdir pgplot.gnu   ]
+Create a pgplot source directory:
+   mkdir pgplot
+Copy pgplot.tar.gz into ~/pgplot , then go there:
+   cd ~/pgplot
+   tar -xvf pgplot.tar.gz
+   mv pgplot ~/pgplot.intel
+
+  [ For GNU, execute  module swap PrgEnv-intel PrgEnv-gnu   ]
+
+   module load cdt/19.11
+   cd ~/pgplot.intel/pgplot/pgplot
+   make
+
+This should end with 
+...
+*** Finished compilation of PGPLOT ***
+Note that if you plan to install PGPLOT in a different
+directory than the current one, the following files will be
+needed.
+       libpgplot.a
+       libpgplot.so
+       grfont.dat
+       rgb.txt
+       pgxwin_server
+----------------------------------------------------------------
+For personal use, copy all necessary files into ~/pgplot.intel/  directory:
+    cd ~/pgplot.intel/pgplot/pgplot/
+    cp libpgplot.a ~/pgplot.intel
+    cp libpgplot.so ~/pgplot.intel
+    cp grfont.dat ~/pgplot.intel
+    cp rgb.txt ~/pgplot.intel
+    cp pgxwin_server ~/pgplot.intel
+For general [m77] use,  
+copy these files into  /global/cfs/cdirs/m77/pgplot.perl.intel
+====================================================================

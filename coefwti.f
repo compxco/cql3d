@@ -21,8 +21,8 @@ c..................................................................
       include 'advnce.h'
       
 c-YuP      call bcast(di(0,1,k,l_),half,(iy+1)*jx) ! could it be error?
-      call bcast(di(0,0,k,l_),half,(iy+1)*(jx+2))
-      !Note: di(0:iy,0:jx+1,1:ngen,lrors)
+      call bcast(di(0,0,k,l_),half,(iymax+1)*(jx+2)) !YuP[2021-03-11] iy-->iymax
+      !Note: di(0:iymax,0:jx+1,1:ngen,lrors)
 
       if (chang .ne. "disabled") then
       
@@ -30,7 +30,7 @@ c-YuP      call bcast(di(0,1,k,l_),half,(iy+1)*jx) ! could it be error?
           if (n.eq.1) jchang(k,l_)=jx !This is the first call of coefwti;
                  !so that jchang from previous time step are not defined.
           do 100 j=1,jx
-            do 1001 i=1,iy
+            do 1001 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
               if (f(i,j,k,l_).le.0.d0) then
                 !Note: This subr.coefwti is called from impavnc0
                 ! before the solution is obtained. So, the f() values here
@@ -78,7 +78,7 @@ c-YuP      call bcast(di(0,1,k,l_),half,(iy+1)*jx) ! could it be error?
         op=one+em8
         call coefmidt(dff,3)
         do 10 j=1,jchang(k,l_)
-          do 2 i=1,iy
+          do 2 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
             df_dff= op*df(i,j)-dff(i,j) !YuP[2019-07-09] added check of denom=0
             if(df_dff.ne.zero)then
             temc1(i)=dy(i,l_)*dd(i,j)*op*df(i,j)/df_dff**2
@@ -92,7 +92,7 @@ c...............................................................
 c     Keep code from blowing up in the 9 loop below.
 c..............................................................
 
-          do 8 i=1,iy
+          do 8 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
             if(abs(temc1(i)).gt.em6) then
               temc3(i)=temc1(i)
             else
@@ -100,7 +100,7 @@ c..............................................................
             endif
  8        continue
 
-          do 4 i=1,iy
+          do 4 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
             if(temc3(i).lt.sevenhun) then
               temc2(i)=temc3(i)
             else
@@ -108,7 +108,7 @@ c..............................................................
             endif
  4        continue
 
-          do 7 i=1,iy
+          do 7 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
             if(temc2(i).le.-sevenhun) then
               temc2(i)=-sevenhun
             endif
@@ -118,7 +118,7 @@ c..............................................................
 c     Evaluate the ratio (modified)
 c..............................................................
 
-          do 9 i=1,iy
+          do 9 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
             di(i,j,k,l_)=1.d0/temc2(i)-(1.d0/(exp(temc2(i))-1.d0))
  9        continue
 
@@ -126,7 +126,7 @@ c.............................................................
 c     Correct for errors in 9 above
 c.............................................................
 
-          do 21 i=1,iy
+          do 21 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
             wsub=(three+temc1(i))/(two+temc1(i))/three
             if(temc3(i).eq.em6) then
               di(i,j,k,l_)=wsub
@@ -137,7 +137,7 @@ c..............................................................
 c     Limit for large positive or negative temc1 follows
 c..............................................................
 
-          do 22 i=1,iy
+          do 22 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
             if (temc2(i).eq.sevenhun) then
               di(i,j,k,l_)=1.d0/temc1(i)
             elseif (temc2(i).eq.-sevenhun) then
@@ -154,7 +154,7 @@ c...............................................................
 
         if (jchang(k,l_).lt.jx) then
           do 60 j=jchang(k,l_),jx !for all j points above first occurence of f<0 (actually -5 below)
-            do 50 i=1,iy
+            do 50 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
               if(dd(i,j).ge.0.d0) then
                 di(i,j,k,l_)=zero
               else
@@ -172,7 +172,7 @@ c.......................................................................
 
       do 3 j=1,jx
         di(0,j,k,l_)=0.d0  ! i=0 only
-        di(iy,j,k,l_)=1.d0 ! i=iy only
+        di(iy_(l_),j,k,l_)=1.d0 ! i=iy only  !YuP[2021-03-11] iy-->iy_(l_)
  3    continue
  
 

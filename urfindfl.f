@@ -59,9 +59,8 @@ c..................................................................
 c     maximum number of ray elements per ray for first call to R.T code
 c     [Not presently implemented, BH060314]
 c..................................................................
-
       do i=1,nmodsa
-         nrfstep1(i)=100
+         nrfstep1(i)=100 ![nrfstep1 presently is not used]
       enddo
 c..................................................................
 c     scaling of power and nparallel- width in rays

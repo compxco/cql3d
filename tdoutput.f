@@ -131,7 +131,7 @@ c     (assumes lrz=1)
       if (cqlpmod .eq. "enabled") then
         ilr=lrindx(1)
         WRITE(6,9115)
-        do 112 ll=1,lrors
+        do 112 ll=1,lrors ! FPE grid
           zbfiob=fpsi(ilr)/solrs(ll)/psis(ll)/bmidplne(ilr)
           WRITE(6,9116) lsindx(ll),sz(ll),solrs(ll),solzs(ll),
      +      zbfiob,psis(ll),psisp(ll),psipols(ll)
@@ -233,6 +233,7 @@ c.......................................................................
 
 cdir$ nextscalar
       do 123 jk=1,ntotal
+         if (cqlpmod.ne."enabled")then !YuP[2021-02-24]
          do ll=1,lrzmax
            qb_mc=bnumb(jk)*charge*bthr(ll)/(fmass(jk)*clight)
            ! Banana width (for v=vthermal, at t-p bndry):
@@ -248,17 +249,29 @@ cdir$ nextscalar
            llp=min(llp,lrzmax) ! not to exceeed lrzmax
            llm=max(llm,1) 
            ll0=1 ! reference density or temp.: at plasma center.
-           ! Density Gradient scale; defined as n(center)/(dn/dr) :
-           dndr=(reden(jk,llp)-reden(jk,llm))/(rpcon(llp)-rpcon(llm))
-           ! Temperature Gradient scale; defined as T(center)/(dT/dr) :
-           dtdr=(temp(jk,llp)-temp(jk,llm))/(rpcon(llp)-rpcon(llm))
+           temp_llp= temp(jk,llp)
+           den_llp= reden(jk,llp)
+           temp_llm= temp(jk,llm)
+           den_llm= reden(jk,llm)
+           temp_ll0= temp(jk,ll0)
+           den_ll0= reden(jk,ll0)
+           drpp= (rpcon(llp)-rpcon(llm)) !distance across surfaces
+           if(drpp.ne.0.d0)then
+             ! Density Gradient scale; defined as n(center)/(dn/dr) :
+             dndr=(den_llp-den_llm)/drpp
+             ! Temperature Gradient scale; defined as T(center)/(dT/dr) :
+             dtdr=(temp_llp-temp_llm)/drpp
+           else
+             dndr=0.d0
+             dtdr=0.d0
+           endif
            if(dndr.ne.0.d0)then
-              dn_scale(ll)= abs(reden(jk,ll0)/dndr)  ! cm
+              dn_scale(ll)= abs(den_ll0/dndr)  ! cm
            else ! dn/dr=0
               dn_scale(ll)= 1000*rmag ! just any large number [~Inf]
            endif
            if(dtdr.ne.0.d0)then
-              dt_scale(ll)= abs(temp(jk,ll0)/dtdr)  ! cm
+              dt_scale(ll)= abs(temp_ll0/dtdr)  ! cm
            else ! dT/dr=0
               dt_scale(ll)= 1000*rmag ! just any large number [~Inf]
            endif
@@ -290,10 +303,12 @@ c        species nnspec.
      +           vth(jk,il),energy(jk,il),enn(il,1),il=1,lrzmax)
             endif
          endif
-        if (cqlpmod .eq. "enabled")
-     +    WRITE(6,9125) lrindx(1),(il,z(il,lrindx(1)),denpar(jk,il)
+         endif !(cqlpmod.ne."enabled")
+         if (cqlpmod.eq."enabled")then
+           WRITE(6,9125) lrindx(1),(il,z(il,lrindx(1)),denpar(jk,il)
      +    ,temppar(jk,il),vthpar(jk,il),enrgypa(jk,il),il=1,lsmax)
- 123  continue
+         endif
+ 123  continue ! k
       !pause
 c
  9120 format(/" species no. ",i3,2x,a,a8,"    charge number: ",f6.2
@@ -326,18 +341,21 @@ c.......................................................................
          WRITE(6,9130) (il,tauee(il),zmax(il),zmax(il)/vth(1,il),
      +        zmax(il)/vth(2,il),taueeh(il),starnue(il),
      +    starnue(il)*eps(il)**1.5,zeff(il),il=1,lrzmax)
-      else
-        WRITE(6,9131) (il,tauee(il),zmax(il),zmax(il)/vth(1,il),
-     +        zmax(il)/vth(2,il),taueeh(il),starnue(il),
+      else ! (cqlpmod.eq."enabled")
+        write(*,*)' eps=', eps(lrindx(1))
+        WRITE(6,9131) (il,tauee(il),z(il,lrindx(1)),
+     &   z(il,lrindx(1))/vthpar(1,il),
+     +   z(il,lrindx(1))/vthpar(2,il),taueeh(il),starnue(il),
      +    starnue(il)*eps(lrindx(1))**1.5,zeff(il),il=1,lsmax)
       endif
 
-c
- 9130 format(//,"  lr","   tauee(l)  ","   zmax(l)   "," zmax/vth(1) "
-     +  ," zmax/vth(2) ",4x,"taueeh",7x,"nuestar",2x,"nuest*eps**3/2",
+      !For (cqlpmod .ne. "enabled") :
+ 9130 format(//,"  lr","   tauee(l)  ","   zmax(l)   ","  zmax/vth(1) "
+     +  ,"  zmax/vth(2) ",4x,"taueeh",7x,"nuestar",2x,"nuest*eps**3/2",
      +  4x,"zeff"/,(i3,1p8e13.4))
- 9131 format(//," ls","   tauee(l)  ","   zmax(l)   "," zmax/vth(1) "
-     +  ," zmax/vth(2) ",4x,"taueeh",7x,"nuestar",2x,"nuest*eps**3/2",
+      !For CQLP,  Adjusted by YuP[2021-02-24]:
+ 9131 format(//," ls","   tauee(l)  ","      z(l)   "," z/vthpar(1) "
+     +  ," z/vthpar(2) ",4x,"taueeh",7x,"nuestar",2x,"nuest*eps**3/2",
      +  4x,"zeff",/,(i3,1p8e13.4))
 
 c.......................................................................
@@ -369,10 +387,11 @@ c.......................................................................
 
 
 c     y mesh for l_=1 and l_=lrors
-      WRITE(6,9140) (l,iy_(l),iyh_(l),itl_(l),itu_(l),l=1,lrors)
+      WRITE(6,9140) (l,iy_(l),iyh_(l),itl_(l),itu_(l),
+     &           y(itl_(l),l),y(itu_(l),l), l=1,lrors)
 
       if (ioutput(1).ge.1) then !-----YuP[2020] Useful diagnostic printout
-      WRITE(6,9141)
+      WRITE(6,9141) ! y(i,1):
       do 140 i=1,iy_(1),10
         WRITE(6,9142) (y(ii,1),ii=i,min(i+9,iy_(1)))
         WRITE(6,9143) (dyp5(ii,1),ii=i,min(i+8,iy_(1)-1))
@@ -400,8 +419,8 @@ c     x mesh
       endif !---------- ioutput(1).ge.1
 
  149  continue
- 9140 format(/," y mesh:",/,1x,7("="),//,"  l","  iy"," iyh"," itl",
-     +  " itu",/,(i5,4i4))
+ 9140 format(/," y mesh:",/,1x,7("="),//,"    l","  iy"," iyh"," itl",
+     +  " itu"," y(itl)","y(itu)",/,(i5,4i4,2f6.3))
  9141 format(/," y(i,1):",/)
  9142 format(1p10e12.3)
  9143 format(6x,1p9e12.3)
@@ -442,6 +461,7 @@ c.......................................................................
 cl    2.1  density and energy at each time-step
 c     Same structure as in tdpltmne.f
 c.......................................................................
+      if (cqlpmod.ne."enabled")then !YuP[2021-02-24]
       if (kelecg.ne.0) then
         WRITE (6,9210) kelecg,pltvs
         WRITE(6,9211) (ztr(lrindx(l)),reden(kelecg,lrindx(l)),
@@ -461,6 +481,7 @@ c.......................................................................
         WRITE(6,9212) sorpwtza,(powurf(kk),kk=0,3),
      +    powurfc(0),powurfl(0)
       endif
+      endif !(cqlpmod.ne."enabled")then !YuP[2021-02-24]
 
       if (niong.ne.0) then
          do kkk=1,mrfn
@@ -477,17 +498,17 @@ cBH120221:  Added following call.  Req'd at each flux surface.
             call tdnflxs(l)
             call cfpgamma
             if (entr(k,3,l).ge. 1.e-20 .and. kelecg.ne.0) then
-              fnu0=2.0/tauee(lrindx(l))
+              fnu0=2.0/tauee(lrindx(l)) ! CQL3D
               xj(lrindx(l))=curr(k,lrindx(l))/reden(k,lrindx(l))
-     +          /charge/vth(kelec,lrindx(l))
+     +          /charge/vth(kelec,lrindx(l)) !CQL3D
               xp(lrindx(l))=entr(k,3,l)/reden(k,lrindx(l))
-     +          /vth(kelec,lrindx(l))**2/fmass(k)/fnu0*1.e7
+     +          /vth(kelec,lrindx(l))**2/fmass(k)/fnu0*1.e7  !CQL3D
 
               xe(lrindx(l))=xj(lrindx(l))/xp(lrindx(l))
 
               fnuc=8.*pi*reden(k,lrindx(l))*charge**4
      +          *gama(kelec,kelec)/(fmass(kelec)**2*clight**3)
-              xc(lrindx(l))=curr(k,lrindx(l))/(entr(k,3,l)*1.e7)
+              xc(lrindx(l))=curr(k,lrindx(l))/(entr(k,3,l)*1.e7) !CQL3D
      +          /(charge/(fnuc*fmass(kelec)*clight))
             endif
  220      continue
@@ -497,31 +518,34 @@ cBH120221:  Added following call.  Req'd at each flux surface.
      +    xp(lrindx(l)),xe(lrindx(l)),xc(lrindx(l)),
      +    l=1,lrz)
  221    continue
-      endif
+      endif !(cqlpmod.ne."enabled")
+
+      
  9270 format(/" Normalized RF Power and Current drive",/,
      + "   In order: rho,  current (units: charge*ne*vth(kelec,lr_),",/,
-     + "     power (units: ne*vth(kelec,lr_)**2*me*nu0), ",/,
+     + "     power (units: ne*vth(kelec,lr_)**2*me*nu0), ",/,     !CQL3D
      + "     efficiency (j/p) (Fisch 1978 units),  ",/,
      + "     efficiency (j/p) (e/(m*c*nuc units)),  ")
  9271 format(1p5e14.4)
 
 c     parallel profile
-      if (cqlpmod .eq. "enabled") then
-        WRITE(6,9213) kelecg,lrindx(1)
-        WRITE(6,9214) (sz(l),denpar(kelecg,lsindx(l)),
-     +    enrgypa(kelecg,lsindx(l)),l=1,lrors)
+      if (cqlpmod.eq."enabled") then
+        ksp=1 !for 1st general species 
+        WRITE(6,9213) ksp,lrindx(1)
+        WRITE(6,9214) (sz(l),denpar(ksp,lsindx(l)),
+     +    enrgypa(ksp,lsindx(l)),l=1,lrors)
         if (ls .ge. 3) then
           zdensto=0.0
           zenrgto=0.0
           zlsto=0.0
           do 210 l=1,ls
-            zdensto=zdensto+denpar(kelecg,lsindx(l))*dsz(l)
-            zenrgto=zenrgto+enrgypa(kelecg,lsindx(l))*dsz(l)
+            zdensto=zdensto+denpar(ksp,lsindx(l))*dsz(l)
+            zenrgto=zenrgto+enrgypa(ksp,lsindx(l))*dsz(l)
             zlsto=zlsto+dsz(l)
  210      continue
           WRITE(6,9215) zdensto/zlsto,zenrgto/zlsto
         endif
-      endif
+      endif !(cqlpmod.eq."enabled")
 
  9210 format(/" Misc.:  (density, energy, power density(W/cm**3),"
      +  " power(W), j/p for  ",
@@ -587,7 +611,7 @@ c.......................................................................
 
       WRITE(6,9223)
       WRITE(6,9224) (sz(l),currmtz(l),currmtpz(l),currmtpz(l)/psis(l),
-     !  l=1,lrors)
+     !  l=1,lrors) ! FPE grid
  9223 format(//" Flux surf. avg. current density [Amps/cm**2] ",
      +  "(along magnetic field):"/,1x,
      +  67("="),/,29x,"s",9x,"fi",9x,"fi+e",6x,"fi+e/psis")
@@ -699,15 +723,20 @@ c     rovsc*0.706/0.93=Connor asymptotic, as eps==>1.
 
       ! Braams-Karney normalization resistivity [cgs]:
       if(kelec.ne.0)then
+       if(cqlpmod.ne."enabled")then
+         temp_kelec= temp(kelec,0)    !CQL3D
+       else ! (cqlpmod.eq."enabled")
+         temp_kelec= temppar(kelec,0) !CQLP
+       endif
        res_BK = sqrt(fmass(kelec))*4.*pi*charge**2
-     +   *gama(kelec,kelec)*zeff(1)/(temp(kelec,0)*ergtkev)**1.5
+     +   *gama(kelec,kelec)*zeff(1)/(temp_kelec*ergtkev)**1.5
       else
        res_BK=0.d0 ! not defined
       endif
 
-      il_old=l_
+      il_old=l_  ! Save l_ value, to be restored after "2301 continue"
       do 230 il=1,lrz
-        call tdnflxs(lmdpln(il))
+        call tdnflxs(lmdpln(il)) ! it gets l_ for each il
         zeps=eps(lr_)
         rovsf=1. / (1.-1.95*zeps**.5+.95*zeps)
         call restcon
@@ -764,17 +793,26 @@ c%OS
       WRITE(*,*)'For explanation of following table, see tdoutput.f'
       WRITE(*,*)
       WRITE(6,9238)
+      
+! 9238 format(/,"epsilon",2x,"res_neo/sp",4x,"Connor",3x
+!     +  ,"Con.largep",2x,"Zeff",2x,"One2/spt(Z)",3x,"Iconnor",2x,
+!     +  "I33/1.95/rep",3x,"Hinton",6x,"Kim",8x,"g",5x,"(eta-1)/g")
+
+      !YuP[2021-03-25] Replaced "g","(eta-1)/g" with
+      ! "res/sp_neo1","res/sp_neo2"
  9238 format(/,"epsilon",2x,"res_neo/sp",4x,"Connor",3x
-     +  ,"Con.largep",2x,"Zeff",2x,"One2/spt(Z)",3x,"Iconnor",2x,
-     !  "I33/1.95/rep",3x,"Hinton",6x,"Kim",8x,"g",5x,"(eta-1)/g")
+     &  ,"Con.largep",2x,"Zeff",2x,"One2/spt(Z)",3x,"Iconnor",2x,
+     &  "I33/1.95/rep",3x,"Hinton",6x,"Kim",8x,
+     &  "res/sp_neo1",1x,"res/sp_neo2")
+     
       if(machine.eq."toroidal")then
       do 2301 il=1,lrz
-        call tdnflxs(lmdpln(il))
+        call tdnflxs(lmdpln(il)) ! get l_, lr_
         zeps=eps(lr_)
 c     R.D. Hazeltine, F.L. Hinton, and M.N. Rosenbluth (1973).
-        rovsf=1. / (1.-1.95*zeps**.5+.95*zeps)
+        rovsf=1. / (1.-1.95*zeps**.5+.95*zeps) ! printed in pltrstv
 c     connor formula
-        call restcon
+        call restcon ! get xconn (trapped fraction)
 c     Hinton, Kim and Sauter formulae for resistivity
         call resthks(l_,lr_,lmdpln_,zreshin(lr_),
      +       zreskim(lr_),zressau1,zressau2)
@@ -783,35 +821,57 @@ c     onetwo formula for resistivity
         zokap11=(0.29+0.46/(1.08+zeff(lr_)))/0.51
         zk033=1.46 + 0.37 / zeff(lr_)
         zft=(zk033*sqrt(zeps)-(zk033-1.)*zeps)*zi33o95
-        zre12=zokap11 / (1. - zft)
+        zre12=zokap11 / (1. - zft) ! printed as "One2/spt(Z)"
         zelecr=300.*fmass(kelec)*vth(kelec,lr_)/(2.*charge*tauee(lr_))
-        zg=(1.-xconn)/xconn
-        rovsc_hi(lr_)=rovsc(lr_)*0.706/0.93
+        zg=(1.-xconn)/xconn        ! printed as "g"
+        rovsc_hi(lr_)=rovsc(lr_)*0.706/0.93 !Connor resistivity over Spitzer, hi eps
+!        WRITE(6,9239) zeps,rovsn(lr_),rovsc(lr_)
+!     +    ,rovsc_hi(lr_),zeff(lr_),zre12,
+!     +    xconn,zi33o95,zreshin(lr_),zreskim(lr_),zg,(rovsn(lr_)-1.)/zg
+        !YuP[2021-03-25] Replaced "g","(eta-1)/g" with
+        ! "res/sp_neo1","res/sp_neo2"
         WRITE(6,9239) zeps,rovsn(lr_),rovsc(lr_)
      +    ,rovsc_hi(lr_),zeff(lr_),zre12,
-     +    xconn,zi33o95,zreshin(lr_),zreskim(lr_),zg,(rovsn(lr_)-1.)/zg
- 2301 continue
+     +    xconn,zi33o95,zreshin(lr_),zreskim(lr_),
+     +    rovsn(lr_)/zressau1, rovsn(lr_)/zressau2
+ 2301 continue !  il=1,lrz
+      WRITE(*,*)"Note: res_neo/sp == rovsn(lr_)= resistn/sptzr "
+      WRITE(*,*)"where resistn= <E_parall*B>/<j_parall*B> [FSA] "
+      WRITE(*,*)"res/sp_neo1== rovsn/zressau1= resistn/(sptzr*zressau1)"
+      WRITE(*,*)"res/sp_neo2== rovsn/zressau2= resistn/(sptzr*zressau2)"
+      WRITE(*,*)"zressau1=corr.factor(starnue=0) low-coll. neoclassical"
+      WRITE(*,*)"zressau2=corr.factor(starnue>0) with collisionality"
       endif
  9239 format(0pf7.5,1p3e12.4,0pf6.2,1p7e12.4)
 c%OS  
 
-      call tdnflxs(il_old)
-      if (cqlpmod .eq. "enabled") 
-     +  WRITE(6,9232) (l,sz(l),rovsloc(l),sptzr(l),l=1,lrors)
- 9232 format(/," Local in s resistivity divided by spitzer:",//,
-     +  "  l",5x,"s",6x,"res/spitz",3x,"spitzer",/,(i3,1p3e11.3))
+      call tdnflxs(il_old) ! restores l_
+      
+      if (cqlpmod.eq."enabled") then
+        WRITE(6,9232) (l,sz(l),rovsloc(l),sptzr(l),
+     &   tauee(lsindx(l)), starnue(lsindx(l)),  l=1,lrors)
+        !Note: sz,rovsloc,sptzr are over FPE grid,
+        !while tauee,starnue are over full grid.
+ 9232   format(/,"CQLP: Local in s resistivity divided by spitzer:",//,
+     &  "  l",5x,"s",6x,"res/spitz",3x,"spitzer",
+     &    5x,"tauee  ",3x,"starnue",
+     &    /,(i3,1p5e11.3))   !YuP[2021-03-25] added tauee and starnue
+        WRITE(*,'(a,2f12.4)')
+     &    'min/max of res/spitz (rovsloc) along fld line:',
+     &     minval(rovsloc),maxval(rovsloc)
+      endif
 
       if (n .lt. nstop) go to 233
 
       if (cqlpmod .ne. "enabled") WRITE(6,9233) lrindx(1)
  9233 format(/" res/spitz. per time step: for first flux surface:"
      +  ," lr_= ",i3,":",/" ========================")
-      if (cqlpmod .eq. "enabled") WRITE(6,9234)lrindx(1),lsindx(1)
+      if (cqlpmod.eq."enabled") WRITE(6,9234)lrindx(1),lsindx(1)
  9234 format(/" res/spitz. per time step: at flux surface:"
      +  ," lr_= ",i3," for first orbit position ls_=",i3,":",
      +  /" ========================")
       illeff=lrindx(1)
-      if (cqlpmod .eq. "enabled") illeff=lsindx(1)
+      if (cqlpmod.eq."enabled") illeff=lsindx(1)
       do 231 l=1,nch(1),8
         WRITE(6,9235) (il,rovsp(il,illeff),il=l,min(l+7,nch(1)))
         !-YuP: added: evolution of resistivity for first flux surface [cgs]
@@ -853,11 +913,11 @@ c     But don't if beyond range of iteration:
       if (cqlpmod .ne. "enabled") WRITE(6,9236) ilprin,lrindx(ilprin)
  9236 format(/" res/spitz. per time step: for surface: ",
      +  "lrindx(",i3,")=",i3," :",/" ========================")
-      if (cqlpmod .eq. "enabled") WRITE(6,9237) ilprin,lsindx(ilprin)
+      if (cqlpmod.eq."enabled") WRITE(6,9237) ilprin,lsindx(ilprin)
  9237 format(/" res/spitz. per time step: for orbit pos.: ",
      +  "lsindx(",i3,")=",i3," :",/" ========================")
       illeff=lrindx(ilprin)
-      if (cqlpmod .eq. "enabled") illeff=lsindx(ilprin)
+      if (cqlpmod.eq."enabled") illeff=lsindx(ilprin)
       do 232 l=1,nch(ilprin),8
         WRITE(6,9235) (il,rovsp(il,illeff),il=l,min(l+7,nch(ilprin)))
  232  continue

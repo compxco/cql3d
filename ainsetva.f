@@ -18,8 +18,10 @@ c.......................................................................
       include 'comm.h'
 CMPIINSERT_INCLUDE
 c
-      real*8:: tmpt(njene)  !Temporary array, local. YuP[2019-10-29]
-
+      !real*8:: tmpt(njene)  !Temporary array, local. YuP[2019-10-29]
+      character*6 cdum !local
+      real*8:: nbeams1p(kb),kblspecp(kb)
+      
 CMPIINSERT_IF_RANK_EQ_0
       WRITE(*,*)''
       WRITE(*,*)'In ainsetva'
@@ -37,10 +39,10 @@ cBH081106:Found following condition leads to overwrite.
 cBH081106:For cqlpmod.ne.enabled, could check code to see how
 cBH081106:essential the condition is.
 
-      if (lsa.lt.lrza) stop 'check that lsa.ge.lrza?'
+!YuP[2021-03-30] No longer needed:  if (lsa.lt.lrza) stop 'check that lsa.ge.lrza?'
 
-      if (cqlpmod.eq."enabled" .and. lza.lt.lsa) 
-     +     stop 'check consistency of lza,lsa for cqlpmod=enabled'
+!      if (cqlpmod.eq."enabled" .and. lza.lt.lsa) !YuP[2021-04-14] lza no longer used
+!     +     stop 'check consistency of lza,lsa for cqlpmod=enabled'
 
 cBH060314      if (nmodsa.ne.3)
 cBH060314     +     stop 'Better check out code for nmodsa.ne.3'
@@ -61,8 +63,14 @@ c     cannot run CQL3D with lrzmax>lrz (only CQL or CQLP)
 
       if (urfmod.ne."disabled" .and. meshy.eq."fixed_mu")
      +  call diagwrng(19)
-      if (urfmod.ne."disabled" .and. iy.gt.255)
-     +  call diagwrng(22)
+     
+      !if (urfmod.eq."enabled" .and. iy.gt.255) call diagwrng(22)
+        !The above limitation - is it because of call pack() limitation?
+        !subr. pack() is not used anymore.
+        !YuP[2024-04-24] Removing this limitation - 
+        !now CQL3D is using pack16() only,
+        !which has a much higher limit (32768). 
+	
 
 c     storage problem for calc of parallel distn function, if
 c     lrz.gt.lz
@@ -162,12 +170,12 @@ CMPIINSERT_ENDIF_RANK
 
 
       if (ngen.gt.ngena .or. nmax.gt.nmaxa) call diagwrng(12)
-      if (lz.gt.lza) then
-         lz=lza
-CMPIINSERT_IF_RANK_EQ_0
-         WRITE(*,*)'WARNING: lz reset to lza =', lza
-CMPIINSERT_ENDIF_RANK
-      endif
+      
+!      if (lz.gt.lza) then !YuP[2021-04-14] lza is not used anymore
+!         lz=lza
+!         WRITE(*,*)'WARNING: lz reset to lza =', lza
+!      endif
+      
 cBH110330      if (msxr.gt.mx) then
 cBH110330        msxr=mx
 cBH110330CMPIINSERT_IF_RANK_EQ_0
@@ -259,7 +267,7 @@ c     Time-dep radial transport multipliers
          drt(k)=one
       enddo
 
-      if (transp .ne. "enabled") nontran=0
+      if (transp.ne."enabled") nontran=0
       if (transp.eq."enabled" .and. adimeth.eq."enabled") then
         if (nonadi .lt. nontran) nonadi=nontran
       endif
@@ -335,7 +343,7 @@ c     Check number of ion Maxwl species with different bnumb.
            if (abs(bnumb(kionm(k))/bnumb(kionm(1))-1.).gt.0.01) 
      +          ndif_bnumb=ndif_bnumb+1
         enddo
-           
+          
 
 
         if (ndif_bnumb.eq.1) then
@@ -358,6 +366,9 @@ c         add a species
  60         continue
             temp(kelecm,0)=temp(kelecm-1,0)
             temp(kelecm,1)=temp(kelecm-1,1)
+            !YuP[2025-12-12] Also need to move up powers npwr and mpwr:
+            mpwr(kelecm)=mpwr(kelecm-1) !For T_e_maxw
+            npwr(kelecm)=npwr(kelecm-1) !For T_e_maxw
             if (nbctime.ne.0) then
                do jtm=1,nbctime
                   redenc(jtm,kelecm)=redenc(jtm,kelecm-1)
@@ -554,8 +565,8 @@ CMPIINSERT_ENDIF_RANK
          continue ! Nothing to check here.
       elseif(read_data.eq.'nimrod')then !check that files are present
         ! Note: data files are declared as
-        !character*128, dimension(101) :: read_data_filenames
-        ! Max number of files is 101, for now. 
+        !character*128, dimension(1000) :: read_data_filenames
+        ! Max number of files is 1000, for now. 
         ! For coupling with NIMROD, each file contains data at one time slice.
         ! Therefore, it is recommended to match the max number of files
         ! with value of nbctimea [set in param.h]
@@ -564,18 +575,42 @@ CMPIINSERT_ENDIF_RANK
         n_files=0 ! Counter of files that are found, see below.
         njene=0 ! To be changed if at least one data file is found.
         do i=1,size(read_data_filenames)
+          !Form a template for file name. !YuP[2021-04-06]
+          ! Example: 'rycq019800.dat', so it is made of prefix 'rycq0',
+          ! followed by 3-digit number and suffix '00.dat'
+          ! Example: Use these variables in namelist:
+          ! read_data_filenames_prefix='rycq0'
+          ! read_data_filenames_suffix='00.dat' 
+          ! Max number of files is set by this range: 000:999,
+          ! i.e. max 1000 files
+          write(cdum,'(i0.3)') i-1 !Write the sequential number into a string
+          !Note that we start with i-1=0, 
+          !because normally there is a file like rycq000000.dat
+          read_data_filenames(i)=
+     &      TRIM(read_data_filenames_prefix) //TRIM(cdum)//
+     &      TRIM(read_data_filenames_suffix)  ! Filename is formed
+          !write(*,*) read_data_filenames(i)
+          !Now try to read it:
           if(read_data_filenames(i).ne."notset")then
             !Try to read this file:
             call read_data_files(read_data_filenames(i),i,
      &                              ipresent,t_data,kopt)
+            !Note that the numbers in sequence of data files 
+            !may have gaps, like
+            !  rycq020000.dat, rycq020500.dat, rycq021500.dat, ...
+            !so that not all rycq0***00.dat will be present.
             if(ipresent.eq.0)then !could not find the file
-CMPIINSERT_IF_RANK_EQ_0
-              WRITE(*,*)
-     &        'read_data_filenames(i)=',TRIM(read_data_filenames(i))
-CMPIINSERT_ENDIF_RANK         
-              STOP 'FILE NOT FOUND'
+!CMPIINSERT_IF_RANK_EQ_0
+!              WRITE(*,*)
+!     &        'read_data_filenames(i)=',TRIM(read_data_filenames(i))
+!              WRITE(*,*) 'FILE NOT FOUND'
+!CMPIINSERT_ENDIF_RANK        
+              continue 
             else ! ipresent=1, which means: file is found
-              n_files= n_files+1 ! Counter of data files
+              n_files= n_files+1 ! Counter of data files.
+              !Re-numerate this file, to have the list of only those 
+              !files that are present on disk :
+              read_data_filenames(n_files)=read_data_filenames(i)
             endif
           endif
         enddo ! i
@@ -584,6 +619,14 @@ CMPIINSERT_IF_RANK_EQ_0
           WRITE(*,*)'read_data=',read_data,'  N. of data files=0'
 CMPIINSERT_ENDIF_RANK         
           STOP 'Set read_data_filenames(i) in cqlinput'
+        else ! at least one file is found; Print the list:
+CMPIINSERT_IF_RANK_EQ_0
+          WRITE(*,*)' --- For read_data= ', TRIM(read_data) 
+          do i=1,n_files
+            WRITE(*,*)
+     &      'i, read_data_filenames(i)=',i,TRIM(read_data_filenames(i))
+          enddo
+CMPIINSERT_ENDIF_RANK         
         endif
         if(n_files.gt.nbctimea)then
 CMPIINSERT_IF_RANK_EQ_0
@@ -652,9 +695,37 @@ CMPIINSERT_ENDIF_RANK
         !iprocur="spline-t"  !xjin_t() is Not provided by NIMROD
         !iprovphi="spline-t" !vphiplin_t() is Not provided by NIMROD
         ! Also reset radcoord:
-        radcoord='rminmax' !In NIMROD data files, the major R grid is given
-        ! [maybe radcoord="polflx" or "sqpolflx" are also ok]
+        !YuP[2024-07-25] Added radcoord="polflx" 
+        !and "sqpolflx" (through psi_data)
+        if((radcoord.eq.'rminmax').or.
+     &     (radcoord.eq.'polflx').or.
+     &     (radcoord.eq.'sqpolflx')    )then
+CMPIINSERT_IF_RANK_EQ_0
+           WRITE(*,*)'For read_data: radcoord=',radcoord
+CMPIINSERT_ENDIF_RANK         
+        else      
+          stop 'read_data: use radcoord=rminmax or polflx or sqpolflx'
+          !Before [2024-07-25] The only option: radcoord='rminmax'
+          !In NIMROD data files, the major R grid is given, see r_data
+        endif !radcoord
         imp_depos_method='disabled' !Just in case. Should not be used.
+        if(transp.eq.'enabled')then
+          !The values of Drr==d_rr() are set in
+          !subr.profiles, at every time step, 
+          !using time-dependent data on dB/B
+          !from NIMROD (other codes for coupling could be added).
+          !Settings for namelist variable difusr,difus_rshape,difus_vshape,
+          !difus_type are not relevant (not used).
+          !For setting of pinch, we should avoid "simple" and "case1","case1n"
+          if(pinch.eq."simple" .or. pinch.eq."case1" 
+     &                         .or. pinch.eq."case1n" )then
+            WRITE(*,*)'WARNING: For read_data=',read_data
+            WRITE(*,*)
+     &        '  pinch can only be disabled,case2,case2n,case3,case3n'
+            !YuP[2021-08] Still needs testing
+            STOP 'ainsetva/wrong pinch setting'
+          endif
+        endif !transp
 CMPIINSERT_IF_RANK_EQ_0
         WRITE(*,*)' ----------------------------------------- '
         WRITE(*,*)'WARNING: For read_data=',read_data
@@ -673,7 +744,7 @@ CMPIINSERT_IF_RANK_EQ_0
         WRITE(*,*)' '
 CMPIINSERT_ENDIF_RANK         
         !Value of imp_type should match NIMROD data files. Select from:
-        !imp_type: 1->He,2->Be,3->C,4->N,5->Ne,6->Ar,7->Xe,8->W
+        !imp_type: 1->He,2->Be,3->C,4->N,5->Ne,6->Ar,7->Xe,8->W,9->B
       else !No other options, for now, but can be added later.
 CMPIINSERT_IF_RANK_EQ_0
         WRITE(*,*)'WARNING:  read_data=',read_data
@@ -729,48 +800,86 @@ cl    4.1 Set non-valid flags and parameters related to CQLP
 c.......................................................................
 
       if (cqlpmod.ne."enabled" .or. transp.ne."enabled") then
-        sbdry = "disabled"
+        !YuP commented:  sbdry="disabled" !YuP[2021-03-03] Why reset?
+        !It is getting reset for CQLP, when transp="disabled".
+        !WRITE(*,*)'ainsetva/WARNING: sbdry is reset to ',sbdry
+        !YuP: Because of this reset, the problems happen in 
+        !subroutine wptrmuy (which is called for meshy="fixed_mu").
+        !Example: iy=80, ls=80, then in wptrmuy we get
+        ! iyhtr=iymax/2 = 40, 
+        ! ilshalf=ls = 80,   and then (line 67)
+        ! iypass=iyhtr-ilshalf+1 = 40-80+1 = -39 ,
+        ! a negative index going into mun(i).
+        ! For (sbdry.eq."periodic") we have 
+        ! ilshalf=ls/2+1 = 41, then iypass=0
+        !Probably CQLP settings should be adjusted,
+        !to have iy/2 > ls-1 ?  Not sure...
       endif
-      if (cqlpmod .eq. "enabled") then
-        if (lsmax .ge. 5) lz=lsmax
-        numclas=nummods/10
+
+      numclas=0 !For CQL3D, just in case (numclas should not be used)
+      if (cqlpmod.eq."enabled") then
+        if (lsmax .ge. 5) lz=lsmax ! Here: CQLP
+        numclas=nummods/10 ! Here: CQLP
         numindx=mod(mod(nummods,10),5)
-        if (numclas.eq.1 .and. transp.eq."enabled") then
+        if (numclas.eq.1 .and. transp.eq."enabled") then ! Here: CQLP
           if (updown .ne. "symmetry") call wpwrng(7)
           if (sbdry .ne. "periodic") call wpwrng(8)
-          if ((ls/2)*2 .ne. ls) call wpwrng(9)
+          !For numclas.eq.1  ==> Be sure that ls is even:
+          if ((ls/2)*2 .ne. ls) call wpwrng(9) ! "ls odd with 9<nummods<20"
           if ((lz/2)*2 .ne. lz) call wpwrng(10)
-          if (jx.lt.iy) stop 'check rhspar/bndmats storage in comm.h'
+          !YuP: it seems that when numclas.eq.0, we still need ls to be even;
+          !     the code crashes otherwise.
+          !YuP[2021-03-12] commented if (jx.lt.iy) stop 'check rhspar/bndmats storage in comm.h'
+          ! See wpalloc:
+          !rhspar(0:2*ls+nbanda+1,jx,2)
+          !bndmats(jx,0:ls+1,nbanda,2)
+          !YuP[2021-03-12] Changed jx--> max(jx,iymax)
         endif
 c     So far assumes lmidpln=1, otherwise, z, sz,psi, bmidpln, etc 
 c     should be redefined
 c     
         if (lmidpln .ne. 1) call wpwrng(3)
-        do 310 ll=1,lrz
-          lmdpln(ll)=lmidpln
- 310    continue
+        lmdpln(:)=lmidpln !Here: CQLP case,  lmidpln=1
 c     parallel transport related flags
-        if (transp .eq. "enabled") then
+        if (transp.eq."enabled") then
           if (nonelpr .lt. nontran) nonelpr=nontran
           if (noffelpr .gt. nofftran) noffelpr=nofftran
           if (numindx.eq.2 .and. numixts.ne.-1 .and. numixts.ne.1) 
      1      call wpwrng(16)
           if (numindx.eq.4 .and. lmidvel.ne.0) call wpwrng(17)
-        endif
+          if (meshy.eq."fixed_mu" .and. tfac.lt.0.0) then
+            !YuP added warning message.
+            !Problem noticed in subr. wptrmuy 
+            !(which is called for meshy="fixed_mu").
+            !Example: iy=80, ls=80, then in wptrmuy we get
+            ! iyhtr=iymax/2 = 40, 
+            ! ilshalf=ls = 80,   and then (line 67)
+            ! iypass=iyhtr-ilshalf+1 = 40-80+1 = -39 ,
+            ! a negative index going into mun(i).
+            ! For (sbdry.eq."periodic") we have 
+            ! ilshalf=ls/2+1 = 41, then iypass=0
+            !Probably CQLP settings should be adjusted,
+            !to have iy/2 > ls-1 ?  
+            !For now, just print a warning
+CMPIINSERT_IF_RANK_EQ_0
+            WRITE(*,*)'WARNING: For CQLP, advised to have iy/2 > ls-1'
+CMPIINSERT_ENDIF_RANK
+          endif
+        endif ! transp in CQLP
 
 c     flags for options not yet valid with CQLP
         if (colmodl .eq. 4) call wpwrng(1)
-        if (eoved .ne. 0.0) then
+        if (eoved .ne. 0.0) then !(default is -0.01)
 CMPIINSERT_IF_RANK_EQ_0
-          PRINT *,' eoved changed to disabled'
+          PRINT *,'CQLP: eoved changed to 0.0 (disabled)'
 CMPIINSERT_ENDIF_RANK
-          eoved=0.0
+          eoved=0.d0 !CQLP case
         endif
         implct="enabled"
         machine="toroidal"
         npa_diag="disabled"
         softxry="disabled"
-        symtrap="disabled"
+        symtrap="disabled" !Here: CQLP
         urfmod="disabled"
 c$$$        vlfmod="disabled"
         vlhmod="disabled"
@@ -781,8 +890,8 @@ c$$$        vlfmod="disabled"
         bremsrad="disabled"
         qsineut="disabled"
         pltlos="disabled"
-        nso=0
-        pltso="disabled"
+        !nso=0 ! Why was it set to 0 ?
+        !pltso="disabled" !Why?
         do 315 k=1,ngen
           lossmode(k)="disabled"
           torloss(k)="disabled"
@@ -791,7 +900,18 @@ c$$$        vlfmod="disabled"
  316      continue
  315    continue
 
-      endif
+        if(taunew.eq.'enabled')then !YuP[2021-03-10] added
+CMPIINSERT_IF_RANK_EQ_0
+         WRITE(*,*)'WARNING: For CQLP, only taunew="disabled" is ready'
+CMPIINSERT_ENDIF_RANK
+         STOP 'CQLP: Use taunew="disabled" '
+         !It will use subr.baviorbto 
+         ![to compute tau(i,lr_) and dtau(i,l,lr_) ]
+         !YuP: Not sure it is really needed for CQLP; 
+         !It is used for plots of parallel distr.func.
+        endif
+        
+      endif ! cqlpmod (CQLP part)
 
 c.......................................................................
 cl    4.2 Miscellaneous, Checks for Consistency...
@@ -911,13 +1031,20 @@ CMPIINSERT_ENDIF_RANK
       endif
       if (qsineut .eq. "enabled") locquas="disabled"
 cBH100517:  Not needed.      if (lrzmax.eq.1) nrstrt=0
-      if (lrzmax.eq.1 .and. meshy.ne."free") then
+
+      !YuP[2021-02-26] was:  if (lrzmax.eq.1 .and. meshy.ne."free") then
+      if (lrzmax.eq.1 .and. (meshy.ne."free") 
+     &     .and.(cqlpmod.ne."enabled") ) then
+         !YuP[2021-02-26] added (cqlpmod.ne."enabled"): 
+         ! We need meshy=fixed_mu in case of CQLP run,
+         ! and during such run we have lrzmax=1
         meshy="free"
 CMPIINSERT_IF_RANK_EQ_0
         WRITE(*,'(/"  WARNING: meshy has been changed to ""free"" ",
      +    "as lrzmax=1 (does not work otherwise)"/)')
 CMPIINSERT_ENDIF_RANK
       endif
+      
       if (soln_method.eq."it3drv".and. meshy.ne."fixed_y") then
         meshy="fixed_y"
 CMPIINSERT_IF_RANK_EQ_0
@@ -1047,6 +1174,23 @@ CMPIINSERT_IF_RANK_EQ_0
 CMPIINSERT_ENDIF_RANK
          efiter="disabled" !The only option for efswtch.eq."method4"
       endif
+      
+      if (efswtch.eq."method6") then 
+        if (efiter.eq."enabled" ) then 
+          !YuP[2022-03-10] Added, for method6, no need in iterations
+CMPIINSERT_IF_RANK_EQ_0
+          WRITE(*,204)
+CMPIINSERT_ENDIF_RANK
+          efiter="disabled" !The only option for efswtch.eq."method6"
+        endif
+        if (iproelec.eq.'spline-t' .or. iproelec.eq.'prbola-t')then
+        !YuP[2022-03-10] Don't use time-dependent profiles for method6
+CMPIINSERT_IF_RANK_EQ_0
+        WRITE(*,*)'efswtch.eq."method6" use iproelec=parabola or spline'
+CMPIINSERT_ENDIF_RANK
+        STOP
+        endif
+      endif ! efswtch.eq."method6"
 
       if (noncntrl.ne.0 .and. (efswtch.ne."method2" .and.
      +     efswtch.ne."method3")) then
@@ -1521,7 +1665,7 @@ CMPIINSERT_ENDIF_RANK
       endif
 
 c     Necessary for some code logic:
-      if (transp.eq.'disabled' .and. soln_method.eq.'it3drv') then
+      if (transp.eq."disabled" .and. soln_method.eq.'it3drv') then
 CMPIINSERT_IF_RANK_EQ_0
          WRITE(*,*)'ainsetva: If transp.eq.disabled, then soln_method'
          WRITE(*,*)'ainsetva: should eq direct,itsol,itsol1, or it3dv'
@@ -1587,10 +1731,40 @@ c     Checking consistency of netcdfvecXX settings:
 
          
       if (frmodp.ne."disabled") then
-         if (nso.ne.1) stop 'STOP: frmod.ne.disabled, NEED nso=1'
-         if (kfrsou.eq.0) 
-     +           stop 'STOP: frmod.ne.disabled, NEED kfrsou.ne.0'
-      endif
+         if (nso.ne.1) stop 'STOP: frmodp.ne.disabled, NEED nso=1'
+         if (nbeamsp.gt.kb) stop 'STOP:frmod case, NEED nbeamsp.le.kb' 
+         do ib=1,nbeamsp
+            if (kfrsou(ib).eq.0 .or. kfrsou(ib).gt.ngen) 
+     +          stop 'STOP: frmod case, NEED to reset kfrsou(1:nbeamsp)'
+         enddo
+c        Check kfrsou() for the beam lines properly grouped
+         kbsp=1   !Number of different beamline species
+         nbeams1p(1)=1 !Number of beamlines for each species
+         kblspecp(1)=kfrsou(1) !spec index for each nbeams1p beamline set
+         do ib=2,nbeamsp
+            if (kfrsou(ib).eq.kfrsou(ib-1)) then
+               nbeams1p(kbsp)=nbeams1p(kbsp)+1
+            elseif(kfrsou(ib).ne.0) then
+               kbsp=kbsp+1      !increment number of beamline species
+               kblspecp(kbsp)=kfrsou(ib)
+               nbeams1p(kbsp)=nbeams1p(kbsp)+1
+            else                !kfrsou(ib).eq.0
+               go to 1
+            endif
+         enddo
+ 1       continue
+         
+         if (kbsp.gt.1) then
+            do ks=1,kbsp
+               do kss=ks+1,kbsp
+                  if(kblspecp(kss).eq.kblspecp(ks)) then
+                     STOP 'kfrsou is improperly ordered'
+                  endif
+               enddo
+            enddo
+         endif
+
+      endif  !On frmodp
 
 c     In view of checking settings in sub frset, this condition
 c     should not (cannot) occur.
@@ -1683,7 +1857,7 @@ CMPIINSERT_IF_RANK_EQ_0
          WRITE(*,*)'ainsetva: Code not complete set up for simultaneous'
          WRITE(*,*)'ainsetva: calc of SXR and NPA.  Need separate'
          WRITE(*,*)'ainsetva: storage for mx related variables, unless'
-         WRITE(*,*)'ainsetva: the related data is recalculed for each'
+         WRITE(*,*)'ainsetva: the related data is recalculated for each'
          WRITE(*,*)'ainsetva: use of the diagnostics.'
 CMPIINSERT_ENDIF_RANK
          STOP

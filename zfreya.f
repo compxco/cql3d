@@ -37,9 +37,13 @@ c
       end
 
       subroutine bproc(atw,ebkev,ibion,ke,kj,mb,nj,nion,
-     &  ene,en,te,z,sb,nprim,sbcx,sbion)
+     &  ene,en,te,z,sb,nprim,sbcx,sbion,ibstart)
       implicit integer (i-n), real*8 (a-h,o-z)
       save
+c----------------------------------------------------------------
+cBH171014:  Doesn't appear to be used anywhere.
+cBH171014:  Modifying it with ibstart anyway.
+c----------------------------------------------------------------
 c----------------------------------------------------------------
 c     inputs
 c----------------------------------------------------------------
@@ -77,12 +81,12 @@ c
 ccc   
       dimension cfione(7),cfionp(7),rpathcxn(2)
 ccc   
-      data cfione/-3.173850e+01,1.143818e+01,
-     1  -3.833998,7.046692e-01,-7.431486e-02,4.153749e-03,
-     2  -9.486967e-05/
-      data cfionp/-4.203309e+01,3.557321,
-     1  -1.045134,3.139238e-01,-7.454475e-02,8.459113e-03,
-     2  -3.495444e-04/
+      data cfione/-3.173850D+01,1.143818D+01,
+     1  -3.833998,7.046692D-01,-7.431486D-02,4.153749D-03,
+     2  -9.486967D-05/
+      data cfionp/-4.203309D+01,3.557321,
+     1  -1.045134,3.139238D-01,-7.454475D-02,8.459113D-03,
+     2  -3.495444D-04/
 ccc   
       do 5000 j=1,nj
         sbcx(j,1)=0.
@@ -92,7 +96,7 @@ ccc
         teev = 1.e3*te(j)
 c990131        if(teev.gt.1.) alogt=alog(teev)
         if(teev.gt.1.) alogt=log(teev)
-        if(teev.gt.1.e+05) alogt=11.51
+        if(teev.gt.1.D+05) alogt=11.51
         expo=cfione(7)
         do 2000 ii=1,6
           if7=7-ii
@@ -100,7 +104,7 @@ c990131        if(teev.gt.1.) alogt=alog(teev)
  2000   continue
         sgvxne=exp(expo)*ene(j)
 ccc   
-        do 4000 ib=1,mb
+        do 4000 ib=ibstart,mb
           do 4001 ic=1,3
             ebev=1.e3* ebkev(ib)/(ic*atw(ibion))
             vbeam=1.384e6*sqrt(ebev)
@@ -114,8 +118,8 @@ ccc
               e = 1.e3*ebkev(ib)/(ic*atw(ibion))
 c990131              aloge=alog10(e)
               aloge=log10(e)
-              sigcx=.6937e-14*(1.-.155*aloge)**2/
-     1          (1.+.1112e-14*e**3.3)
+              sigcx=.6937D-14*(1.-.155*aloge)**2/
+     1          (1.+.1112D-14*e**3.3)
               aloge=aloge*2.302585093-6.907755279
               if(aloge.le.-2.30258) go to 2220
               expo=cfionp(7)
@@ -138,7 +142,7 @@ c     ionization by impact with impurity
 c------------------------------------------------------------
  2500         continue
               ebi=ebkev(ib)/(ic*atw(ibion))
-              rpathii=1.0e-17*en(j,k)*46.*z(j,k)*
+              rpathii=1.0D-17*en(j,k)*46.*z(j,k)*
      .          (32.*z(j,k)/ebi)*(1.-exp(-ebi/(32.*z(j,k))))
               rpathcx=0.
 c------------------------------------------------------------
@@ -152,7 +156,7 @@ c------------------------------------------------------------
             sbcx(j,2)=sbcx(j,2) + fractcx2*sb(j,ic,ib)
             sbion(j)=sbion(j) + (1.-fractcx1-fractcx2)*sb(j,ic,ib)
  4001     continue
- 4000   continue
+ 4000   continue  !On do ib=ibstart,mb
  5000 continue
 ccc   
       return
@@ -172,7 +176,7 @@ c
       common/b4/en(mc+1),dg(mc+1),ae(ms,mc),be(ms,mc),
      *  de1(ms,mc),de2(ms,mc),ge1(ms,mc),ge2(ms,mc)
       data ryd/13.6/
-      ceef1(ni,nj,te)=1.6e-7*sqrt(te)
+      ceef1(ni,nj,te)=1.6D-7*sqrt(te)
      *  *exp(-(ryd/te)*(1./dfloat(ni)**2-1./dfloat(nj)**2))
 c990131     *  *(ae(ni,nj)*alog(.3*te/ryd+de2(ni,nj))+be(ni,nj))
      *  *(ae(ni,nj)*log(.3*te/ryd+de2(ni,nj))+be(ni,nj))
@@ -192,7 +196,8 @@ c
       id=2
       if(ni.eq.1)id=1
       return
-      end
+      end function ceef
+      
       subroutine chek(x,xmin,xmax,imin,imax,ick)
       implicit integer (i-n), real*8 (a-h,o-z)
       ick = 0
@@ -204,7 +209,7 @@ c
       if(imax.eq.0) return
       if(x.gt.xmax) ick = 1
       return
-      end
+      end subroutine chek
 c
 c
       real*8 function cief(i,te)
@@ -228,10 +233,10 @@ c
         return
       endif
 
-      cief=9.56e-6*exp(-ent(i))
+      cief=9.56D-6*exp(-ent(i))
      *  /(te*sqrt(te)*(ent(i)**2.33+4.38*ent(i)**1.72+1.32*ent(i)))
       return
-      end
+      end function cief
 
 cKinsey substituted crsecs version below (from onetwo)
 c$$$c     ONETWO DIVERGENCE
@@ -372,7 +377,8 @@ c
 c
       subroutine crsecs(iexcit,atw,ebkev,ibion,mb,mfm1,nion,vbeam,zne,
      .                  zni,zte,zzi,dtemax,dnemax,dzemax,
-     .                  sgvxne,sgxn,sgxnmi)
+     .                  sgvxne,sgxn,sgxnmi,ibstart) !for iexcit.le.0 only
+      !YuP: subr.crsecs might have bugs in sgxn() array usage.
 c
 c     This subroutine calculates charge exchange, proton ionization, and
 c     electron ionization cross sections from the fitted results of
@@ -387,7 +393,6 @@ c
       real*8 atw(kion), ebkev(kb), vbeam(ke,kb), zne(kz), zni(kz,kion),
      .    zte(kz), zzi(kz,kion), sgvxne(kz)
       real*8 sgxn(kcmp1,kz,kbe,ksge), sgxnmi(ke,kb)  ! stand alone code
-c      real*8 sgxn(kcmp1,kz,ke,kb), sgxnmi(ke,kb)
 c
       real*8  cfione(7), cfionp(7)
 c
@@ -399,17 +404,24 @@ c
 c---:----1----:----2----:----3----:----4----:----5----:----6----:----7-c
 c
 c... initializations
-c
+c     
+      WRITE(*,*)'crsecs might have a bug... Use iexcit=5' !YuP[2022-12]
+      !It could be ok if only one beam is used. See "BUG?" below.
+
+      if (ibstart.eq.1) then
       do ib=1,kb
-       do j=1,ke
-         sgxnmi(j,ib)=0.D0
-         do i=1,kz
-          do k=1,kcmp1
-            sgxn(k,i,j,ib)=0.D0
-          enddo
+         do j=1,ke
+            sgxnmi(j,ib)=0.D0
+            !do i=1,kz
+            !   do k=1,kcmp1 !=1:4
+            !      sgxn(k,i,j,ib)=0.D0 !YuP[2022-12-15] BUG?
+            !      !See above: real*8 sgxn(kcmp1,kz,kbe,ksge)
+            !   enddo
+            !enddo
          enddo
-       enddo
       enddo
+      sgxn=0.d0 !!YuP[2022-12-15] Replaced the above
+      endif  !On ibstart.eq.1
       do i=1,kz
        sgvxne(i)=0.D0
       enddo
@@ -429,51 +441,62 @@ c
         sgvxne(i) = dexp(expo) * zne(i)
    20 continue
 c
-      do 50 ib = 1, mb
-        do 40 j = 1, 3
-          veli = 1.0 / vbeam(j,ib)
-          do 30 i = 1, mfm1
-            sgxn(4,i,j,ib) = sgvxne(i) * veli
+      do 50 ib=ibstart,mb
+        do 40 j=1,ke !was 3
+          index=ke*(ib-1)+j !YuP[2023-01-24] combined energy&beam_index
+          veli= 1.0 / vbeam(j,ib)
+          do 30 i=1,mfm1
+            !sgxn(4,i,j,ib) = sgvxne(i) * veli  !YuP[2022-12-15] BUG?
+            !See above: real*8 sgxn(kcmp1,kz,kbe,ksge)
+            !YuP: Need to change j->ke*(ib-1)+j, ib->1
+            sgxn(4,i,index,1) = sgvxne(i) * veli !YuP[2023-01-24]
    30     continue
    40   continue
    50 continue
 c
-      do 110 ib = 1, mb
-        do 100 ion = 1, nion
-          do 90 j = 1, 3
+      do 110 ib=ibstart,mb
+        do 100 ion=1,nion
+          do 90 j=1,ke !was 3
+            index=ke*(ib-1)+j !YuP[2023-01-24] combined energy&beam_index
             if (atw(ion).le.3.01) then
-              e = 1.D3 * ebkev(ib) / (j*atw(ibion))
-              aloge = dlog10(e)
-              sigcx = .6937D-14 * (1.D0-.155D0*aloge) ** 2 /
+              e= 1.D3 * ebkev(ib) / (j*atw(ibion))
+              aloge= dlog10(e)
+              sigcx= .6937D-14 * (1.D0-.155D0*aloge) ** 2 /
      .            (1.D0+.1112D-14*e**3.3D0)
-              aloge = aloge * 2.302585093D0 - 6.907755279D0
+              aloge= aloge * 2.302585093D0 - 6.907755279D0
               if (aloge.gt.-2.30258) then
-                expo = cfionp(7)
-                do 60 ii = 1, 6
-                  if7 = 7 - ii
-                  expo = expo * aloge + cfionp(if7)
+                expo= cfionp(7)
+                do 60 ii=1, 6
+                  if7= 7 - ii
+                  expo= expo * aloge + cfionp(if7)
    60           continue
-                sigi = dexp(expo)
+                sigi= dexp(expo)
               else
-                sigi = 0.D0
+                sigi = 0.D0  !YuP[2018-01-23] corrected sig to sigi
               endif
 c
-              do 70 i = 1, mfm1
-                sgxncx = sigcx * zni(i,ion)
-                sgxni = sigi * zni(i,ion)
-                sgxn(4,i,j,ib) = sgxn(4,i,j,ib) + sgxncx + sgxni
+              do 70 i=1,mfm1
+                sgxncx= sigcx * zni(i,ion)
+                sgxni= sigi * zni(i,ion)
+                !sgxn(4,i,j,ib) = sgxn(4,i,j,ib) + sgxncx + sgxni !YuP[2022-12-15] BUG?
+                !      !See above: real*8 sgxn(kcmp1,kz,kbe,ksge)
+                !YuP: Need to change j->ke*(ib-1)+j, ib->1
+                sgxn(4,i,index,1)=sgxn(4,i,index,1)+sgxncx+sgxni !YuP[2023-01-24]
    70         continue
 c
             else
 c------------------------------------------------------------
 c  r.e. olson et al., phys. rev. lett. 41, 163 (1978)
 c------------------------------------------------------------
-              ebi = ebkev(ib) / (j*atw(ibion))
-              do 80 i = 1, mfm1
-                rpath = 1.0e-17 * zni(i,ion) * 46.D0 * zzi(i,ion) * 
+              ebi= ebkev(ib) / (j*atw(ibion))
+              do 80 i=1,mfm1
+                rpath = 1.0D-17 * zni(i,ion) * 46.D0 * zzi(i,ion) * 
      .             (32.D0*zzi(i,ion)/ebi) * 
      .             (1.D0-dexp(-ebi/(32.D0*zzi(i,ion))))
-                sgxn(4,i,j,ib) = sgxn(4,i,j,ib) + rpath
+                !sgxn(4,i,j,ib) = sgxn(4,i,j,ib) + rpath !YuP[2022-12-15] BUG?
+                !      !See above: real*8 sgxn(kcmp1,kz,kbe,ksge)
+                !YuP: Need to change j->ke*(ib-1)+j, ib->1
+                sgxn(4,i,index,1)= sgxn(4,i,index,1) +rpath !YuP[2023-01-24]
    80         continue
             endif
 c------------------------------------------------------------
@@ -481,25 +504,31 @@ c------------------------------------------------------------
   100   continue
   110 continue
 c
-c         do ib = 1, mb
-c           do j = 1, 3
+c         do ib=ibstart,mb
+c           do j=1,3
 c             do i=1,mfm1
 c       write(*,'(3i3,2x,1p1e10.4,a14)') i,j,ib,sgxn(4,i,j,ib), ' sgxn'
 c             enddo
 c           enddo
 c         enddo
 c
-      do 150 ib = 1, mb
+      do 150 ib=ibstart,mb
         if (ib.le.1.or.ebkev(ib).ne.ebkev(1)) then
-          do 130 j = 1, 3
-            sgxnm = sgxn(4,1,j,ib)
-            do 120 i = 2, mfm1
-              if (sgxnm.lt.sgxn(4,i,j,ib)) sgxnm = sgxn(4,i,j,ib)
+          do 130 j=1,ke !was 3
+            index=ke*(ib-1)+j !YuP[2023-01-24] combined energy&beam_index
+            !sgxnm = sgxn(4,1,j,ib) !YuP[2022-12-15] BUG?
+            !See above: real*8 sgxn(kcmp1,kz,kbe,ksge)
+            sgxnm = sgxn(4,1,index,1) !YuP[2023-01-24]
+            do 120 i=2,mfm1
+              !if (sgxnm.lt.sgxn(4,i,j,ib)) sgxnm = sgxn(4,i,j,ib) !YuP[2022-12-15] BUG?
+              !See above: real*8 sgxn(kcmp1,kz,kbe,ksge)
+              !YuP: Need to change j->ke*(ib-1)+j, ib->1
+              if (sgxnm.lt.sgxn(4,i,index,1)) sgxnm=sgxn(4,i,index,1) !YuP[2023-01-24]
   120       continue
             sgxnmi(j,ib) = 1.D0 / sgxnm
   130     continue
         else
-          do 140 j = 1, 3
+          do 140 j=1,ke !was 3
             sgxnmi(j,ib) = sgxnmi(j,1)
   140     continue
         endif
@@ -512,23 +541,30 @@ c     Stearns formula
 c..................................................................
 c
  200  continue
-      do 212 ib=1,mb
-        do 211 j=1,3
-          sigeff1=7.e-19*(dzemax+.2)**.65
+      do 212 ib=ibstart,mb
+        do 211 j=1,ke !was 3
+          index=ke*(ib-1)+j !YuP[2023-01-24] combined energy&beam_index
+          sigeff1=7.D-19*(dzemax+.2)**.65
           sigeff2=(3.*dnemax/(2.*dtemax+1.))**.118
           tem=dfloat(j)*atw(ibion)
           tem1=-(.7+.02*dzemax)
           sigeff3=(ebkev(ib)/(1000.*tem))**tem1
           sigeff=sigeff1*sigeff2*sigeff3
           do 210 i=1,mfm1
-            sgxn(4,i,j,ib)=sigeff*zne(i)
+            !sgxn(4,i,j,ib)=sigeff*zne(i) !YuP[2022-12-15] BUG?
+            !See above: real*8 sgxn(kcmp1,kz,kbe,ksge)
+            !YuP: Need to change j->ke*(ib-1)+j, ib->1
+            sgxn(4,i,index,1)=sigeff*zne(i) !YuP[2023-01-24]
  210      continue
-          sgxnmi(j,ib)=1./sgxn(4,1,j,ib)
+          !sgxnmi(j,ib)=1./sgxn(4,1,j,ib) !YuP[2022-12-15] BUG?
+          !See above: real*8 sgxn(kcmp1,kz,kbe,ksge)
+          !YuP: Need to change j->ke*(ib-1)+j, ib->1
+          sgxnmi(j,ib)=1./sgxn(4,1,index,1) !YuP[2023-01-24]
  211    continue
  212  continue
 c
-c         do ib = 1, mb
-c           do j = 1, 3
+c         do ib=ibstart,mb
+c           do j=1,3
 c             do i=1,mfm1
 c       write(*,'(3i3,2x,1p1e10.4,a14)') i,j,ib,sgxn(4,i,j,ib), ' sgxn2'
 c             enddo
@@ -536,7 +572,7 @@ c           enddo
 c         enddo
 c
       return
-      end
+      end subroutine crsecs
 c
 c
       real*8 function cxr (x)
@@ -545,33 +581,33 @@ c
 c ----------------------------------------------------------------------
 c this function calculates the charge exchange rate for hydrogen atoms
 c interacting with protons in units of cm**3/s.
-c x is in units of keV for 1.0e-3 .le. x .le. 100, the
+c x is in units of keV for 1.0D-3 .le. x .le. 100, the
 c the formula is taken from the paper by r.l. freeman and e.m. jones
 c clm-r 137 culham laboratory 1974.
-c for x .lt. 1.0e-3, a rate coefficient derived from an analytic average
-c over the approximate cross section  sigma = 0.6937e-14*(1.0-0.155*LOG10
+c for x .lt. 1.0D-3, a rate coefficient derived from an analytic average
+c over the approximate cross section  sigma = 0.6937D-14*(1.0-0.155*LOG10
 c (e/1ev))**2 is used.  this cross section is an approximation to that
 c given by riviere, nuclear fusion 11,363(1971).
 c ----------------------------------------------------------------------
 c
-      if (x .lt.   1.0e-3)  go to 10
+      if (x .lt.   1.0D-3)  go to 10
       if (x .gt. 100     )  go to 20
       tc  = LOG (x)+6.9077553
-      dum = 0.2530205e-4-tc*0.8230751e-6
-      tc  = -0.1841757e2+tc*(0.528295-tc*(0.2200477-tc*(0.9750192e-1-tc*
-     .      (0.1749183e-1-tc*(0.4954298e-3+tc*(0.2174910e-3-tc*dum))))))
+      dum = 0.2530205D-4-tc*0.8230751D-6
+      tc  = -0.1841757e2+tc*(0.528295-tc*(0.2200477-tc*(0.9750192D-1-tc*
+     .      (0.1749183D-1-tc*(0.4954298D-3+tc*(0.2174910D-3-tc*dum))))))
       tc  = EXP (tc)
       cxr = tc
       return
 c
-   10 tc  = 0.50654 - 6.7316e-2 * LOG  (x)
-      cxr =           3.3340e-7 * SQRT (x) * (tc*tc + 7.454e-3)
+   10 tc  = 0.50654 - 6.7316D-2 * LOG  (x)
+      cxr =           3.3340D-7 * SQRT (x) * (tc*tc + 7.454D-3)
       return
 c
    20 cxr = 0.0
       return
 c
-      end
+      end function cxr
 c
 c
       BLOCK DATA d01bbf_data
@@ -610,125 +646,125 @@ c
 
 c
       data wgh10   /
-     >  7.6404329e-06,  1.3436457e-03,  3.3874394e-02,  2.4013861e-01,
-     >  6.1086263e-01,  6.1086263e-01,  2.4013861e-01,  3.3874394e-02,
-     >  1.3436457e-03,  7.6404329e-06/
+     >  7.6404329D-06,  1.3436457D-03,  3.3874394D-02,  2.4013861D-01,
+     >  6.1086263D-01,  6.1086263D-01,  2.4013861D-01,  3.3874394D-02,
+     >  1.3436457D-03,  7.6404329D-06/
 
 
       data xgh10   /
-     >  3.4361591e+00,  2.5327317e+00,  1.7566836e+00,  1.0366108e+00,
-     >  3.4290133e-01, -3.4290133e-01, -1.0366108e+00, -1.7566836e+00,
-     >  -2.5327317e+00, -3.4361591e+00/
+     >  3.4361591D+00,  2.5327317D+00,  1.7566836D+00,  1.0366108D+00,
+     >  3.4290133D-01, -3.4290133D-01, -1.0366108D+00, -1.7566836D+00,
+     >  -2.5327317D+00, -3.4361591D+00/
 
 
       data wgh16   /
-     >  2.6548075e-10,  2.3209808e-07,  2.7118601e-05,  9.3228401e-04,
-     >  1.2880312e-02,  8.3810041e-02,  2.8064746e-01,  5.0792948e-01,
-     >  5.0792948e-01,  2.8064746e-01,  8.3810041e-02,  1.2880312e-02,
-     >  9.3228401e-04,  2.7118601e-05,  2.3209808e-07,  2.6548075e-10/
+     >  2.6548075D-10,  2.3209808D-07,  2.7118601D-05,  9.3228401D-04,
+     >  1.2880312D-02,  8.3810041D-02,  2.8064746D-01,  5.0792948D-01,
+     >  5.0792948D-01,  2.8064746D-01,  8.3810041D-02,  1.2880312D-02,
+     >  9.3228401D-04,  2.7118601D-05,  2.3209808D-07,  2.6548075D-10/
 
 
       data xgh16   /
-     >  4.6887389e+00,  3.8694479e+00,  3.1769992e+00,  2.5462022e+00,
-     >  1.9517880e+00,  1.3802585e+00,  8.2295145e-01,  2.7348105e-01,
-     >  -2.7348105e-01, -8.2295145e-01, -1.3802585e+00, -1.9517880e+00,
-     >  -2.5462022e+00, -3.1769992e+00, -3.8694479e+00, -4.6887389e+00/
+     >  4.6887389D+00,  3.8694479D+00,  3.1769992D+00,  2.5462022D+00,
+     >  1.9517880D+00,  1.3802585D+00,  8.2295145D-01,  2.7348105D-01,
+     >  -2.7348105D-01, -8.2295145D-01, -1.3802585D+00, -1.9517880D+00,
+     >  -2.5462022D+00, -3.1769992D+00, -3.8694479D+00, -4.6887389D+00/
 
 
       data wgh20   /
-     >  2.2293936e-13,  4.3993410e-10,  1.0860694e-07,  7.8025565e-06,
-     >  2.2833864e-04,  3.2437733e-03,  2.4810521e-02,  1.0901721e-01,
-     >  2.8667551e-01,  4.6224367e-01,  4.6224367e-01,  2.8667551e-01,
-     >  1.0901721e-01,  2.4810521e-02,  3.2437733e-03,  2.2833864e-04,
-     >  7.8025565e-06,  1.0860694e-07,  4.3993410e-10,  2.2293936e-13/
+     >  2.2293936D-13,  4.3993410D-10,  1.0860694D-07,  7.8025565D-06,
+     >  2.2833864D-04,  3.2437733D-03,  2.4810521D-02,  1.0901721D-01,
+     >  2.8667551D-01,  4.6224367D-01,  4.6224367D-01,  2.8667551D-01,
+     >  1.0901721D-01,  2.4810521D-02,  3.2437733D-03,  2.2833864D-04,
+     >  7.8025565D-06,  1.0860694D-07,  4.3993410D-10,  2.2293936D-13/
 
 
       data xgh20   /
-     >  5.3874809e+00,  4.6036824e+00,  3.9447640e+00,  3.3478546e+00,
-     >  2.7888061e+00,  2.2549740e+00,  1.7385377e+00,  1.2340762e+00,
-     >  7.3747373e-01,  2.4534071e-01, -2.4534071e-01, -7.3747373e-01,
-     >  -1.2340762e+00, -1.7385377e+00, -2.2549740e+00, -2.7888061e+00,
-     >  -3.3478546e+00, -3.9447640e+00, -4.6036824e+00, -5.3874809e+00/
+     >  5.3874809D+00,  4.6036824D+00,  3.9447640D+00,  3.3478546D+00,
+     >  2.7888061D+00,  2.2549740D+00,  1.7385377D+00,  1.2340762D+00,
+     >  7.3747373D-01,  2.4534071D-01, -2.4534071D-01, -7.3747373D-01,
+     >  -1.2340762D+00, -1.7385377D+00, -2.2549740D+00, -2.7888061D+00,
+     >  -3.3478546D+00, -3.9447640D+00, -4.6036824D+00, -5.3874809D+00/
 
 
       data wgh24   /
-     >  1.6643685e-16,  6.5846202e-13,  3.0462543e-10,  4.0189712e-08,
-     >  2.1582457e-06,  5.6886916e-05,  8.2369248e-04,  7.0483558e-03,
-     >  3.7445471e-02,  1.2773962e-01,  2.8617954e-01,  4.2693116e-01,
-     >  4.2693116e-01,  2.8617954e-01,  1.2773962e-01,  3.7445471e-02,
-     >  7.0483558e-03,  8.2369248e-04,  5.6886916e-05,  2.1582457e-06,
-     >  4.0189712e-08,  3.0462543e-10,  6.5846202e-13,  1.6643685e-16/
+     >  1.6643685D-16,  6.5846202D-13,  3.0462543D-10,  4.0189712D-08,
+     >  2.1582457D-06,  5.6886916D-05,  8.2369248D-04,  7.0483558D-03,
+     >  3.7445471D-02,  1.2773962D-01,  2.8617954D-01,  4.2693116D-01,
+     >  4.2693116D-01,  2.8617954D-01,  1.2773962D-01,  3.7445471D-02,
+     >  7.0483558D-03,  8.2369248D-04,  5.6886916D-05,  2.1582457D-06,
+     >  4.0189712D-08,  3.0462543D-10,  6.5846202D-13,  1.6643685D-16/
 
 
       data xgh24   /
-     >  6.0159256e+00,  5.2593829e+00,  4.6256628e+00,  4.0536644e+00,
-     >  3.5200068e+00,  3.0125461e+00,  2.5238810e+00,  2.0490036e+00,
-     >  1.5842500e+00,  1.1267608e+00,  6.7417111e-01,  2.2441455e-01,
-     >  -2.2441455e-01, -6.7417111e-01, -1.1267608e+00, -1.5842500e+00,
-     >  -2.0490036e+00, -2.5238810e+00, -3.0125461e+00, -3.5200068e+00,
-     >  -4.0536644e+00, -4.6256628e+00, -5.2593829e+00, -6.0159256e+00/
+     >  6.0159256D+00,  5.2593829D+00,  4.6256628D+00,  4.0536644D+00,
+     >  3.5200068D+00,  3.0125461D+00,  2.5238810D+00,  2.0490036D+00,
+     >  1.5842500D+00,  1.1267608D+00,  6.7417111D-01,  2.2441455D-01,
+     >  -2.2441455D-01, -6.7417111D-01, -1.1267608D+00, -1.5842500D+00,
+     >  -2.0490036D+00, -2.5238810D+00, -3.0125461D+00, -3.5200068D+00,
+     >  -4.0536644D+00, -4.6256628D+00, -5.2593829D+00, -6.0159256D+00/
 
 
       data wgl10   /
-     >  3.0844112e-01,  4.0111993e-01,  2.1806829e-01,  6.2087456e-02,
-     >  9.5015170e-03,  7.5300839e-04,  2.8259233e-05,  4.2493140e-07,
-     >  1.8395648e-09,  9.9118272e-13/
+     >  3.0844112D-01,  4.0111993D-01,  2.1806829D-01,  6.2087456D-02,
+     >  9.5015170D-03,  7.5300839D-04,  2.8259233D-05,  4.2493140D-07,
+     >  1.8395648D-09,  9.9118272D-13/
 
 
       data xgl10   /
-     >  1.3779347e-01,  7.2945455e-01,  1.8083429e+00,  3.4014337e+00,
-     >  5.5524961e+00,  8.3301527e+00,  1.1843786e+01,  1.6279258e+01,
-     >  2.1996586e+01,  2.9920697e+01/
+     >  1.3779347D-01,  7.2945455D-01,  1.8083429D+00,  3.4014337D+00,
+     >  5.5524961D+00,  8.3301527D+00,  1.1843786D+01,  1.6279258D+01,
+     >  2.1996586D+01,  2.9920697D+01/
 
 
 
 
       data wgl16   /
-     >  2.0615171e-01,  3.3105785e-01,  2.6579578e-01,  1.3629693e-01,
-     >  4.7328929e-02,  1.1299900e-02,  1.8490709e-03,  2.0427192e-04,
-     >  1.4844587e-05,  6.8283193e-07,  1.8810248e-08,  2.8623502e-10,
-     >  2.1270790e-12,  6.2979670e-15,  5.0504737e-18,  4.1614624e-22/
+     >  2.0615171D-01,  3.3105785D-01,  2.6579578D-01,  1.3629693D-01,
+     >  4.7328929D-02,  1.1299900D-02,  1.8490709D-03,  2.0427192D-04,
+     >  1.4844587D-05,  6.8283193D-07,  1.8810248D-08,  2.8623502D-10,
+     >  2.1270790D-12,  6.2979670D-15,  5.0504737D-18,  4.1614624D-22/
 
 
       data xgl16   /
-     >  8.7649410e-02,  4.6269633e-01,  1.1410578e+00,  2.1292836e+00,
-     >  3.4370866e+00,  5.0780186e+00,  7.0703385e+00,  9.4383143e+00,
-     >  1.2214223e+01,  1.5441527e+01,  1.9180157e+01,  2.3515906e+01,
-     >  2.8578730e+01,  3.4583399e+01,  4.1940453e+01,  5.1701160e+01/
+     >  8.7649410D-02,  4.6269633D-01,  1.1410578D+00,  2.1292836D+00,
+     >  3.4370866D+00,  5.0780186D+00,  7.0703385D+00,  9.4383143D+00,
+     >  1.2214223D+01,  1.5441527D+01,  1.9180157D+01,  2.3515906D+01,
+     >  2.8578730D+01,  3.4583399D+01,  4.1940453D+01,  5.1701160D+01/
 
 
       data wgl20   /
-     >  1.6874680e-01,  2.9125436e-01,  2.6668610e-01,  1.6600245e-01,
-     >  7.4826065e-02,  2.4964417e-02,  6.2025508e-03,  1.1449624e-03,
-     >  1.5574177e-04,  1.5401441e-05,  1.0864864e-06,  5.3301209e-08,
-     >  1.7579812e-09,  3.7255024e-11,  4.7675293e-13,  3.3728442e-15,
-     >  1.1550143e-17,  1.5395221e-20,  5.2864427e-24,  1.6564566e-28/
+     >  1.6874680D-01,  2.9125436D-01,  2.6668610D-01,  1.6600245D-01,
+     >  7.4826065D-02,  2.4964417D-02,  6.2025508D-03,  1.1449624D-03,
+     >  1.5574177D-04,  1.5401441D-05,  1.0864864D-06,  5.3301209D-08,
+     >  1.7579812D-09,  3.7255024D-11,  4.7675293D-13,  3.3728442D-15,
+     >  1.1550143D-17,  1.5395221D-20,  5.2864427D-24,  1.6564566D-28/
 
 
       data xgl20   /
-     >  7.0539890e-02,  3.7212682e-01,  9.1658210e-01,  1.7073065e+00,
-     >  2.7491993e+00,  4.0489253e+00,  5.6151750e+00,  7.4590175e+00,
-     >  9.5943929e+00,  1.2038803e+01,  1.4814293e+01,  1.7948896e+01,
-     >  2.1478788e+01,  2.5451703e+01,  2.9932555e+01,  3.5013434e+01,
-     >  4.0833057e+01,  4.7619994e+01,  5.5810796e+01,  6.6524417e+01/
+     >  7.0539890D-02,  3.7212682D-01,  9.1658210D-01,  1.7073065D+00,
+     >  2.7491993D+00,  4.0489253D+00,  5.6151750D+00,  7.4590175D+00,
+     >  9.5943929D+00,  1.2038803D+01,  1.4814293D+01,  1.7948896D+01,
+     >  2.1478788D+01,  2.5451703D+01,  2.9932555D+01,  3.5013434D+01,
+     >  4.0833057D+01,  4.7619994D+01,  5.5810796D+01,  6.6524417D+01/
 
 
       data wgl24   /
-     >  1.4281197e-01,  2.5877411e-01,  2.5880671e-01,  1.8332269e-01,
-     >  9.8166273e-02,  4.0732478e-02,  1.3226019e-02,  3.3693491e-03,
-     >  6.7216256e-04,  1.0446121e-04,  1.2544722e-05,  1.1513158e-06,
-     >  7.9608130e-08,  4.0728590e-09,  1.5070082e-10,  3.9177365e-12,
-     >  6.8941811e-14,  7.8198004e-16,  5.3501888e-18,  2.0105175e-20,
-     >  3.6057659e-23,  2.4518188e-26,  4.0883016e-30,  5.5753458e-35/
+     >  1.4281197D-01,  2.5877411D-01,  2.5880671D-01,  1.8332269D-01,
+     >  9.8166273D-02,  4.0732478D-02,  1.3226019D-02,  3.3693491D-03,
+     >  6.7216256D-04,  1.0446121D-04,  1.2544722D-05,  1.1513158D-06,
+     >  7.9608130D-08,  4.0728590D-09,  1.5070082D-10,  3.9177365D-12,
+     >  6.8941811D-14,  7.8198004D-16,  5.3501888D-18,  2.0105175D-20,
+     >  3.6057659D-23,  2.4518188D-26,  4.0883016D-30,  5.5753458D-35/
 
 
       data xgl24   /
-     >  5.9019852e-02,  3.1123915e-01,  7.6609691e-01,  1.4255976e+00,
-     >  2.2925621e+00,  3.3707743e+00,  4.6650837e+00,  6.1815351e+00,
-     >  7.9275392e+00,  9.9120980e+00,  1.2146103e+01,  1.4642732e+01,
-     >  1.7417993e+01,  2.0491460e+01,  2.3887330e+01,  2.7635937e+01,
-     >  3.1776041e+01,  3.6358406e+01,  4.1451720e+01,  4.7153106e+01,
-     >  5.3608575e+01,  6.1058531e+01,  6.9962240e+01,  8.1498279e+01/
+     >  5.9019852D-02,  3.1123915e-01,  7.6609691e-01,  1.4255976D+00,
+     >  2.2925621D+00,  3.3707743D+00,  4.6650837D+00,  6.1815351D+00,
+     >  7.9275392D+00,  9.9120980D+00,  1.2146103D+01,  1.4642732D+01,
+     >  1.7417993D+01,  2.0491460D+01,  2.3887330D+01,  2.7635937D+01,
+     >  3.1776041D+01,  3.6358406D+01,  4.1451720D+01,  4.7153106D+01,
+     >  5.3608575D+01,  6.1058531D+01,  6.9962240D+01,  8.1498279D+01/
 
 
       end
@@ -838,7 +874,7 @@ c     cond = an estimate of the condition of  a .
 c     for the linear system  a*x = b, changes in  a  and  b
 c     may cause changes  cond  times as large in  x .
 c     if  cond+1.0 .eq. cond , a is singular to working
-c     precision.  cond  is set to  1.0e+32  if exact
+c     precision.  cond  is set to  1.0D+32  if exact
 c     singularity is detected.
 c
 c     ipvt = the pivot vector.
@@ -975,7 +1011,7 @@ c
 c
 c     exact singularity
 c
- 90   cond = 1.0e+32
+ 90   cond = 1.0D+32
       return
       end
 c
@@ -1713,7 +1749,7 @@ c
      >  3x,'ncont= ',i4)
       go to 20
 
-      end
+      end subroutine hexnb
 c
 c
       subroutine hradin(ncor,numz,nz,izstrp,amz)
@@ -1971,7 +2007,7 @@ c--   evaluate coronal z, zsq, and radiation.
 cBH080118      call second(cpua)
       iwatch=0
       ihigh=0
-      tekev=teev*1.0e-3
+      tekev=teev*1.0D-3
       do 60 imp=1,numimp
         if(izstrp(imp).eq.1) go to 51
 c**   find temperature region. test for less than 5 intervals.
@@ -2178,7 +2214,7 @@ cBH080118      call second(cpub)
       cpu5 = cpu5 + cpub - cpua
 c
       return
-      end
+      end subroutine hxsve
 c
 c
       subroutine hxsvi
@@ -2403,7 +2439,7 @@ c
       ister0=0
       er0old = er0
       return
-      end
+      end subroutine hxsvi
 c
 c
 c$$$ Replaced by Kinsey, when adding ADAS cross-sections to old (1990's)
@@ -2575,9 +2611,9 @@ ccc
 ccc   
       data xdat/4.,6.,8.,10.,20.,30.,40.,60.,80.,100.,
      1  200.,300.,400.,600.,800./
-      data ydat/8.95e-01,8.75e-01,8.70e-01,8.65e-01,8.20e-01,
-     1  7.25e-01,6.25e-01,4.40e-01,2.90e-01,1.90e-01,2.40e-02,
-     2  5.25e-03,1.20e-03,1.60e-04,5.40e-05/
+      data ydat/8.95D-01,8.75D-01,8.70D-01,8.65D-01,8.20D-01,
+     1  7.25D-01,6.25D-01,4.40D-01,2.90D-01,1.90D-01,2.40D-02,
+     2  5.25D-03,1.20D-03,1.60D-04,5.40D-05/
 ccc   
       mdat=15
       mdatm=mdat-1
@@ -2622,7 +2658,7 @@ c*****************************************************************
       common/b5/al(ms+1)
       common/b8/iexcit,ilorent,mstate,ncont
       dimension sl(30)
-      data w0/4.1341e16/,almin/1.e-10/,almax/1.e15/,expl/4./
+      data w0/4.1341d16/,almin/1.D-10/,almax/1.d15/,expl/4.d0/
 c     data sl/
 c     *1.00000000e+00,2.50000000e-01,2.77777778e-02,1.73611111e-03,
 c     *6.94444444e-05,1.92901235e-06,3.93675989e-08,6.15118733e-10,
@@ -2633,11 +2669,11 @@ c     *3.83100022e-40,7.91528971e-43,1.49627405e-45,2.59769800e-48,
 c     *4.15631680e-51,6.14839763e-54,8.43401595e-57,1.07576734e-59,
 c     *1.27915260e-62,1.42128067e-65/
       data sl/
-     *  1.00000000e+00,2.50000000e-01,2.77777778e-02,1.73611111e-03,
-     *  6.94444444e-05,1.92901235e-06,3.93675989e-08,6.15118733e-10,
-     *  7.59405843e-12,7.59405843e-14,6.27608135e-16,4.35838982e-18,
-     *  2.57892889e-20,1.31578005e-22,5.84791131e-25,2.28434036e-27,
-     *  7.90429189e-30,2.43959626e-32,6.75788439e-35,1.68947110e-37,
+     *  1.00000000D+00,2.50000000D-01,2.77777778D-02,1.73611111D-03,
+     *  6.94444444D-05,1.92901235D-06,3.93675989D-08,6.15118733D-10,
+     *  7.59405843D-12,7.59405843D-14,6.27608135D-16,4.35838982D-18,
+     *  2.57892889D-20,1.31578005D-22,5.84791131D-25,2.28434036D-27,
+     *  7.90429189D-30,2.43959626D-32,6.75788439D-35,1.68947110D-37,
      *  10*0.0/
 c
       fl(n,an3,el)=((4./(an3*el))**(2*n-1))
@@ -2876,7 +2912,7 @@ cBH080118      call second(cpub)
       cpu6 = cpu6 + cpub - cpua
 c
       return
-      end
+      end subroutine matri
 c
 c
       subroutine newgrid(xold,yold,nold,xnew,ynew,nnew)
@@ -2886,7 +2922,7 @@ c     ---------------------------------------------------------------
 c     convert to new grid
 c     ---------------------------------------------------------------
       dimension xold(nold),yold(nold),xnew(nnew),ynew(nnew)
-      data tol/1.0e-20/
+      data tol/1.0D-20/
 c
       iold=1
       inew=1
@@ -2944,12 +2980,21 @@ c     ONETWO DIVERGENCE
  8010 format(6e12.3)
  8020 format(i6)
       end
-
+c      
+c
       subroutine pfit(p,x,y,xv,yv,nx,f,dfdx,dfdy)
-      implicit integer (i-n), real*8 (a-h,o-z)
-      dimension p(nx,*),x(*),y(*)
-      dimension cx(4),cy(4),cxp(4),cyp(4)
-      dimension c2xp(4),c2yp(4)
+      !YuP[2021-01-12] Commented lines related to output dfdx,dfdy.
+      ! All calls to this subroutine do not need such output.
+      implicit none ! integer (i-n), real*8 (a-h,o-z)
+cyup/was      dimension p(nx,*),x(*),y(*)
+      real*8 p(4,4),x(4),y(4) !YuP[2018-01-24] Only 4 points are used
+      integer nx
+      real*8 xv,yv
+      real*8 cx(4),cy(4),cxp(4),cyp(4)
+      real*8 c2xp(4),c2yp(4)
+      real*8 a1,a2,a3,a4, b1,b2,b3,b4
+      real*8 f, dfdx, dfdy, d2fdx2, d2fdy2
+      integer i,j
 c
 c-----------------------------------------------------------------------
 c
@@ -2973,85 +3018,104 @@ c
 c-----------------------------------------------------------------------
 c
 c
+      cx(1:4)=0.d0
+      cy(1:4)=0.d0
+      cxp(1:4)=0.d0
+      cyp(1:4)=0.d0
+      c2xp(1:4)=0.d0
+      c2yp(1:4)=0.d0
+      f=0.d0
+      dfdx=0.d0
+      dfdy=0.d0
+      d2fdx2=0.d0
+      d2fdy2=0.d0
+      
       a1=(x(1)-x(2))*(x(1)-x(3))*(x(1)-x(4))
       a2=(x(2)-x(1))*(x(2)-x(3))*(x(2)-x(4))
       a3=(x(3)-x(1))*(x(3)-x(2))*(x(3)-x(4))
       a4=(x(4)-x(1))*(x(4)-x(2))*(x(4)-x(3))
-c
+      if(a1.eq.0.d0)write(*,*)'pfit: a1=0'
+      if(a2.eq.0.d0)write(*,*)'pfit: a2=0'
+      if(a3.eq.0.d0)write(*,*)'pfit: a3=0'
+      if(a4.eq.0.d0)write(*,*)'pfit: a4=0'
       cx(1)=(xv-x(2))*(xv-x(3))*(xv-x(4))/a1
       cx(2)=(xv-x(1))*(xv-x(3))*(xv-x(4))/a2
       cx(3)=(xv-x(1))*(xv-x(2))*(xv-x(4))/a3
       cx(4)=(xv-x(1))*(xv-x(2))*(xv-x(3))/a4
-c
-      cxp(1)=((xv-x(3))*(xv-x(4))
-     2  +      (xv-x(2))*(xv-x(3))
-     3  +      (xv-x(2))*(xv-x(4)))/a1
-      cxp(2)=((xv-x(3))*(xv-x(4))
-     2  +      (xv-x(1))*(xv-x(3))
-     3  +      (xv-x(1))*(xv-x(4)))/a2
-      cxp(3)=((xv-x(1))*(xv-x(2))
-     2  +      (xv-x(1))*(xv-x(4))
-     3  +      (xv-x(2))*(xv-x(4)))/a3
-      cxp(4)=((xv-x(1))*(xv-x(2))
-     2  +      (xv-x(1))*(xv-x(3))
-     3  +      (xv-x(2))*(xv-x(3)))/a4
-c
-      c2xp(1)=2.0*(3.0*xv-x(2)-x(3)-x(4))/a1
-      c2xp(2)=2.0*(3.0*xv-x(1)-x(3)-x(4))/a2
-      c2xp(3)=2.0*(3.0*xv-x(1)-x(2)-x(4))/a3
-      c2xp(4)=2.0*(3.0*xv-x(1)-x(2)-x(3))/a4
-c
-c
+      !write(*,*)'cx=',cx
+      
+!      cxp(1)=((xv-x(3))*(xv-x(4))
+!     2  +      (xv-x(2))*(xv-x(3))
+!     3  +      (xv-x(2))*(xv-x(4)))/a1
+!      cxp(2)=((xv-x(3))*(xv-x(4))
+!     2  +      (xv-x(1))*(xv-x(3))
+!     3  +      (xv-x(1))*(xv-x(4)))/a2
+!      cxp(3)=((xv-x(1))*(xv-x(2))
+!     2  +      (xv-x(1))*(xv-x(4))
+!     3  +      (xv-x(2))*(xv-x(4)))/a3
+!      cxp(4)=((xv-x(1))*(xv-x(2))
+!     2  +      (xv-x(1))*(xv-x(3))
+!     3  +      (xv-x(2))*(xv-x(3)))/a4
+!      !write(*,*)'cxp=',cxp
+!      c2xp(1)=2.d0*(3.d0*xv-x(2)-x(3)-x(4))/a1
+!      c2xp(2)=2.d0*(3.d0*xv-x(1)-x(3)-x(4))/a2
+!      c2xp(3)=2.d0*(3.d0*xv-x(1)-x(2)-x(4))/a3
+!      c2xp(4)=2.d0*(3.d0*xv-x(1)-x(2)-x(3))/a4
+!      !write(*,*)'c2xp=',c2xp
+
       b1=(y(1)-y(2))*(y(1)-y(3))*(y(1)-y(4))
       b2=(y(2)-y(1))*(y(2)-y(3))*(y(2)-y(4))
       b3=(y(3)-y(1))*(y(3)-y(2))*(y(3)-y(4))
       b4=(y(4)-y(1))*(y(4)-y(2))*(y(4)-y(3))
-c
+      if(b1.eq.0.d0)write(*,*)'pfit: b1=0'
+      if(b2.eq.0.d0)write(*,*)'pfit: b2=0'
+      if(b3.eq.0.d0)write(*,*)'pfit: b3=0'
+      if(b4.eq.0.d0)write(*,*)'pfit: b4=0'
       cy(1)=(yv-y(2))*(yv-y(3))*(yv-y(4))/b1
       cy(2)=(yv-y(1))*(yv-y(3))*(yv-y(4))/b2
       cy(3)=(yv-y(1))*(yv-y(2))*(yv-y(4))/b3
       cy(4)=(yv-y(1))*(yv-y(2))*(yv-y(3))/b4
-c
-      cyp(1)=((yv-y(3))*(yv-y(4))
-     2  +      (yv-y(2))*(yv-y(3))
-     3  +      (yv-y(2))*(yv-y(4)))/b1
-      cyp(2)=((yv-y(3))*(yv-y(4))
-     2  +      (yv-y(1))*(yv-y(3))
-     3  +      (yv-y(1))*(yv-y(4)))/b2
-      cyp(3)=((yv-y(1))*(yv-y(2))
-     2  +      (yv-y(1))*(yv-y(4))
-     3  +      (yv-y(2))*(yv-y(4)))/b3
-      cyp(4)=((yv-y(1))*(yv-y(2))
-     2  +      (yv-y(1))*(yv-y(3))
-     3  +      (yv-y(2))*(yv-y(3)))/b4
-      c2yp(1)=2.0*(3.0*yv-y(2)-y(3)-y(4))/b1
-      c2yp(2)=2.0*(3.0*yv-y(1)-y(3)-y(4))/b2
-      c2yp(3)=2.0*(3.0*yv-y(1)-y(2)-y(4))/b3
-      c2yp(4)=2.0*(3.0*yv-y(1)-y(2)-y(3))/b4
-c
-c
-c
-      f=0.0
-      dfdx=0.0
-      dfdy=0.0
-      d2fdx2=0.0
-      d2fdy2=0.0
+      !write(*,*)'cy=',cy
+
+!      cyp(1)=((yv-y(3))*(yv-y(4))
+!     2  +      (yv-y(2))*(yv-y(3))
+!     3  +      (yv-y(2))*(yv-y(4)))/b1
+!      cyp(2)=((yv-y(3))*(yv-y(4))
+!     2  +      (yv-y(1))*(yv-y(3))
+!     3  +      (yv-y(1))*(yv-y(4)))/b2
+!      cyp(3)=((yv-y(1))*(yv-y(2))
+!     2  +      (yv-y(1))*(yv-y(4))
+!     3  +      (yv-y(2))*(yv-y(4)))/b3
+!      cyp(4)=((yv-y(1))*(yv-y(2))
+!     2  +      (yv-y(1))*(yv-y(3))
+!     3  +      (yv-y(2))*(yv-y(3)))/b4
+!      !write(*,*)'cyp=',cyp
+!     
+!      c2yp(1)=2.d0*(3.d0*yv-y(2)-y(3)-y(4))/b1
+!      c2yp(2)=2.d0*(3.d0*yv-y(1)-y(3)-y(4))/b2
+!      c2yp(3)=2.d0*(3.d0*yv-y(1)-y(2)-y(4))/b3
+!      c2yp(4)=2.d0*(3.d0*yv-y(1)-y(2)-y(3))/b4
+!      !write(*,*)'c2yp=',c2yp
+
       do 10 i=1,4
         do 11 j=1,4
           f=f+cx(i)*cy(j)*p(i,j)
-          dfdx=dfdx+cxp(i)*cy(j)*p(i,j)
-          dfdy=dfdy+cx(i)*cyp(j)*p(i,j)
-          d2fdx2=d2fdx2+c2xp(i)*cy(j)*p(i,j)
-          d2fdy2=d2fdy2+c2yp(j)*cx(i)*p(i,j)
+          !dfdx=dfdx+cxp(i)*cy(j)*p(i,j)
+          !dfdy=dfdy+cx(i)*cyp(j)*p(i,j)
+          !d2fdx2=d2fdx2+c2xp(i)*cy(j)*p(i,j)
+          !d2fdy2=d2fdy2+c2yp(j)*cx(i)*p(i,j)
  11     continue
  10   continue
-      if (nx.gt.0) return
-      dfdx=dfdx/d2fdx2
-      dfdy=dfdy/d2fdy2
-c
-c
+      !write(*,*)'pfit: exit'
+      !pause
+      !if (nx.gt.0) return
+      !if(abs(d2fdx2).le.1.d-9)write(*,*)'pfit: d2fdx2=0, dfdx=',dfdx
+      !if(abs(d2fdy2).le.1.d-9)write(*,*)'pfit: d2fdy2=0, dfdy=',dfdy
+      !dfdx=dfdx/d2fdx2
+      !dfdy=dfdy/d2fdy2
+
       return
-      end
+      end subroutine pfit
 c
 c
       subroutine polfit(ideg,npnts,x,y,coeff,ier)
@@ -3163,15 +3227,17 @@ c000114*Not portable*         y=drand(iflag)
  10   a=a+y
       ranorm=(a-0.5*k)/rtkd12
       return
-      end
+      end function ranorm
+      
+      
       real*8 function reldif(x1,x2)
       implicit integer (i-n), real*8 (a-h,o-z)
       del=abs(x1-x2)
       xabs=abs(x1)
-      if(xabs.gt.1.0e-20) del=del/xabs
+      if(xabs.gt.1.0D-20) del=del/xabs
       reldif=del
       return
-      end
+      end function reldif
 c
 c
       subroutine revers(x,work,n)
@@ -3589,9 +3655,9 @@ c     below 1.e6 ev, use riviere's fit       above 1.e6 ev, use
 c     power-law extrapolation.
 c
       if(er .gt. 1.e6)goto 105
-      siif1=(.6937e-14)*(1.-.06732*aer)**2/(1.+.1112e-14*er**3.3)
+      siif1=(.6937D-14)*(1.-.06732*aer)**2/(1.+.1112D-14*er**3.3)
       goto 110
- 105  siif1=(4.8363e-22)/((1.e-6)*er)**3.3
+ 105  siif1=(4.8363D-22)/((1.D-6)*er)**3.3
 c
  110  scxif=siif1
       return
@@ -3600,9 +3666,9 @@ c
       ansq=(nfhx(i))**2
       xtilda = ansq*er/9260.
       scxif = 0.
-      if(xtilda.lt.1.) scxif=1.465e-11*xtilda*(ansq/er)
+      if(xtilda.lt.1.) scxif=1.465D-11*xtilda*(ansq/er)
       return
-      end
+      end function scxif
 c
 c
       real*8 function scxzf(i,z,er)
@@ -3618,7 +3684,7 @@ c
       ansq=(dfloat(ni))**2
       xtilda = ansq*er/(31250.*z)
       scxzf = 0.
-      if(xtilda.lt.1.) scxzf=1.465e-11*xtilda*(ansq*z*z/er)
+      if(xtilda.lt.1.) scxzf=1.465D-11*xtilda*(ansq*z*z/er)
       return
       end
 c
@@ -3635,7 +3701,7 @@ c
       omega=.5*(1./((dfloat(ni))**2)-1./((dfloat(nj))**2))
       alam=sqrt(f(ni,nj)/(2.*omega))
       beta=z*alam*omega/(er/24982.)
-      sdaccf=(1.7595e-16)*(z*alam/omega)*dfhx(beta)
+      sdaccf=(1.7595D-16)*(z*alam/omega)*dfhx(beta)
       return
       end
 c
@@ -3705,11 +3771,11 @@ c--   1s to 2s:
       goto 223
 c--   linear interpolation for region just above threshold:
  221  continue
-      seef=((er-10.2)/.9)*1.6297e-17
+      seef=((er-10.2)/.9)*1.6297D-17
       goto 223
 c--   asymptotic:
  222  continue
-      seef=(5.312e-16)/er
+      seef=(5.312D-16)/er
  223  continue
       return
 c
@@ -3721,22 +3787,22 @@ c--   1s to 2p:
       goto 233
 c--   asymptotic:
  232  continue
-      seef=(2.65571e-15/er)*(aer-2.120681)
+      seef=(2.65571D-15/er)*(aer-2.120681)
  233  continue
       return
 c
 c--   2s to 2p:
  240  continue
-c990131      seef=(8.617e-15/er)*alog(1.14e4*er)
-      seef=(8.617e-15/er)*log(1.14e4*er)
+c990131      seef=(8.617D-15/er)*alog(1.14e4*er)
+      seef=(8.617D-15/er)*log(1.14e4*er)
       return
 c
  250  continue
       ni=nfhx(i)
       nj=j-1
 c--   from vriens & smeets (eq.(14)):
-c990131   seef=(1.75947e-16*ryd)*(ae(ni,nj)*alog(.5*er/ryd+de1(ni,nj))
-      seef=(1.75947e-16*ryd)*(ae(ni,nj)*log(.5*er/ryd+de1(ni,nj))
+c990131   seef=(1.75947D-16*ryd)*(ae(ni,nj)*alog(.5*er/ryd+de1(ni,nj))
+      seef=(1.75947D-16*ryd)*(ae(ni,nj)*log(.5*er/ryd+de1(ni,nj))
      *  +be(ni,nj))/(er+ge1(ni,nj))
 c990131      seef=amax1(seef,0.)
       zero=0.d0
@@ -3751,7 +3817,7 @@ c
  3939 format(' ??? seef error: i4,j are in error       i4=',i3,
      &  /,'   j = ',i3)
       return
-      end
+      end function seef
 c
 c
       subroutine setrz(ndim,rmin,rmax,zmin,zmax,dr,dz,nr,nz)
@@ -3822,7 +3888,7 @@ c
 c--   1s to 2s:
  220  continue
       if(er .ge. emin12)goto 221
-      sezf=2.8875e-18*(er/emin12)**.7093
+      sezf=2.8875D-18*(er/emin12)**.7093
       goto 223
  221  continue
       if(er .ge. emax12)goto 222
@@ -3830,7 +3896,7 @@ c--   1s to 2s:
 c@    sezf=exp(polyf(ai12,11,aer))
       goto 223
  222  continue
-      sezf=1.9564e-12/er
+      sezf=1.9564D-12/er
  223  continue
       sezfsv = sezf
       return
@@ -3838,7 +3904,7 @@ c
 c--   1s to 2p:
  230  continue
       if(er .ge. emin13)goto 231
-      sezf=1.4053e-17*(er/emin13)**.95695
+      sezf=1.4053D-17*(er/emin13)**.95695
       goto 233
  231  continue
       if(er .ge. emax13)goto 232
@@ -3850,15 +3916,15 @@ cBH120202      sezf=exp(polyf(ai13,twelve,aer))
       sezf=exp(polyf(ai13,n12,aer))
       goto 233
  232  continue
-c990131      sezf=(6.7085e-13/er)*alog(5701.79*er)
-      sezf=(6.7085e-13/er)*log(5701.79*er)
+c990131      sezf=(6.7085D-13/er)*alog(5701.79*er)
+      sezf=(6.7085D-13/er)*log(5701.79*er)
  233  continue
       sezfsv = sezf
       return
 c
 c--   2s to 2p:
-c990131 240  sezf=(1.584e-10/er)*alog(.62*er)
- 240  sezf=(1.584e-10/er)*log(.62*er)
+c990131 240  sezf=(1.584D-10/er)*alog(.62*er)
+ 240  sezf=(1.584D-10/er)*log(.62*er)
 c990131      sezf=amax1(sezf,0.)
       zero=0.d0
       sezf=max(sezf,zero)
@@ -3948,7 +4014,7 @@ c@    * 5.5114285405e-17,-2.4253587346e-18, 3.0573876445e-20/
 c
 c--   be across section (ansq=n**2, ery=e/ryd):
       sbea(ansq,ery)=
-     *  (3.519e-16)*(5.*ansq/3.-1./ery-2./(3.*ansq*ery*ery))
+     *  (3.519D-16)*(5.*ansq/3.-1./ery-2./(3.*ansq*ery*ery))
      *  /(ery+3.25/ansq)
 c
       sief=0.
@@ -3964,7 +4030,7 @@ c--   1s:
       sief=polyf(ae1,7,aer)
       goto 113
  112  continue
-      sief=(1.3563e-15/er)*(aer+1.823647)
+      sief=(1.3563D-15/er)*(aer+1.823647)
  113  continue
       return
 c
@@ -3975,7 +4041,7 @@ c--   2s:
       sief=polyf(ae2,9,aer)
       goto 123
  122  continue
-      sief=(8.195137e-15/er)*(aer-.9445204)
+      sief=(8.195137D-15/er)*(aer-.9445204)
  123  continue
       return
 c
@@ -3985,7 +4051,7 @@ c--   2p and higher:
       if(er .le. ryd/ansq)return
       sief=sbea(ansq,er/ryd)
       return
-      end
+      end function sief
 c
 c
       real*8 function siif(i,er)
@@ -4033,9 +4099,9 @@ c     below 1.e6 ev, use riviere's fit       above 1.e6 ev, use
 c     power-law extrapolation.
 c
       if(er .gt. 1.e6)goto 105
-      siif1=(.6937e-14)*(1.-.06732*aer)**2/(1.+.1112e-14*er**3.3)
+      siif1=(.6937D-14)*(1.-.06732*aer)**2/(1.+.1112D-14*er**3.3)
       goto 110
- 105  siif1=(4.8363e-22)/((1.e-6)*er)**3.3
+ 105  siif1=(4.8363D-22)/((1.D-6)*er)**3.3
 c
 c     ion-impact ionization.
 c     at low energies or high energies, use riviere's fits
@@ -4059,16 +4125,16 @@ c@    siif2=exp(polyf(ai1,6,aer))
  113  continue
       siif2=exp(-80.206+8.156*aer-.3784*aer*aer)
       goto 120
- 114  siif2=(1.56346e-12/er)*(aer-1.792160)
+ 114  siif2=(1.56346D-12/er)*(aer-1.792160)
  120  continue
       siif=siif1+siif2
       return
 c
  200  continue
       ansq=(nfhx(i))**2
-      siif=(1.465e-11)*(ansq/er)*(1.-exp(-ansq*er/9260.))
+      siif=(1.465D-11)*(ansq/er)*(1.-exp(-ansq*er/9260.))
       return
-      end
+      end function siif
 c
 c
       real*8 function sizf(i,z,er)
@@ -4082,7 +4148,7 @@ c
       if(ni.eq.1)id=1
 c
       ansq=(dfloat(ni))**2
-      sizf=(1.465e-11)*(ansq*z*z/er)*(1.-exp(-ansq*er/(31250.*z)))
+      sizf=(1.465D-11)*(ansq*z*z/er)*(1.-exp(-ansq*er/(31250.*z)))
       return
       end
 c
@@ -4139,7 +4205,7 @@ c
 c     calculate taus, the Spitzer momentum exchange time for electron-ion
 c     collisions
 c
-        teerg = 1.6e-9*te(j)
+        teerg = 1.6D-9*te(j)
 c990131        xlam  = 24. - alog(sqrt(ene(j))/(1.e3*te(j)))
         xlam  = 24. - log(sqrt(ene(j))/(1.e3*te(j)))
         ztaue = sqrt(xmasse*teerg**3)
@@ -4460,10 +4526,10 @@ cBH131015      external RANDOM_my  ! random number generator
 c
       data pio180 /0.017453293D0/
       data rt2 /1.414213562D0/
-      data seed0 /0.0/
+      data seed0 /0.d0/
 c
       x0 = 0.D0
-      isourc = 1
+      isourc=1 !YuP/note: This line changes isourc from 0 to 1 at 1st call
       if (nsourc.eq.1) goto 10
 c
 c     two sources (DIII-D case)
@@ -4471,7 +4537,7 @@ c     sfrac1 is fraction of source current coming from source 1 (upper
 c     or rightmost source, assuming positive offsets).
 
 c        if (RANF().gt.sfrac1(ib)) isourc = -1
-      if (RANDOM_my(seed0) .gt. sfrac1(ib)) isourc = -1
+      if (RANDOM_my(seed0).gt.sfrac1(ib)) isourc=-1 !Only if nsourc>1
    10 if (nbshape(ib).ne.'circ') go to 20
 c
 c   12 y0 = RANF() - 0.5D0
@@ -4522,18 +4588,23 @@ c
       vy0 = vy0 + thy * pio180 * vx0
 c
       return
-      end
+      end subroutine sorspt1
 c
 c
       subroutine timtor(rin, rmax, x0, y0, z0, vx0, vy0, vz0,
      *  zmin, zmax, tenter, texit)
-      implicit integer (i-n), real*8 (a-h,o-z)
+      implicit none !integer (i-n), real*8 (a-h,o-z)
 c
 c     This subroutine calculates the times for a particle to enter and
 c     exit a toroidal box surrounding the plasma starting from the
 c     point (x0,y0,z0) and moving with velocity (vx0,vy0,vz0).
 c
-      dimension edge(4),timsol(6)
+      real*8 rin,rmax,zmin,zmax, x0, y0, z0, vx0, vy0, vz0 !IN
+      real*8 tenter, texit !OUT
+      real*8 edge(4),timsol(6) !local
+      real*8 zero,aa,bb,cc,arg,sqr,xx,yy,zz,rr,tt !local
+      integer isol,i,iin !local
+      
 c
       zero=0.d0
 
@@ -4597,8 +4668,13 @@ c
 c
 c     return if particle misses box
 c
-      tenter = -1.e10
+      tenter = -1.d10 !YuP[2022-12] was -1.e10
       if(isol.eq.0) return
+      
+      if(isol.gt.6)then
+        WRITE(*,*)'subr.timtor: isol>6  BUG?'
+        STOP
+      endif
 c
 c     calculate times to enter and exit box
 c
@@ -4609,7 +4685,7 @@ c
         iin=i
         tenter=timsol(i)
  80   continue
-      texit=1.e10
+      texit=1.d10 !YuP[2022-12] was 1.e10
       do 90 i=1,isol
         if(i.eq.iin) go to 90
         if(timsol(i).lt.texit) texit=timsol(i)
@@ -4618,17 +4694,18 @@ c      write(*,*) 'x0,y0,z0,vx0,vy0,vz0,tenter,texit',
 c     +     x0,y0,z0,vx0,vy0,vz0,tenter,texit
 
       return
-      end
+      end subroutine timtor
 c
 c
       subroutine tozone(x,y,n,xz,yz,nz,nout,ncrt)
       implicit integer (i-n), real*8 (a-h,o-z)
+      integer iz,ip
       save
 c     ---------------------------------------------------------------
 c     convert from point values to zone values
 c     ---------------------------------------------------------------
       dimension x(*),y(*),xz(*),yz(*)
-      data tol/1.0e-20/
+      data tol/1.0D-20/
 c
       ip=1
       iz=1
@@ -4703,7 +4780,8 @@ c.......................................................................
       subroutine inject_old (atw,codeid,drutpi,droti,dri,dzi,elongi,
      .    ib,ie,mfm1,mim1,mjm1,newpar,psiax,psi,r,rmajor,rin,rmax,sgxn,
      .    sgxnmi,x0,y0,z0,vx0,vy0,vz0,vbeam,z,zax,zmin,zmax,izone,pzone,
-     .    rzone,rpos,xpos,ypos,zpos)
+     .    rzone,rpos,xpos,ypos,zpos) !for iexcit.le.0 only
+      !YuP: subr.inject_old might have bugs in sgxn() array usage.
 
 c     This subroutine follows the particle from the pivot point
 c     into, through, or around the plasma. It is the older version
@@ -4764,7 +4842,8 @@ c      write(*,*) 'vz0 = ',vz0
 c      write(*,*) 'zmin = ',zmin
 c      write(*,*) 'zmax = ',zmax
 c      write(*,*) 'tenter = ',tenter
-          if (tenter.le.-1.e10) go to 20
+          if (tenter.le.-1.d10) go to 20 
+           !YuP[2022-12] was -1.e10
 c
 c... advance particle to edge of box
 c
@@ -4804,7 +4883,7 @@ c
           if (codeid.eq.'onedee') then
             rzone2 = (rpos-rmajor) ** 2 + (elongi*(zpos-zax)) ** 2
             rzone = SQRT (rzone2)
-            izone = rzone * droti + 1.
+            izone= INT(rzone * droti + 1.d0)  !YuP[2022-12] INT()
           else
 c
 c... Determine zone in which particle collides for general geometry;
@@ -4828,8 +4907,8 @@ c
               call pfit(psi(i-1,j-1),r(i-1),z(j-1),rpos,zpos,ki,pzone,
      .            dum,dum)
             endif
-            pzone = MAX(pzone,psiax)
-            izone = SQRT (pzone-psiax) * drutpi + 1.
+            pzone= MAX(pzone,psiax)
+            izone= INT(SQRT(pzone-psiax)*drutpi +1.d0) !YuP[2022-12] INT()
 c            write(*,*) 'izone-inject = ',izone
           endif ! codeid
 c
@@ -4837,9 +4916,14 @@ c... If particle has psuedo-collision, continue following particle;
 c    If particle has real collision, return
 c
           if (izone.gt.mfm1) go to 10
-c          if (ranf().gt.sgxn(izone,ie,ib)*sgxnmi(ie,ib)) go to 10
+!YuP/was          if (RANDOM_my(seed0) .gt. 
+!YuP/was     .       sgxn(4,izone,ie,ib)*sgxnmi(ie,ib))  go to 10
+          !YuP[2022-12-15] BUG in inject_old?
+          !See above: real*8 sgxn(kcmp1,kz,kbe,ksge)
+          index=ke*(ib-1)+ie !YuP[2023-01-24] combined energy&beam_index
+          !YuP[2023-01-24] Changed to:
           if (RANDOM_my(seed0) .gt. 
-     .       sgxn(4,izone,ie,ib)*sgxnmi(ie,ib))  go to 10
+     .       sgxn(4,izone,index,1)*sgxnmi(ie,ib))  go to 10
           return
 c
         endif ! tt.lt.texit
@@ -4848,10 +4932,10 @@ c
 c
 c... set flag to indicate that particle hit wall
 c
-   20 izone = mfm1 + 1
+   20 izone= mfm1 + 1
 c
       return
-      end
+      end subroutine inject_old
 
 
       subroutine inject1 (atw,codeid,debin,drutpi,droti,dri,ds1,dzi,
@@ -4859,10 +4943,10 @@ c
      .                   mjm1,nebin,newpar,nout,psiax,psi,r,rmajor,rin,
      .                   rmax,sgxn,sgxnloc,sgxnmi,x0,y0,z0,vx0,vy0,vz0,
      .                   vbeam,z,zangrot,zax,zmin,zmax,izone,
-     .                   pzone,rzone,rpos,xpos,ypos,zpos,myid,tenter,
+     .                   pzone,rzone,rpos,xpos,ypos,zpos,tenter,
      .                   smax,texit)
 c
-      implicit  integer (i-n), real*8 (a-h, o-z)
+      implicit none ! integer (i-n), real*8 (a-h, o-z)
 c
 c ----------------------------------------------------------------------
 c  This subroutine follows the particle from the pivot point into,
@@ -4874,7 +4958,24 @@ c  appreciable increase in accuracy.
 c ----------------------------------------------------------------------
 c
 cBH131015      external  RANDOM_my             ! random number generator
-      dimension cvec(200)
+      integer ib,ie,kb,kbe,ksge,ke,kz,ki,mfm1,mim1,mjm1,newpar !IN
+      integer nebin !IN  nebin==ne_tk in cqlinput
+      integer nout !IN
+      integer izone !OUT
+      real*8 x0,y0,z0,vx0,vy0,vz0 !IN/OUT
+      real*8 dzi,dri,psiax,droti !IN
+      real*8 debin !IN debin==de_tk in cqlinput
+      real*8 ds1 !IN  ds1==ds_tk in cqlinput
+      real*8 pzone,rzone,rpos,xpos,ypos,zpos !IN/OUT
+      real*8 atw,zax,zmin,zmax,elongi,rmajor,rin,rmax !IN
+      real*8 drutpi !IN
+      real*8 smax !OUT
+      real*8 texit,tenter !to be found in subr.timtor
+      real*8 x1,y1,z1,delt,dt1,area1,area2,area3,area4,p1,r1,tt !local
+      real*8 vrel1,ptest,smin_time,rzone2,eova,vrel2,dum,dfac,tstep !local
+      real*8 psix,smin_step,xnorm,vdotu,usq !local
+      integer i,j,n1,ktk,ir,iz,izone1,ne1,index !local
+      real*8 cvec(200) !local
       data      cvec
      .     /  1.0,  2.0,  3.0,  4.0,  5.0,  6.0,  7.0,  8.0,  9.0, 10.0,
      .       11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0,
@@ -4899,16 +5000,25 @@ cBH131015      external  RANDOM_my             ! random number generator
 c
       parameter (ktk = 100)
       character*8  codeid
-      integer i1(ktk)
-      real*8 sgxn(4,kz,kbe,ksge), sgxnloc(kbe), 
-     .       sgxnmi(ke,kb), vbeam(ke,kb)
-      dimension r(*), z(*), psi(ki,*)
-      real*8 zangrot(kz), e1(ktk), sgxntab(ktk)
-      data   seed0    /0.0/
+      integer i1(ktk) !local
+      real*8 sgxn(4,kz,kbe,ksge)
+      real*8 sgxnmi(ke,kb), vbeam(ke,kb)
+      real*8 sgxnloc(4) !YuP[2022-12-15] Was (kbe)
+      real*8 r(*), z(*), psi(ki,*)
+      real*8 zangrot(kz) !INPUT
+      real*8 e1(ktk), sgxntab(ktk)
+      
+      real*8 seed0 !local
+      data   seed0 /0.d0/
+      
       real*8 kevperg, xmassp
-      data xmassp / 1.67262310e-24 /    ! proton   mass   (g)
-      data kevperg /6.2415064e+08/
+      data xmassp / 1.67262310d-24 /    ! proton   mass   (g)
+      data kevperg /6.2415064d+08/
 c
+      real*8 wk_r(4),wk_z(4), wk_p(4,4)
+      
+      real*8 amaxaf,random_my !external func
+      
 c     the following assumes that data from previous
 c     particle is saved. this ok only if passed through
 c     argument list. HSJ
@@ -4918,12 +5028,10 @@ c
         e1(i)=0.D0
         sgxntab(i)=0.D0
       enddo
-      do i=1,kbe
-        sgxnloc(i)=0.D0
-      enddo
+      sgxnloc=0.D0 !initialize for all (:)
 c
 c      write(*,*)
-c      write(*,*) 'inside subroutine inject...',newpar
+!      if(ib.eq.2)write(*,*) 'inside subroutine inject...',newpar
 c      write(*,*) 'atw = ',atw
 c      write(*,*) 'codeid = ',codeid
 c      write(*,*) 'debin = ',debin
@@ -4939,27 +5047,24 @@ c      write(*,*) 'z0 = ',z0
 c      write(*,*) 'ib,ie,kbe = ',ib,ie,kbe
 c      write(*,*) 'ke,kz,ki = ',ke,kz,ki
 c      write(*,*) 'mfm1,mim1,mjm1 = ',mfm1,mim1,mjm1
-c      write(*,*) 'nebin = ',nebin
+!      if(ib.eq.2)write(*,*) 'nebin = ',nebin
 c      write(*,*) 'newpar = ',newpar
       if (newpar .eq. 0)  go to 100
 c
 c calculate times for particle to enter and exit toroidal box surrounding plasma
 c
-      call timtor (rin,rmax,x0,y0,z0,vx0,vy0,vz0,zmin,zmax,tenter,texit)
-c      write(*,*)
-c      write(*,*) 'after timtor ...'
-c      write(*,*) 'rin = ',rin
-c      write(*,*) 'rmax = ',rmax
-c      write(*,*) 'x0 = ',x0
-c      write(*,*) 'y0 = ',y0
-c      write(*,*) 'z0 = ',z0
-c      write(*,*) 'vx0 = ',vx0
-c      write(*,*) 'vy0 = ',vy0
-c      write(*,*) 'vz0 = ',vz0
-c      write(*,*) 'zmin = ',zmin
-c      write(*,*) 'zmax = ',zmax
-c      write(*,*) 'tenter = ',tenter
-      if (tenter .le. -1.0e10)  go to 140
+      call timtor(rin,rmax,x0,y0,z0,vx0,vy0,vz0,zmin,zmax,tenter,texit)
+      if(tenter.le.-1.0d10)then !just a printout
+        !write(*,*)
+        write(*,'(a,1pe11.3,a,1p2e11.3)') 'after timtor: tenter=',
+     &           tenter,' x0,vx0= ',x0,vx0
+        !write(*,*) 'rin,rmax= ',rin,rmax
+        !write(*,*) 'x0,vx0= ',x0,vx0
+        !write(*,*) 'y0 = ',y0
+        !write(*,*) 'z0 = ',z0
+        !write(*,*) 'zmin,zmax= ',zmin,zmax
+      endif !printout
+      if (tenter .le. -1.0d10)  go to 140 !izone=mfm1+1, exit
 c
 c advance particle to edge of box
 c
@@ -4967,7 +5072,7 @@ c
       y0 = y0 + vy0*tenter
       z0 = z0 + vz0*tenter
 c
-      if (nebin .ne. 0) then
+      if (nebin .ne. 0) then !toroidal rotation (ne_tk>0)
 c
 c ----------------------------------------------------------------------
 c follow collisionless neutral trajectory to obtain minimum mean free path.
@@ -4981,13 +5086,13 @@ c                                            Daniel Finkenthal    9-6-95
 c ----------------------------------------------------------------------
 c
       smax = vbeam(ie,ib) * (texit-tenter)
-      n1   = 2.0 + smax/ds1
+      n1   = 2.0 + smax/ds1 !ds1==ds_tk in cqlinput
       if (n1 .gt. ktk) then
         n1  = ktk
-        ds1 = smax / FLOAT (n1-1)
+        ds1 = smax / dble(n1-1) !YuP[2022-12-19] was FLOAT
         write (nout, 200) ds1
       endif
-      dt1 = smax / (FLOAT (n1-1) * vbeam(ie,ib))
+      dt1 = smax / (dble(n1-1) * vbeam(ie,ib)) !YuP[2022-12-19] was FLOAT
       ne1 = 0
 c
       if (codeid .eq. 'onedee') then
@@ -5014,7 +5119,7 @@ c
             e1(ne1) = ABS (e1(ne1))
           endif
         enddo
-      else
+      else !(codeid .ne. 'onedee')
         do i=1,n1
           delt  = (cvec(i) - 1.0) * dt1
           x1    = x0 + delt*vx0
@@ -5044,7 +5149,7 @@ c
             e1(ne1) = ABS (e1(ne1))
           endif
         enddo
-      endif
+      endif !(codeid)
 c
 c      write(*,*)
 c       write(*,*) 'calling getsgxn ...'
@@ -5061,17 +5166,19 @@ c      write(*,*) 'nebin = ',nebin
 c      write(*,*) 'debin = ',debin,' in inject'
 c      write(*,*) 'sgxn(4,22,3,2)-pre = ',sgxn(4,22,3,2)
 c
- 10   call getsgxn (e1, i1, ne1, ktk, ib, ie, sgxn, nebin, debin, kbe,
+ 10   call getsgxn (e1, i1, ne1, ktk, ib, ie, sgxn, nebin, debin, kbe, !Tor.rot.case
      .              ksge, kz, nout, sgxntab)
-c      write(*,*) 'after call to getsgxn ...'
-c      write(*,*) 'ne1 = ',ne1
+      !write(*,*) 'after call to getsgxn ...'
+      !write(*,*) 'ne1 = ',ne1
 c      do i=1,ne1
 c       write(*,*) i, sgxntab(i), ' sgxntab'
 c      enddo
       xnorm         = amaxaf (sgxntab, 1, ne1)
       sgxnmi(ie,ib) = 1.0 / xnorm
 c      write(*,*) 'sgxnmi(ie,ib) = ',sgxnmi(ie,ib)
-      end if
+      end if ! nebin.ne.0
+      
+      
 c      stop
 c
 c ----------------------------------------------------------------------
@@ -5084,14 +5191,14 @@ c
       ypos      = y0
       zpos      = z0
       tt        = tenter
-      izone     = mfm1 + 1     ! initially neutral is outside the plasma
+      izone= mfm1 + 1     ! initially neutral is outside the plasma
       smin_step = 0.1                           ! 0.1 cm min step or
       smin_step = MIN (smin_step, smax/1000.0)  ! make scale-independent
       smin_time = smin_step / SQRT (vx0**2 + vy0**2 + vz0**2)
 c
 c... follow particle into plasma
 c
-  110 dfac  = -LOG (RANDOM_my (seed0))
+  110 dfac  = -LOG(RANDOM_my(seed0))
 c
 c     if neutral is not yet in the plasma (izone ge mf) then take steps
 c     of minimum size 1 mm until we enter the plasma. we could find the
@@ -5102,6 +5209,7 @@ c     the plasma and will be a significant savings if the cross sections
 c     are large. dfac is 1/exponentially distributed, so for large steps
 c     don't modify tstep. --------------------------- 27 Oct 95 ---- HSJ
 c
+
       if (izone .le. mfm1) then                     !  inside the plasma
         tstep =      dfac * sgxnmi(ie,ib) / vbeam(ie,ib)
       else
@@ -5110,7 +5218,12 @@ c
       endif
 c
       tt    = tt  + tstep
-      if (tt .ge. texit)  go to 140
+      if (tt .ge. texit)  then
+!       write(*,'(a,i2,i5,1p3e9.2)') 
+!     &  'inject1: ie,izone,sgxnmi,vbeam,smin_time=',
+!     &  ie,izone,sgxnmi(ie,ib),vbeam(ie,ib),smin_time
+       go to 140 !izone=mfm1+1, exit
+      endif
       xpos = xpos + vx0*tstep
       ypos = ypos + vy0*tstep
       zpos = zpos + vz0*tstep
@@ -5120,8 +5233,8 @@ c  determine zone in which particle collides for 'onedee' geometry
 c
       if (codeid .eq. 'onedee') then
         rzone2 = (rpos-rmajor)**2 + (elongi*(zpos-zax))**2
-        rzone  = SQRT (rzone2)
-        izone  = rzone*droti + 1.0
+        rzone= SQRT (rzone2)
+        izone= INT(rzone*droti + 1.d0)  !YuP[2022-12] INT()
       else
 c
 c  determine zone in which particle collides for general geometry;
@@ -5132,8 +5245,12 @@ c
         j     = (zpos-z(1))*dzi+1.0
         i     = MIN0 (i,mim1)
         j     = MIN0 (j,mjm1)
+        
         psix  = MIN  (psi(i,j),psi(i+1,j),psi(i,j+1),psi(i+1,j+1))
         ptest = (psix-psiax)*(drutpi/mfm1)**2
+        
+!      if(ib.eq.2)write(*,*)'ptest=',ptest
+
         if (ptest .ge. 0.02) then
           area1 = (rpos-r(i))*(zpos-z(j))
           area2 = (r(i+1)-rpos)*(zpos-z(j))
@@ -5144,25 +5261,42 @@ c
         else
          !YuP160330: Avoiding out of bounds occuring near R=0 for mirror geometry
          if (i.ne.1) then
-         call pfit(psi(i-1,j-1), r(i-1), z(j-1), rpos, zpos, ki, pzone,
-     *   dum, dum)
+           !YuP[2018-01-24] Small mod. of input for pfit:    
+           ! Note: subroutine pfit(p,x,y, xv,   yv,  nx,  f,   dfdx,dfdy)
+           ! It uses: p(4,4),x(4),y(4)
+           dum=0.d0
+           pzone=0.d0
+           wk_r(1:4)=r(i-1:i+2)
+           wk_z(1:4)=z(j-1:j+2)
+           wk_p(1:4,1:4)=psi(i-1:i+2,j-1:j+2)
+           call pfit(wk_p, wk_r, wk_z, rpos, zpos, ki, pzone, dum, dum)
+!           if(ib.eq.2)write(*,*)'pzone,psiax,ki=',pzone,psiax,ki
+cyup         call pfit(psi(i-1,j-1), r(i-1), z(j-1), rpos, zpos, ki, pzone,
+cyup     *   dum, dum)
          else
-         call pfit(psi(1,j-1), r(1), z(j-1), rpos, zpos, ki, pzone,
-     *   dum, dum)
+           dum=0.d0
+           pzone=0.d0
+           wk_r(1:4)=r(1:4)
+           wk_z(1:4)=z(j-1:j+2)
+           wk_p(1:4,1:4)=psi(1:4,j-1:j+2)
+           call pfit(wk_p, wk_r, wk_z, rpos, zpos, ki, pzone, dum, dum)
+cyup         call pfit(psi(1,j-1), r(1), z(j-1), rpos, zpos, ki, pzone,
+cyup     *   dum, dum)
          endif
      
         endif
-        pzone =  MAX (pzone,psiax)
-        izone = SQRT (pzone-psiax)*drutpi + 1.0
+        pzone=  MAX(pzone,psiax)
+        izone= INT(SQRT(pzone-psiax)*drutpi + 1.d0)
 c        write(*,*) '** izone = ',izone,psiax
       endif
 c
 c... if particle has psuedo-collision, continue following particle.
 c    if particle has real collision, return.
 c
+
       if (izone .gt. mfm1)  go to 110 ! the particle is inside the box..
 c                                     ..but still outside the plasma
-      if (nebin .ne. 0) then
+      if (nebin .ne. 0) then !toroidal rotation case (ne_tk>0)
         usq   = (rpos*zangrot(izone))**2
         vdotu = (xpos*vy0-ypos*vx0)*zangrot(izone)
         vrel2 = vbeam(ie,ib)**2 + usq - 2.0*vdotu
@@ -5170,35 +5304,37 @@ c                                     ..but still outside the plasma
         eova  = ABS (eova)
 c        write(*,*) 'eova = ',eova
 c        write(*,*) 'vrel2 = ',vrel2
-        call getsgxn (eova, izone, 1, ktk, ib, ie, sgxn, nebin,
+        call getsgxn (eova, izone, 1, ktk, ib, ie, sgxn, nebin, !tor.rot.case
      .                debin, kbe, ksge, kz, nout, sgxnloc)
-      else
+      else ! nebin==ne_tk=0
         index      = ke*(ib-1) + ie
-        sgxnloc(1) = sgxn(1,izone,index,1)
-        sgxnloc(2) = sgxn(2,izone,index,1)
-        sgxnloc(3) = sgxn(3,izone,index,1)
-        sgxnloc(4) = sgxn(4,izone,index,1)
+        sgxnloc(1)= sgxn(1,izone,index,1) !Here: inject1(nebin=0; no rotation)
+        sgxnloc(2)= sgxn(2,izone,index,1) !Here: inject1(nebin=0; no rotation)
+        sgxnloc(3)= sgxn(3,izone,index,1) !Here: inject1(nebin=0; no rotation)
+        !YuP[2023-01] In present logic, we only need sgxnloc(4)= sgxn(4,*)
+        !In fact, other sgxnloc(1:3)=sgxn(1:3,*) are computed with old nbsgold
+        !and are used for printout/comparison only]
+        sgxnloc(4)= sgxn(4,izone,index,1) !Here: inject1(nebin=0; no rotation)
       end if
-*     if (RANF   (     ) .gt. sgxnloc(4) * sgxnmi(ie,ib))  go to 110
-      if (RANDOM_my (seed0) .gt. sgxnloc(4) * sgxnmi(ie,ib))  go to 110
+      if (RANDOM_my(seed0) .gt. sgxnloc(4) * sgxnmi(ie,ib))  go to 110
       return
 c
 c... set flag to indicate that particle hit wall
 c
-  140 izone = mfm1 + 1
+  140 izone= mfm1 + 1
   200 format (' WARNING from subroutine INJECT1:'                  /
      .        '         maximum number of grid elements exceeded' /
      .        '         increasing ds1 to ', e10.3, ' cm')
       return
 c
-      end
+      end subroutine inject1
 
 c
 c
       subroutine nbsgxn (iexcit,namep,namei,mb,mfm1,nebin,nprim,nimp,
      .                   nion,atw_beam,atw,ebkev,ebfac,ibion,vbeam,
-     .                   zne,zni,zte,zti,zzi,debin,
-     .                   dtemax,dnemax,dzemax,hxfrac,sgxn,sgxnmi)
+     .                   zne,zni,zte,zti,zzi,debin,dtemax,dnemax,dzemax,
+     .                   hxfrac,sgxn,sgxnmi,ibstart)
 c
 c ----------------------------------------------------------------------
 c
@@ -5214,11 +5350,13 @@ c          ebkev(mb)      - maximum energy of mb-th neutral beamline
 c                           (keV)
 c          ebfac          - factor defining upper bound on energy bin
 c                           range,  > 1.0
+c                           (cqlinput: set fe_tk for ebfac)
 c          atw_beam         mass no. of beam
 c
 c          mb             - number of beamlines modeled
 c          mfm1           - number of flux zones minus one
 c          nebin          - number of energy bins (rotation case only)
+c                           (cqlinput: set ne_tk for nebin)
 c          vbeam(ie,mb)   - speed of ie-th energy group of the mb-th
 c                           beamline (cm/sec)
 c          zne(mfm1)      - local electron density (cm**-3)
@@ -5247,9 +5385,10 @@ c                   = 2, fraction of reactions producing species 1 ion;
 c                   = 3, fraction of reactions producing species 2 ion;
 c                   = 4, total inverse mean free path;
 c               j - FREYA zone index
-c               k - beam index
-c                   k = 3*(ib-1) + ie, where ib is the beam index and ie
+c               k - beam&energy index
+c                   k = ke*(ib-1) + ie, where ib is the beam index and ie
 c                                      is the beam energy group index
+c                                      and ke=3 (three energy groups).
 c               l - index for relative energy.  bins are equispaced in
 c                   delta(energy) between 0 and max(ebkev(ib))*ebfac,
 c                   with bin width given by
@@ -5278,7 +5417,7 @@ c
       character*8 namei(kimp), namep(kprim)   ! added for cql3d
       integer mb, mfm1, nion, nprim
       real*8  ebkev(kb), vbeam(ke,kb)
-      real*8  hxfrac(ke,kb),sgxnmi(ke,kb), sgxne(kz)
+      real*8  hxfrac(ke,kb),sgxnmi(ke,kb),sgxne(kbe) !YuP[2022-12]BUG? Was sgxne(kz)
       real*8  sgvxne(kz), sgxn(kcmp1,kz,kbe,ksge)  ! stand alone code
 c      real*8  sgvxne(kz), sgxn(kcmp1,kz,ke,kb)
 c here, atw(kion)=atw(5), atwpm(kprim)=atwpm(3), atwim(kimp)=atwim(2)
@@ -5301,10 +5440,10 @@ c ----------------------------------------------------------------------
         write(*,*) 'Calling Freeman-Jones routine...'
         call crsecs(iexcit,atw,ebkev,ibion,mb,mfm1,nion,vbeam,
      .              zne,zni,zte,zzi,dtemax,dnemax,dzemax,
-     .              sgvxne,sgxn,sgxnmi)
+     .              sgvxne,sgxn,sgxnmi,ibstart)
 c
-c         do ib = 1, mb
-c           do j = 1, 3
+c         do ib=ibstart,mb
+c           do j=1,3
 c             do i=1,mfm1
 c        write(*,'(3i3,2x,1p1e10.4,a12)') i,j,ib,sgxn(4,i,j,ib), ' sgxn'
 c             enddo
@@ -5317,13 +5456,26 @@ c ----------------------------------------------------------------------
 c Use ADAS routines (iexcit = 5)
 c ----------------------------------------------------------------------
       if (iexcit .eq. 5) then
-        write(*,*) 'Calling adassgxn routine...'
+        !write(*,*) 'Calling adassgxn routine...'
+        !write(*,'(a,1p3e11.2)') '  bef.adassgxn sgxnmi=',sgxnmi(1:ke,1)
         call adassgxn (namep,namei,mb,mfm1,nprim,nimp,nion,atw,
      .                 ebkev,ebfac,ibion,nebin,vbeam,zne,zni,zte,
-     .                 zti,zzi,debin,sgxn,sgxnmi,atw_beam)
+     .                 zti,zzi,debin,sgxn,sgxnmi,atw_beam,ibstart)
+        !Note the flow: 
+        !freya[621]
+        !  |-> nbsgxn(case of nebin=0, no rotation) --> 
+        !      |->adassgxn->nbsgold() where sgxn(1:4,*) are computed.
+        !      |->adassgxn->adasqh6: get sgxeff(1:3)==qrat(1:3), then
+        !                   sgxn(4,i,ind,1) = zne(i)*sgxeff(ie)
+        !                   sgxnmi(ie,ib)= MAX(sgxnmi(ie,ib),sgxn(4,i,ind,1))
+        !                   [adasqh6 only changes sgxn(4,*)]
+        !write(*,'(a,1p3e11.2)') '  aft.adassgxn sgxnmi=',sgxnmi(1:ke,1)
+        ! do j=1,3
+        ! write(*,'(a,4f8.5)')' aft.adassgxn: sgxn(1:4,1,ie)=',sgxn(1:4,1,j,1)
+        ! enddo
 c
-c        do ib = 1, mb
-c          do j = 1, 3
+c        do ib=ibstart,mb
+c          do j =1,3
 c            do i=1,mfm1
 c             write(*,'(3i4,2x,1p1e10.4,a16)') 
 c     .         i,j,ib,sgxn(4,i,j,ib), ' sgxn-nbsgxn'
@@ -5332,7 +5484,7 @@ c          enddo
 c        enddo
 c        stop
 c
-        return
+        return !-> exit from iexcit=5 option; No further changes in sgxn()
       endif
 c
 c ---------------------------------------------------- HSJ-2/5/98 ------
@@ -5422,11 +5574,12 @@ c stationary plasma case
 c ----------------------------------------------------------------------
 c
       if (nebin .eq. 0) then
-        do ib=1,mb
+      
+        do ib=ibstart,mb
           do ie=1,ke
             sgxnmi(ie,ib) = 0.D0
             ind  = ke*(ib-1) + ie
-            eova = 1.D3*ebkev(ib)/(FLOAT (ie)*atw_beam)
+            eova = 1.D3*ebkev(ib)/(dFLOAT(ie)*atw_beam) !YuP[2022-12-19] was FLOAT
             vbin = vbeam(ie,ib)
             do i=1,mfm1
               teev = 1.D3*zte(i)
@@ -5475,23 +5628,24 @@ c     .                      ihxerr)
             enddo
           enddo
         enddo
-        do ib=1,mb
+        do ib=ibstart,mb
           do ie=1,ke
             sgxnmi(ie,ib) = 1.D0 / sgxnmi(ie,ib)
           enddo
         enddo
-      else
+        
+      else !nebin>0
 c
 c ----------------------------------------------------------------------
 c rotating plasma case
 c ----------------------------------------------------------------------
 c
         ebmax = 0.D0
-        do ib=1,mb
+        do ib=ibstart,mb
           ebmax = MAX (ebmax,ebkev(ib))
         enddo
         ebmax = ebmax/atw_beam
-        debin = ebmax*ebfac/FLOAT (nebin)
+        debin = ebmax*ebfac/dFLOAT(nebin) !YuP[2022-12-19] was FLOAT
 c
         do 340 i=1,mfm1
         teev = 1.D3 * zte(i)
@@ -5504,26 +5658,27 @@ c
               zniim(j-nprim) = zni(i,j)
             endif
           enddo
-        endif
+        endif !(iexcit .ne. 0)
 c
 c       electron impact ionization independent of rotation speed
 c
-        do ib=1,mb
+        do ib=ibstart,mb
           do ie=1,ke
             ind = ke*(ib-1) + ie
             sgxne(ind) = fsgxne(vbeam(ie,ib),teev,zne(i))
           enddo
         enddo
+        !Here ind= ke*(mb-1) + ke
 c
         do 340 j=1,nebin
-        ebin = FLOAT (j) * debin
+        ebin = dFLOAT(j) * debin !YuP[2022-12-19] was FLOAT
         eova = 1.D3 * ebin
         sgxn(1,i,1,j) = 0.D0
-        do k=1,nion
+        do kk=1,nion
           sgxn(1,i,1,j) = sgxn(1,i,1,j)
-     .                  + fsgxni(atw(k),eova,zni(i,k),zzi(i,k))
-          if ((k .le. nprim) .and. (k .le. 2.0))
-     .      sgxn(k+1,i,1,j) = fsgxncx(atw(k),eova,zni(i,k))
+     .                  + fsgxni(atw(kk),eova,zni(i,kk),zzi(i,kk))
+          if ((kk .le. nprim) .and. (kk .le. 2.0))
+     .      sgxn(kk+1,i,1,j) = fsgxncx(atw(kk),eova,zni(i,kk))
         enddo
         if (iexcit .ne. 0) then
 c          call hexnb (istart, 1, ilorent, mstate, ncont, eova,
@@ -5538,23 +5693,32 @@ c     .                ncorin, rerate, rmfp, hexfrac, ihxerr)
             call STOP ('subroutine NBSGXN: problem #2', 46)
           endif
         endif
-        do 340 k=ind,1,-1
+
+cBH171014: Use of ind below is strange.  It has only been set in 
+cBH171014: above do 320 loop, with final value ind=ke*(mb-1)+ke.
+cBH171014: It's initial value is ke*(ibstart-1)+1.
+cBH171014: OK, I'll take this as final value in following loop.
+cBH171014        do 340 k=ind,1,-1
+        do 340 k=ind,ke*(ibstart-1)+1,-1  !ind=ke*(ib-1)+ie,beam energy index
           sgxn(1,i,k,j) = sgxn(1,i,1,j) + sgxne(k)
           sgxn(4,i,k,j) = sgxn(1,i,k,j) + sgxn(2,i,1,j) + sgxn(3,i,1,j)
           sgxn(1,i,k,j) = sgxn(1,i,k,j)/sgxn(4,i,k,j)
           sgxn(2,i,k,j) = sgxn(2,i,1,j)/sgxn(4,i,k,j)
           sgxn(3,i,k,j) = sgxn(3,i,1,j)/sgxn(4,i,k,j)
           if (iexcit .ne. 0)  sgxn(4,i,k,j) = 1.D0/rmfp
-  340   continue
-      endif
+  340   continue !i=1,mfm1 ; j=1,nebin ; k=ind,ke*(ibstart-1)+1,-1
+        !YuP: Same label for different loops - ok?
+  
+      endif !nebin 
 c
  1000 format (' subroutine NBSGXN reports a HEXNB return code of ', i5)
  1010 format (' ERROR: execution terminated - file "coronb" not found')
 c
       return
 c
-      end
-c
+      end subroutine NBSGXN
+      
+c=======================================================================
       real*8 function fsgxncx (atw, e, zni)
 c
       implicit integer (i-n), real*8 (a-h, o-z)
@@ -5573,13 +5737,13 @@ c
         sigcx = 0.0
       else
         aloge = LOG10 (e)
-        sigcx = 0.6937e-14 * (1.0 - 0.155*aloge)**2 /
-     .                       (1.0 + 0.1112e-14*e**3.3)
+        sigcx = 0.6937D-14 * (1.0 - 0.155*aloge)**2 /
+     .                       (1.0 + 0.1112D-14*e**3.3)
       endif
       fsgxncx = sigcx*zni
 c
       return
-      end
+      end function fsgxncx
 
       real*8 function fsgxne (vb, te, zne)
 c
@@ -5596,13 +5760,13 @@ c             zne - target electron density (cm**-3)
 c ----------------------------------------------------------------------
 c
       dimension cfione(7)
-      data      cfione /-3.173850e+01,  1.143818e+01, -3.833998    ,
-     .                   7.046692e-01, -7.431486e-02,  4.153749e-03,
-     .                  -9.486967e-05/
+      data      cfione /-3.173850D+01,  1.143818D+01, -3.833998    ,
+     .                   7.046692D-01, -7.431486D-02,  4.153749D-03,
+     .                  -9.486967D-05/
 c
       alogt = 0.0
       if (te .gt. 1.0    )  alogt = LOG (te)
-      if (te .gt. 1.0e+05)  alogt = 11.51
+      if (te .gt. 1.0D+05)  alogt = 11.51
       expo = (((((cfione(7) *alogt + cfione(6))*alogt + cfione(5))*alogt
      .          + cfione(4))*alogt + cfione(3))*alogt + cfione(2))*alogt
      .          + cfione(1)
@@ -5630,9 +5794,9 @@ c             zzi  - average charge state of target ion
 c ----------------------------------------------------------------------
 c
       dimension cfionp(7)
-      data      cfionp /-4.203309e+01,  3.557321    , -1.045134,
-     .                   3.139238e-01, -7.454475e-02,  8.459113e-03,
-     .                  -3.495444e-04/
+      data      cfionp /-4.203309D+01,  3.557321    , -1.045134,
+     .                   3.139238D-01, -7.454475D-02,  8.459113D-03,
+     .                  -3.495444D-04/
 c
       if (atw .le. 3.01) then
         aloge = LOG10 (eova)
@@ -5648,8 +5812,8 @@ c
         endif
         fsgxni = sigi*zni
       else
-        ekev   = 1.0e-3*eova
-        fsgxni = 1.0e-17*zni*46.0*zzi*(32.0*zzi/ekev)*
+        ekev   = 1.0D-3*eova
+        fsgxni = 1.0D-17*zni*46.0*zzi*(32.0*zzi/ekev)*
      .              (1.0 - EXP (-ekev/(32.0*zzi)))
       endif
       return
@@ -5659,6 +5823,7 @@ c
 c
       subroutine getsgxn (e, iz, ns, ktk, ib, ie, sgxn, nbins,
      .                    debin, kbe, ksge, kz, nout, sgxnloc)
+      !Only for nebin.ne.0 (Tor. rot. case)
 c
       implicit integer (i-n), real*8 (a-h, o-z)
 c
@@ -5679,18 +5844,18 @@ c                           i  - data type index
 c                                =1, fraction of interactions producing
 c                                    electrons;
 c                                =2, fraction of interactions producing
-c                                    neutral species 1;
+c                                    neutral species 1; (via CX)
 c                                =3, fraction of interactions producing
-c                                    neutral species 2;
+c                                    neutral species 2; (via CX)
 c                                =4, inverse mean free path (cm**-1)
 c                           iz - flux zone index
 c                           j  - beam/energy index, j = 3*(ib-1)+ie
 c                           k  - energy bin index
 c
 c --- output through argument list:
-c          sgxnloc(i)     - local neutral stopping data (cm**-1)
+c          sgxnloc(i=1:4) - local neutral stopping data (cm**-1)
 c                           i - data type index (see above)
-c                           note:  iftns>1, only the inverse mean free
+c                           note:  if ns>1, only the inverse mean free
 c                           path is evaluated (i = 4) and ns data points
 c                           are passed.  this facilitates faster
 c                           execution when evaluating the max imfp along
@@ -5714,7 +5879,8 @@ c
 c ----------------------------------------------------------------------
 c
       real*8 e(ns) !YuP[2019-06-17]: was e(ktk)   BUG?
-      real*8 sgxn(4,kz,kbe,ksge), sgxnloc(kbe)  ! stand alone code
+      real*8 sgxn(4,kz,kbe,ksge)
+      real*8 sgxnloc(4) !YuP[2022-12-15] Was (kbe)
       integer iz(ns) !YuP[2019-06-17]: was iz(ktk)   BUG?
       integer imaxa(200)
       integer,save :: imax 
@@ -5723,21 +5889,43 @@ c
 c
       ind = 3 * (ib - 1) + ie
       if (ns .gt. 1) then
+        !note:  if ns>1, only the inverse mean free
+        ! path is evaluated (i = 4) and ns data points
+        ! are passed.  this facilitates faster
+        ! execution when evaluating the max imfp along
+        ! the collisionless neutral trajectory (used
+        ! in rotating discharges only).  otherwise
+        ! more detailed information is passed in the
+        ! first four elements only (ns = 1).
         do i=1,ns
           ibin       = e(i) / debin + 1.0
           imaxa(i)   = ibin
           ibin       = MIN0 (ibin, nbins)
-          sgxnloc(i) = sgxn (4, iz(i), ind, ibin)
+          !YuP sgxnloc(i) = sgxn (4, iz(i), ind, ibin)
+          !YuP[2022-12-15] Probably a BUG? Maybe sgxnloc(4)=...
+          !YuP[2023-07-11] In other parts of zfreya, the usage is
+          !sgxn(1:4,1:kz,1:kbe,1:ksge), where kbe=kb*ke,ksge=20
+          if(ibin.gt.ksge) then
+            WRITE(*,*)'subr.getsgxn(a): ibin,ksge=',ibin,ksge
+            STOP 'subr.getsgxn ibin>ksge, Increase ksge' !YuP[2023-07-11]added
+          endif
+          sgxnloc(4) = sgxn(4, iz(i), ind, ibin) !YuP[2023-07-11]
         end do
         imax = maxaf (imaxa, 1, ns)
-      else       
+      else    !ns=1    
         ibin       = e(1) / debin + 1.0
         imax       = MAX0 (ibin, imax )
         ibin       = MIN0 (ibin, nbins)
-        sgxnloc(1) = sgxn (1, iz(1), ind, ibin)
-        sgxnloc(2) = sgxn (2, iz(1), ind, ibin)
-        sgxnloc(3) = sgxn (3, iz(1), ind, ibin)
-        sgxnloc(4) = sgxn (4, iz(1), ind, ibin)
+        if(ibin.gt.ksge) then
+           WRITE(*,*)'subr.getsgxn(b): ibin,ksge=',ibin,ksge
+           STOP 'subr.getsgxn ibin>ksge, Increase ksge' !YuP[2023-07-11]added
+        endif
+        !YuP[2023-07-11] In other parts of zfreya, the usage is
+        !sgxn(1:4,1:kz,1:kbe,1:ksge), where kbe=kb*ke,ksge=20
+        sgxnloc(1) = sgxn(1, iz(1), ind, ibin) !here: getsgxn, ns=1
+        sgxnloc(2) = sgxn(2, iz(1), ind, ibin) !here: getsgxn, ns=1
+        sgxnloc(3) = sgxn(3, iz(1), ind, ibin) !here: getsgxn, ns=1
+        sgxnloc(4) = sgxn(4, iz(1), ind, ibin) !here: getsgxn, ns=1
       end if
 c      write(*,*) 'sgxn(4,22,3,2) = ',sgxn(4,22,3,2)
 c      if(ie.eq.2) stop
@@ -5759,14 +5947,15 @@ c
 c
       return
 c
-      end
+      end subroutine getsgxn
 c
 c
       subroutine adassgxn (namep,namei,mb,mfm1,nprim,nimp,nion,atw,
      .                     ebkev,ebfac,ibion,nebin,vbeam,zne,zni,zte,
-     .                     zti0,zzi,debin,sgxn,sgxnmi,atw_beam)
+     .                     zti0,zzi,debin,sgxn,sgxnmi,atw_beam,ibstart)
 c
       implicit  integer (i-n), real*8 (a-h, o-z)
+CMPIINSERT_INCLUDE
 c
 c      character what_id*45
 c      save      what_id
@@ -5800,7 +5989,7 @@ c     atw
 c     ebkev(mb)      - full energy of mb-th neutral beamline
 c                      (keV)
 c     ebfac          - factor defining upper bound on energy bin
-c                      range,  .gt. 1.0
+c                      range,  .gt. 1.0 (cqlinput: set fe_tk for ebfac)
 c     ibion          - index of beam ion species
 c                      (e.g. atwb = atw(ibion))
 c                      if ibion = -1 beam is dt mixture
@@ -5808,6 +5997,7 @@ c     atw_beam         (use atw_beam for mass in this case)
 c     mb             - number of beamlines modeled
 c     mfm1           - number of flux zones minus one
 c     nebin          - number of energy bins (rotation case only)
+c                      (cqlinput: set ne_tk for nebin)
 c     vbeam(ie,mb)   - speed of ie-th energy group of the mb-th
 c                      beamline (cm/sec)
 c     zne(mfm1)      - local electron density (cm**-3)
@@ -5869,25 +6059,30 @@ c
       data init /0/
 c
       do i=1, kz
-        do k = 1, 20
+        do k=1,20
           cnz(i,k) = 0.D0
         enddo
       enddo
 c
-      do i=1,kz
-       do j=1,ke
-         do k=1,kb
-          sgxn(1,i,j,k)=0.D0
-          sgxn(2,i,j,k)=0.D0
-          sgxn(3,i,j,k)=0.D0
-          sgxn(4,i,j,k)=0.D0
-        enddo
-       enddo
-      enddo
+      if (ibstart.eq.1) then 
+!      do i=1,kz
+!       do j=1,ke
+!         do k=1,kb
+!          sgxn(1,i,j,k)=0.D0
+!          sgxn(2,i,j,k)=0.D0
+!          sgxn(3,i,j,k)=0.D0
+!          sgxn(4,i,j,k)=0.D0 !YuP: BUG? 
+!               !See above declaration: real*8 sgxn(kcmp1,kz,kbe,ksge)
+!         enddo
+!       enddo
+!      enddo
+          sgxn=0.d0 !YuP[2022-12-15] replaced the above.
+      endif
 c
       do i=1,3
        sgxeff(i)=0.D0
       enddo
+      
 c
       if (init .eq. 0) then
 c
@@ -5990,21 +6185,33 @@ c
 c
 c ----------------------------------------------------------------------
 c... Get original cross sections-Used to determine relative deposition
-c    fractions only. Total cross section is determined using ADAS.
+c    fractions only [YuP: does it refer to sgxn(1:3)?].
+c    Total [YuP:sgxn(4)?] cross section is determined using ADAS [subr.adasqh6].
 c ----------------------------------------------------------------------
 c
+      !write(*,'(a,1p3e11.2)') '   bef.nbsgold sgxnmi=',sgxnmi(1:ke,1)
+      ![Evaluate old cross sections based on Freeman&Jones,
+      ! just for comparison with the newer ADAS]:
       call nbsgold (mb,mfm1,nebin,nprim,nimp,nion,atw,ebkev,
      .              ebfac,ibion,vbeam,zne,zni,zte,zzi,
-     .              debin,sgxn,sgxnmi,atw_beam)
+     .              debin,sgxn,sgxnmi,atw_beam,ibstart)
+      !write(*,'(a,1p3e11.2)') '   aft.nbsgold sgxnmi=',sgxnmi(1:ke,1)
+      do j=1,3
+      write(*,'(a,4f8.5)')' adassgxn/aft.nbsgold: sgxn(1:4,1,ie)=',
+     &     sgxn(1:4,1,j,1) !Note: sgxn(4,*) is recomputed by adasqh6().
+      enddo
 c
 c ----------------------------------------------------------------------
 c... Set up the cnz arrays (concentrations of plasma ions) and Zeffx
 c    zni and zne are the (FREYA zone) densities of electron and ions:
 c ----------------------------------------------------------------------
 c
+      cnz= 0.D0 !YuP[2022-12-20] Initialize ALL values to 0. 
+      !(was cnz(i,k)=0 inside the k=1,nion loop below, 
+      !which means - not for all k=1:10)  
       do i=1, mfm1
-        do k = 1, nion
-          cnz(i,k) = 0.D0
+        do k=1, nion
+          !cnz(i,k)=0.D0 !YuP[2022-12-20] BUG - not all k. See above.
           if (izatom(k) .eq.  1)  cnz(i, 1) = zni(i,k)/zne(i)
           if (izatom(k) .eq.  2)  cnz(i, 2) = zni(i,k)/zne(i)
           if (izatom(k) .eq.  4)  cnz(i, 4) = zni(i,k)/zne(i)
@@ -6028,42 +6235,71 @@ c
       if (nebin .eq. 0) then
         ierr = 0
         do i=1,mfm1
-          do ib=1,mb
+          do ib=ibstart,mb
             tiev = 1.D3 * zti0(i)
             ecol = 1.D3 * ebkev(ib) / (atwb)
             call adasqh6 (tiev,ecol,izbm,0,zne(i),zeffx(i),
      .                    cnz(i,2),cnz(i,4),cnz(i,5),cnz(i,6),
      .                    cnz(i,7),cnz(i,8),cnz(i,10),
-     .                    sgxeff,ierr)
+     .                    sgxeff(1:3),ierr) !sgxeff(1:3)==qrat(1:3)
             if (ierr .eq. 1) then
               call STOP ('subroutine ADASSGXN: problem #1', 183)
             end if
             do ie = 1,ke
               ind  = ke*(ib-1) + ie
               sgxn(4,i,ind,1) = zne(i)*sgxeff(ie)
-              sgxnmi(ie,ib)   = MAX (sgxnmi(ie,ib),sgxn(4,i,ind,1))
-            enddo
-          enddo
-        enddo
+!              write(*,'(a,2i4,1p3e11.2)') 
+!     &         '   adassgxn: i,ie,sgxnmi,zne(i),sgxeff(ie)=',
+!     &          i,ie,sgxnmi(ie,ib),zne(i),sgxeff(ie)
+              sgxnmi(ie,ib)= MAX(sgxnmi(ie,ib),sgxn(4,i,ind,1))
+            enddo !ie
+          enddo !ib
+        enddo ! i
+        
+        !For printout of cross-sections (fractions of total)
+c  sgxn(i,j,k,l)
+c  i - mode index
+c    = 1, fraction of reactions producing electrons 
+!         (impact e+neut -> 2e+i,  impact ion+neut -> ion+ion+e)
+c    = 2, fraction of reactions producing species 1 ion
+!         (CX   fast_neutral+ion -> FI+slow_neut)
+c    = 3, fraction of reactions producing species 2 ion;
+!         (CX   fast_neutral+ion -> FI+slow_neut)
+c    = 4, total inverse mean free path (normalized above to include ne)
+c  j - FREYA zone index (radial)
+c  k - beam&energy index = ke*(ib-1) + ie
+c  l - related to nebin.ne.0 (normally nebin=0, then l=1 only)
+        
+CMPIINSERT_IF_RANK_EQ_0     
+        !Just a printout of Impact and CX rates, for each ib and ie 
+        do ib= ibstart,mb
+        do ie= 1,ke
+           ind= ke*(ib-1) + ie
+          WRITE(*,'(a,2i2,3f8.5)')
+     &    ' adassgxn/aft.adasqh6: ib,ie,sgxn(1:3,ir=1,ind,1)=',
+     &                            ib,ie,sgxn(1:3,1,ind,1)
+        enddo !ie
+        enddo !ib
+CMPIINSERT_ENDIF_RANK
 c
-      else
+      else !nebin>0
 c
 c ----------------------------------------------------------------------
 c     rotating plasma case
 c ----------------------------------------------------------------------
 c
         ebmax = 0.D0
-        do ib=1,mb
+        do ib=ibstart,mb
           ebmax = MAX (ebmax,ebkev(ib))
         end do
         ebmax = ebmax/atwb
-        debin = ebmax*ebfac/FLOAT (nebin)
+        debin = ebmax*ebfac/dFLOAT(nebin) !YuP[2022-12-19] was FLOAT
 c
         do i=1,mfm1
           tiev  = 1.D3*zti0(i)
           jreff = 0
           do j=1,nebin
-            ebin = FLOAT (j) * debin
+            ebin = dFLOAT(j) * debin !YuP[2022-12-19] was FLOAT
             ecol =     1.D3 *  ebin
 c
 c... Only call ADAS if beam energy (ecol) is greater than 5 keV/amu.
@@ -6088,7 +6324,12 @@ c
                 jreff     = j
                 sgxnscale = zne(i)*sgxeff(1)/sgxn(4,i,1,j)
               endif
-              do k=1,ke*mb
+              !YuP/commented do k=ke*ibstart,ke*mb
+              do k= ke*(ibstart-1)+1, ke*mb
+              !YuP[2018-01-24] Originally (one beam species), it was k=1,ke*mb
+              !Maybe now it should be ke*(ibstart-1)+1 ?
+              !Then when ibstart=1, k starts with 1, as before.
+              !Note: mb=(ibstart-1)+nbeams1(kbsp) 
                 sgxn(4,i,k,j) = zne(i)*sgxeff(1)
               enddo
 c
@@ -6101,7 +6342,12 @@ c    datapoint for the energy bins below 5.0 keV/amu
 c
           if (jreff .gt. 1) then
             do  j=1,jreff-1
-             do k=1,ke*mb
+              !YuP/commented do k=ke*ibstart,ke*mb
+              do k= ke*(ibstart-1)+1, ke*mb
+              !YuP[2018-01-24] Originally (one beam species), it was k=1,ke*mb
+              !Maybe now it should be ke*(ibstart-1)+1 ?
+              !Then when ibstart=1, k starts with 1, as before.
+              !Note: mb=(ibstart-1)+nbeams1(kbsp) 
                sgold=sgxn(4,i,k,j)
                sgxn(4,i,k,j) = sgxn(4,i,k,j)*sgxnscale
              enddo
@@ -6119,7 +6365,7 @@ c       enddo
 c      enddo
 c
       return
-      end
+      end subroutine adassgxn
 c
 c
       subroutine adasqh6 (ti,ecol,bmz,iflag,ne,zeff,conche,
@@ -6195,10 +6441,11 @@ c      USE param
 c      USE io 
 c      USE ext_prog_info, only : nchars_12,onetwo_xsct
 c
-      implicit  integer (i-n), real*8 (a-h, o-z)
+      implicit none ! integer (i-n), real*8 (a-h, o-z)
 c      include 'params.inc'
        include 'param.h'
 c      include 'io.i'
+CMPIINSERT_INCLUDE
 
 c
 c ipass : file read switch.  Reread files if beam species has changed
@@ -6227,8 +6474,8 @@ c
 c Physics Constants
 c
       real*8 amu, eV
-      parameter (amu = 1.6605e-24)
-      parameter (eV  = 1.6022e-12)
+      parameter (amu = 1.6605D-24)
+      parameter (eV  = 1.6022D-12)
 c
 c Local variables
 c
@@ -6236,11 +6483,19 @@ c      integer    bmz, iflag, nebeam
       integer    bmz, iflag
       integer,save :: nebeam
       real*8     ti, ecol, ne, qrat(3)
+      real*8 zeff  !IN
+      real*8 zeff8 !local
+      integer ncrt,nout,ierror,nunadas !local
+      integer LENGTH ! integer function
       real*8     conche, concbe, concb, concc, concn, conco, concne
-****  real*8     conch
       integer    nsp, maxe, maxn, maxt, ierr
-      parameter (nsp = 8)              ! 8 different ion species
-      parameter (maxe = 15, maxn = 10, maxt = 10)
+      parameter (nsp = 8) ! 8 different ion species available
+!YuP/was      parameter (maxe=15, maxn=10, maxt=10) !Grids: energy,density,temperature
+      parameter(maxe=13, maxn=10, maxt=9) !Grids: energy,density,temperature
+      !From printout:
+      ! ADASQH6: neb(isp)=            13
+      ! ADASQH6: ndens(isp)=          10
+      ! ADASQH6: ntemp(isp)=           9
       integer    isp, z(nsp), neb(nsp), ndens(nsp), ntemp(nsp), i, j, k
       real*8     eb(maxe,nsp), dens(maxn,nsp), temp(maxt,nsp)
       real*8     tref(nsp), ebref(nsp), denref(nsp), svref(nsp)
@@ -6253,15 +6508,21 @@ c      real*8     ti8, ecol8, ne8, qrat8(3)
       real*8,    save  :: ecol8
       real*8     conc(nsp)
 c
-      integer ifail
+      integer ifail !YuP: Not really used
       real*8 be(maxe,maxn,nsp),ce(maxe,maxn,nsp),de(maxe,maxn,nsp)
       real*8 bt(maxt,nsp),ct(maxt,nsp),dt(maxt,nsp)
       real*8 bn(maxn,nsp,3),cn(maxn,nsp,3),dn(maxn,nsp,3)
       real*8 svintn(maxn,nsp,3),svintt,svtot(nsp),svtcor(nsp)
 c
       real*8 zeffm1, vbeam
-      save z, svref, neb, ndens, tref, eb, dens, sven, ntemp
+      save neb, ndens, ntemp !(nsp) Grids in ADAS tables
+      save z, svref, tref, eb, dens, sven
       save ebref, denref, temp, svt
+      save svintn !(maxn,nsp,3)  YuP[2022-12-30] added
+      
+      save be,ce,de !YuP[2022-12] added: save spline coeffs
+      save bt,ct,dt !YuP[2022-12] added: save spline coeffs
+      save bn,cn,dn !YuP[2022-12] added: save spline coeffs
 c
 
 cBH171118      code_xsct is the name of directory where ADAS directory
@@ -6271,14 +6532,13 @@ cBH171118      link to it therein. A copy of adas_dir data comes with
 cBH171118      the code distribution.
 cBH171118      Alternative, cql3d will search /usr/local/ for adas_dir.
       code_xsct="./adas_dir/"
-
       ierr    = 0
-      qrat(1) = 0.0
-      qrat(2) = 0.0
-      qrat(3) = 0.0
+      qrat(1) = 0.d0
+      qrat(2) = 0.d0
+      qrat(3) = 0.d0
       ti8     = ti
       zeff8   = zeff
-      ne8     = ne * 1.0e-13
+      ne8     = ne * 1.0D-13
 ****  conc(1) = conch
       conc(2) = conche
       conc(3) = concbe
@@ -6288,24 +6548,51 @@ cBH171118      Alternative, cql3d will search /usr/local/ for adas_dir.
       conc(7) = conco
       conc(8) = concne
       nchars_12 = LENGTH(code_xsct)
+
+      svtcor=0.d0 !YuP[2022-12] added initialization. (local array)
+      svtot= 0.d0 !YuP[2022-12] added initialization. (local array)
 c
 c open and read input file only once
 c ** need to save data
+
 c
-      if (ipass .ne. bmz) then
-        write (ncrt, 1100)
+      ncrt=6 !YuP[2018-01-23] ncrt was not defined here
+      nout=6 !YuP[2018-01-23] nout was not defined here
+      !-----------
+      !ipass=0 !TEST YuP[2022-11-23] - call ADAS anyway (at next freya call)
+      !Note: bmz==izbm==izatom(ibion)
+      !----------
+      if (ipass .ne. bmz) then !YuP: This part is only called once, to read ADAS
+
+      !OUTPUT from spline_12() / INPUT for func.seval() :
+      be=0.d0 !YuP[2022-12] added initialization.
+      ce=0.d0 !YuP[2022-12] added initialization.
+      de=0.d0 !YuP[2022-12] added initialization.
+      bt=0.d0 !YuP[2022-12] added initialization.
+      ct=0.d0 !YuP[2022-12] added initialization.
+      dt=0.d0 !YuP[2022-12] added initialization.
+      bn=0.d0 !YuP[2022-12] added initialization.
+      cn=0.d0 !YuP[2022-12] added initialization.
+      dn=0.d0 !YuP[2022-12] added initialization.     
+
+CMPIINSERT_IF_RANK_EQ_0
+        write (ncrt, 1100) 
         write (nout, 1100)
+CMPIINSERT_ENDIF_RANK
 c
-        ecol8 = ecol
+        ecol8 = ecol !saved
 c
+        nunadas=10001 !YuP/added: any number (except 6) within integer*4 range
+        
         do isp=1,nsp
-          call getioun(nunadas,nunadas)
+          !call getioun(nunadas,nunadas) !YuP[2022-12]: a dummy subroutine?
           print *,'file =',code_xsct(1:nchars_12)//dsn(isp,bmz) !jmp.den
           open (unit = nunadas,
      .       file = code_xsct(1:nchars_12)//dsn(isp,bmz),status='OLD',
      .       action='read',iostat=ierror)
+          write(*,*)' isp=',isp,' ierror=',ierror, ' nunadas=',nunadas
           if (ierror.ne.0) then
-             call getioun(nunadas,nunadas)
+             !call getioun(nunadas,nunadas) !YuP: a dummy subroutine?
              print *,'file = ','/usr/local/adas_dir/'//dsn(isp,bmz) !jmp.den
              open (unit = nunadas,
      .       file='/usr/local/adas_dir/'//dsn(isp,bmz),status='OLD',
@@ -6337,16 +6624,35 @@ c
           call giveupus_cql3d(nunadas)
           close (nunadas)
 c
+          write(*,*)'  ADASQH6: neb(isp)=  ',neb(isp) !should not exceed maxe
+          write(*,*)'  ADASQH6: ndens(isp)=',ndens(isp) !should not exceed maxn
+          write(*,*)'  ADASQH6: ntemp(isp)=',ntemp(isp) !should not exceed maxt
+          if(neb(isp).gt.maxe)then !YuP[2022-12]added this check:
+            WRITE(*,*)'  ADASQH6: neb(isp)>maxe   Increase maxe'
+            STOP
+          endif
+          if(ndens(isp).gt.maxn)then !YuP[2022-12]added this check:
+            WRITE(*,*)'  ADASQH6: ndens(isp)>maxn   Increase maxn'
+            STOP
+          endif
+          if(ntemp(isp).gt.maxt)then !YuP[2022-12]added this check:
+            WRITE(*,*)'  ADASQH6: ntemp(isp)>maxt   Increase maxt'
+            STOP
+          endif
+          
           do k = 1, ndens(isp)
-            dens(k,isp) = dens(k,isp) * 1.0e-13
+            dens(k,isp) = dens(k,isp) * 1.0D-13
           enddo
 c
 c spline the data on energy and temperature
 c
           do k=1,ndens(isp)
-            ifail = 0
+            ifail = 0 !YuP: There is no ifail flag in spline_12 ???
             call spline_12 (neb(isp),eb(1,isp),sven(1,k,isp),
      .                   be(1,k,isp),ce(1,k,isp),de(1,k,isp))
+            !OUT: be(maxe,maxn,nsp),ce(maxe,maxn,nsp),de(maxe,maxn,nsp)
+            ![ b,c,d spline coeffs for energy grid eb(1:neb),
+            !  saved for each species 'isp' and each k-grid point ] 
             if (ifail .ne. 0) then
               write (6, '(a)')  ' spline error #1 in ADASQH6'
               ierr = 1
@@ -6354,9 +6660,12 @@ c
             endif
           enddo
 c
-          ifail = 0
+          ifail = 0 !YuP: There is no ifail flag in spline_12 ???
           call spline_12 (ntemp(isp),temp(1,isp),svt(1,isp),
      .                 bt(1,isp),ct(1,isp),dt(1,isp))
+            !OUT: bt(maxt,nsp),ct(maxt,nsp),dt(maxt,nsp)
+            ![ b,c,d spline coeffs for T-grid temp(1:ntemp),
+            !  saved for each species 'isp' ] 
           if (ifail .ne. 0) then
             write (6, '(a)')  ' spline error #2 in ADASQH6'
             ierr = 1
@@ -6379,17 +6688,19 @@ c
      .             sven(1,k,isp),be(1,k,isp),ce(1,k,isp),de(1,k,isp))
             enddo
 c
-            ifail = 0
+            ifail = 0 !YuP: There is no ifail flag in spline_12 ???
             call spline_12(ndens(isp),dens(1,isp),svintn(1,isp,i),
      .                  bn(1,isp,i),cn(1,isp,i),dn(1,isp,i))
-c
+            !OUT: bn(maxn,nsp,3),cn(maxn,nsp,3),dn(maxn,nsp,3)
+            ![ b,c,d spline coeffs for density-grid dens(1:ndens),
+            !  saved for each species 'isp' and each energy point 'i'] 
             if (ifail .ne. 0) then
               write (6, '(a)')  ' spline error #3 in ADASQH6'
               ierr = 1
               return
             endif
-          enddo
-        enddo
+          enddo ! i (energy grid)
+        enddo !isp
 c
  1000   format (i5, 8x, d9.3)
  1001   format (2i5, 7x, d9.3)
@@ -6399,13 +6710,14 @@ c
      . ' Using ADAS, the effective beam stopping cross sections:' /
      . ' ***** Opening and Reading the Atomic Data Tables *****'  /)
 c
-        ipass = bmz
+        ipass = bmz !YuP: at next call to freya, this portion will be skipped.
 c
-      else
+      else ! ipass
 c
 c  redo density splines only if beam energy has changed by more than 1%
 c
         if (ABS (ecol8-ecol) / ecol8 .gt. 0.01) then
+          write(*,*)'  ADASQH6: Recalc. density spline coeffs bn,cn,dn'
           do isp=1,nsp
             ecol8 = ecol
             do i=1,nebeam
@@ -6413,7 +6725,7 @@ c
                 svintn(k,isp,i) = seval(neb(isp),ecol8/i,eb(1,isp),
      .                sven(1,k,isp),be(1,k,isp),ce(1,k,isp),de(1,k,isp))
               enddo
-              ifail = 0
+              ifail = 0 !YuP: There is no ifail flag in spline_12 ???
               call spline_12 (ndens(isp),dens(1,isp),svintn(1,isp,i),
      .                     bn(1,isp,i),cn(1,isp,i),dn(1,isp,i))
               if (ifail .ne. 0) then
@@ -6424,35 +6736,68 @@ c
             enddo
           enddo
         endif
+        
+      endif ! ipass
+
+c !YuP[2022-12] Moved conc()-related part in front of the rest.
+c scale the input concentrations to match the required zeff
+c
+      zeffm1 = 0.d0
+      do isp=2,nsp
+         zeffm1 = zeffm1 +dfloat(z(isp)*(z(isp)-1))*conc(isp)
+      enddo
+      
+      if (zeffm1 .gt. 1.0D-5) then
+        do isp=2,nsp
+           conc(isp) = (zeff8-1.0) / zeffm1 * conc(isp)
+        enddo
       endif
+      
+      conc(1) = 1.d0
+      do isp=2,nsp
+        conc(1) = conc(1) - dfloat(z(isp))*conc(isp)
+      enddo
+
 c
 c calculate correction to requested temperature
 c
       do isp=1,nsp
+        if(conc(isp).gt.0.d0)then !YuP[2022-12-20] added
         if (ti8 .le. temp(1,isp)) then
           svtcor(isp) = svt(1,isp)/svref(isp)
+!          write(*,'(a,i3,1p2e11.2)')
+!     &    '     adasqh6_a: isp,svt(1,isp),svref(isp)=',
+!     &                     isp,svt(1,isp),svref(isp)
         else
           svintt      = seval(ntemp(isp),ti8,temp(1,isp),
      .                  svt(1,isp),bt(1,isp),ct(1,isp),dt(1,isp))
-          svtcor(isp) = svintt/svref(isp)
+          svtcor(isp) = svintt/svref(isp) ! usually ~1.0
+!          write(*,'(a,i3,1p2e11.2)')
+!     &    '     adasqh6_b: isp,svintt,svref(isp)=',
+!     &                     isp,svintt,svref(isp)
         endif
-      enddo
-c
-c scale the input concentrations to match the required zeff
-c
-           zeffm1 = 0.0
-           do isp=2,nsp
-             zeffm1 = zeffm1 + z(isp)*(z(isp)-1)*conc(isp)
-           enddo
-           if (zeffm1 .gt. 1.0e-5) then
-             do isp=2,nsp
-               conc(isp) = (zeff8-1.0) / zeffm1 * conc(isp)
-             enddo
-           endif
-           conc(1) = 1.0
-           do isp=2,nsp
-             conc(1) = conc(1) - z(isp)*conc(isp)
-           enddo
+        endif !(conc(isp).gt.0.d0) !YuP[2022-12-20] added
+      enddo !isp
+!c
+!c scale the input concentrations to match the required zeff
+!c
+!      zeffm1 = 0.d0
+!      do isp=2,nsp
+!        if(conc(isp).gt.0.d0)then !YuP[2022-12-20] added
+!          zeffm1 = zeffm1 +dfloat(z(isp)*(z(isp)-1))*conc(isp)
+!        endif !(conc(isp).gt.0.d0) !YuP[2022-12-20] added
+!      enddo
+!      
+!      if (zeffm1 .gt. 1.0D-5) then
+!        do isp=2,nsp
+!           conc(isp) = (zeff8-1.0) / zeffm1 * conc(isp)
+!        enddo
+!      endif
+!      
+!      conc(1) = 1.d0
+!      do isp=2,nsp
+!        conc(1) = conc(1) - dfloat(z(isp))*conc(isp)
+!      enddo
 c
 c evaluate at three energy components
 c
@@ -6461,6 +6806,8 @@ c
 c interpolate to requested density
 c
         do isp=1,nsp
+          if(conc(isp).gt.0.d0)then !YuP[2022-12-20] added:
+           !skip species that give no contribution.
           if (ne8 .le. dens(1,isp)) then
             svtot(isp) = seval(ndens(isp),dens(1,isp),dens(1,isp),
      .            svintn(1,isp,i),bn(1,isp,i),cn(1,isp,i),dn(1,isp,i))
@@ -6468,28 +6815,38 @@ c
             svtot(isp) = seval(ndens(isp),ne8,dens(1,isp),
      .            svintn(1,isp,i),bn(1,isp,i),cn(1,isp,i),dn(1,isp,i))
           endif
+          endif !(conc(isp).gt.0.d0) !YuP[2022-12-20] added
         enddo
 c
 c  construct the total stopping cross section
 c
-        qrat8(i) = 0.0
+        qrat8(i) = 0.d0
         do isp=1,nsp
-          qrat8(i) = qrat8(i) + svtot(isp)*svtcor(isp)*z(isp)*conc(isp)
+          if(conc(isp).gt. 0.d0) then !YuP[2022-12-20] added
+           !skip species that give no contribution.
+           qrat8(i)= qrat8(i) 
+     &              +svtot(isp)*svtcor(isp)*dfloat(z(isp))*conc(isp)
+!           write(*,'(a,i3,1p2e11.2)')
+!     &     '     adasqh6: isp,svtot(isp),svtcor(isp)=',
+!     &                    isp,svtot(isp),svtcor(isp)
+          endif !(conc(isp).gt.0.d0) !YuP[2022-12-20] added
         enddo
 c
 c  divide by the beam speed to get a cross section and convert to m**2
 c
         vbeam   = SQRT (2.0 * ecol8 / i * ev / amu)
         qrat(i) = qrat8(i) / vbeam
-      enddo
+        !write(*,'(a,i3,1p2e11.2)')  '     adasqh6: i,qrat8(i),vbeam=',
+        !&                                             i,qrat8(i),vbeam
+      enddo !i=1,nebeam
 c
       return
-      end
+      end subroutine adasqh6
 c
 c
       subroutine nbsgold (mb,mfm1,nebin,nprim,nimp,nion,atw,ebkev,
      .                    ebfac,ibion,vbeam,zne,zni,zte,zzi,debin,
-     .                    sgxn,sgxnmi,atw_beam)
+     .                    sgxn,sgxnmi,atw_beam,ibstart)
 c
 c
 c ----------------------------------------------------------------------
@@ -6497,7 +6854,7 @@ c
 c     This subroutine calculates the neutral beam attenuation array sgxn
 c     using the old cross sections based on Freeman & Jones (1972).
 c     No excited state effects are included. These cross sections have
-c     been found to be outdated and are not to used except for purposes
+c     been found to be outdated and are not to be used except for purposes
 c     of comparison to the newer ADAS data.
 c
 c     Created:     12-JUL-1995     Daniel Finkenthal
@@ -6507,12 +6864,13 @@ c
 c          ebkev(mb)      - maximum energy of mb-th neutral beamline
 c                           (keV)
 c          ebfac          - factor defining upper bound on energy bin
-c                           range,  > 1.0
+c                           range,  > 1.0 (cqlinput: set fe_tk for ebfac)
 c          ibion          - index of beam ion species
 c                           (e.g., atwb = atw(ibion))
 c          mb             - number of beamlines modeled
 c          mfm1           - number of flux zones minus one
 c          nebin          - number of energy bins (rotation case only)
+c                           (cqlinput: set ne_tk for nebin)
 c          vbeam(ie,mb)   - speed of ie-th energy group of the mb-th
 c                           beamline (cm/sec)
 c          zne(mfm1)      - local electron density (cm**-3)
@@ -6566,33 +6924,37 @@ c
 c      real*8 sgxn(kcmp1,kz,ke,kb),sgxnmi(ke,kb)
 c      real*8 sgxne(ke)
 c
-      do ib=1,kb   !YuP[07-2016] Bug: was 1,ke
+      if (ibstart.eq.1) then
+        do ib=1,kb   !YuP[07-2016] Bug: was 1,ke
         do ie=1,ke !YuP[07-2016] Bug: was 1,kb
           sgxnmi(ie,ib) = 0.D0
         enddo
-      enddo
-c
-      do i=1,kz
-       do j=1,ke
-         do k=1,kb
-          sgxn(1,i,j,k)=0.D0
-          sgxn(2,i,j,k)=0.D0
-          sgxn(3,i,j,k)=0.D0
-          sgxn(4,i,j,k)=0.D0
         enddo
-       enddo
-      enddo
+c
+!      do i=1,kz
+!       do j=1,ke
+!         do k=1,kb
+!          sgxn(1,i,j,k)=0.D0
+!          sgxn(2,i,j,k)=0.D0
+!          sgxn(3,i,j,k)=0.D0
+!          sgxn(4,i,j,k)=0.D0 !YuP[2022-12-15]: BUG? 
+!          !See above declaration: real*8 sgxn(kcmp1,kz,kbe,ksge)
+!        enddo
+!       enddo
+!      enddo
+        sgxn=0.d0 !YuP[2022-12-15] replaced the above.
+      endif  !On ibstart.eq.1
 c
 c ----------------------------------------------------------------------
 c stationary plasma case
 c ----------------------------------------------------------------------
 c
       if (nebin .eq. 0) then
-        do 220 ib=1,mb
+        do 220 ib=ibstart,mb
         do 220 ie=1,ke
         sgxnmi(ie,ib) = 0.0
         ind  = ke*(ib-1) + ie
-        eova = 1.0e3*ebkev(ib)/(FLOAT (ie)*atw_beam)
+        eova = 1.0e3*ebkev(ib)/(dFLOAT(ie)*atw_beam) !YuP[2022-12-19] was FLOAT
         vbin = vbeam(ie,ib)
         do 220 i=1,mfm1
         teev = 1.0e3 * zte(i)
@@ -6612,34 +6974,38 @@ c
         sgxn(3,i,ind,1) = sgxn(3,i,ind,1)/sgxn(4,i,ind,1)
         sgxnmi(ie,ib) = MAX (sgxnmi(ie,ib),sgxn(4,i,ind,1))
   220   continue
-        do   ib=1,mb
+        do ib=ibstart,mb
           do ie=1,ke
             sgxnmi(ie,ib) = 1.0 / sgxnmi(ie,ib)
           end do
         end do
-      else
+        
+      else !nebin>0
 c
 c ----------------------------------------------------------------------
 c rotating plasma case
 c ----------------------------------------------------------------------
 c
         ebmax = 0.0
-        do ib=1,mb
+        do ib=ibstart,mb
            ebmax = MAX (ebmax,ebkev(ib))
         end do
         ebmax = ebmax/atw_beam
-        debin = ebmax*ebfac/FLOAT (nebin)
+        debin = ebmax*ebfac/dFLOAT(nebin) !YuP[2022-12-19] was FLOAT
 c
         do 340 i=1,mfm1
         teev = 1.0e3*zte(i)
+        
 c       electron impact ionization independent of rotation speed
-        do 320 ib=1,mb
+        do 320 ib=ibstart,mb
         do 320 ie=1,ke
-        ind = ke*(ib-1) + ie
+        ind=ke*(ib-1) + ie
         sgxne(ind) = fsgxne(vbeam(ie,ib),teev,zne(i))
   320   continue
+        !Here ind= ke*(mb-1) + ke
+  
         do 340 j=1,nebin
-        ebin = FLOAT (j)*debin
+        ebin = dFLOAT(j)*debin !YuP[2022-12-19] was FLOAT
         eova = 1.0e3*ebin
         sgxn(1,i,1,j) = 0.0
         do 330 k=1,nion
@@ -6648,18 +7014,26 @@ c       electron impact ionization independent of rotation speed
         if ((k .le. nprim) .and. (k .le. 2.0))
      .    sgxn(k+1,i,1,j) = fsgxncx(atw(k),eova,zni(i,k))
   330   continue
-        do 340 k=ind,1,-1       ! (ind=ke*(ib-1) +ie,beam energy index)
+
+cBH171014: Use of ind below is strange.  It has only been set in 
+cBH171014: above do 320 loop, with final value ind=ke*(mb-1)+ke.
+cBH171014: It's initial value is ke*(ibstart-1)+1.
+cBH171014: OK, I'll take this as final value in following loop.
+
+cBH171014      do 340 k=ind,1,-1
+        do 340 k=ind,ke*(ibstart-1)+1,-1  !ind=ke*(ib-1)+ie,beam energy index
           sgxn(1,i,k,j) = sgxn(1,i,1,j) + sgxne(k)
           sgxn(4,i,k,j) = sgxn(1,i,k,j) + sgxn(2,i,1,j) + sgxn(3,i,1,j)
           sgxn(1,i,k,j) = sgxn(1,i,k,j)/sgxn(4,i,k,j)
           sgxn(2,i,k,j) = sgxn(2,i,1,j)/sgxn(4,i,k,j)
           sgxn(3,i,k,j) = sgxn(3,i,1,j)/sgxn(4,i,k,j)
-  340   continue
-c
-      endif
+  340   continue !i=1,mfm1 ; j=1,nebin ; k=ind,ke*(ibstart-1)+1,-1
+        !YuP: Same label for different loops - ok?
+        
+      endif !nebin
 c
       return
-      end
+      end subroutine nbsgold
 c
 c
       real*8  function AMAXAF (array, first, last)
@@ -6889,8 +7263,12 @@ c
       return
 c
       end
-c
+c======================================================================
+
       real*8 function seval (n, u, x, y, b, c, d)
+      !YuP: Only used by subr. adasqh6().
+      !Should be called after spline_12(), 
+      !to get the b, c, d coeffs.
 c
       implicit  integer (i-n), real*8 (a-h, o-z)
 c.......................................................................
@@ -6939,7 +7317,7 @@ c
 c    n     = the number of data points
 c    u     = the abscissa at which the spline is to be evaluated
 c    x,y   = the arrays of data abscissas and ordinates
-c    b,c,d = arrays of spline coefficients computed by spline
+c    b,c,d = arrays of spline coefficients computed by subr.spline_12()
 c
 c  if  u  is not in the same interval as the previous call, then a
 c  binary search is performed to determine the proper interval.
@@ -6964,8 +7342,8 @@ c  added  1/29/98  HSJ
 c
       if (u .lt. x(1)) then
          if(extend_seval .eq. 1)then
-           seval=y(1)
-           return
+           seval=y(1) !It means: if u is to the left of lower boundary,
+           return     ! use data from {x(1),y(1)} point in ADAS table.
          else
            write(*,100)u,x(1),x(n)
             write(nout,100)u,x(1),x(n)
@@ -7015,9 +7393,10 @@ c
      .       ' You can set extend_seval=1 in the first namelist',/,
      .       ' in inone if you want to ignore this problem')
 c
-      end
+      end function seval
 c
-c
+c======================================================================
+
       subroutine spline_12 (n, x, y, b, c, d)
 c
       implicit  integer (i-n), real*8 (a-h, o-z)
@@ -7049,7 +7428,7 @@ c    b(i) = sp(x(i))
 c    c(i) = spp(x(i))/2
 c    d(i) = sppp(x(i))/6  (derivative from the right)
 c
-c  the accompanying function subprogram  seval  can be used
+c  the accompanying function subprogram  seval()  can be used
 c  to evaluate the spline.
 c
       integer nm1, ib, i
@@ -7123,7 +7502,7 @@ c
       d(2) = 0.0
       return
 c
-      end
+      end subroutine spline_12
 c
 c
 

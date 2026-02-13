@@ -1,29 +1,34 @@
 c
 c
       subroutine frinitz(
-     +        nprim,nimp,nion,ibion,namep,namei,atw,fd,smth)
+     +        nprim,nimp,nion,ibion,namep,namei,atw,fd,smth,nbeams)
       implicit integer (i-n), real*8 (a-h,o-z)
 c
       include 'param.h'
-      include 'comm.h'
+      include 'comm.h'    ! <<<<<==========
+CMPIINSERT_INCLUDE
 
+c     nprim,nimp,fd,smth,nbeams are in variables.
+c     nion,ibion,namep,namei,atw are out variables.
 
 c..................................................................
-c     This routine communicates between common blocks of CQL3D and the
-c     segregated CRAY32 (NFREYA ONETWO version) common blocks,
-c     by passing subroutine arguments.
+c     This routine is called by frinitl which includes frcomm,
+c     after reading the frsetup namelist.
+c     It communicates between common blocks of CQL3D and the
+c     segregated CRAY32 (NFREYA ONETWO version) frcomm.h common blocks,
+c     by passing values through the subroutine arguments.
 c
-c     smooth in comm.h and frcomm.h is passed from frcomm to comm,
+c     smooth_ in comm.h is set from smooth in frcomm.h, passed
 c       through argument smth.
-c     fd specified in frinitl passed here to give dt mixture ratio.
+c     fd specified in frinitl passed here to give a beam dt mixture ratio.
 c     nprim,nimp,nion,ibion,namep,namei,atw are in frcomm.h, not comm.h.
-c     These variables are determined from comm.h data, passed to 
+c     These variables are determined from comm.h data, and passed to 
 c     frcomm.h through the arguments of frinitz.
 c       
 c..................................................................
 
       character*8 namep,namei
-      dimension namep(*),namei(*),atw(*)
+      dimension namep(*),namei(*),atw(*),ibion(*)
 
       smooth_=smth
 
@@ -62,7 +67,7 @@ cBH180908      if (kelec.eq.0) call diagwrng(9)
       if (kelec.eq.0) then
 CMPIINSERT_IF_RANK_EQ_0
          WRITE(*,*)
-         WRITE(*,*) 'WARNING: Unphysical plasma, only one species.'
+         WRITE(*,*) 'WARNING: Unphysical plasma: no electrons?'
          WRITE(*,*) '         Have not checked with NBI turned on.'
          WRITE(*,*)
 CMPIINSERT_ENDIF_RANK
@@ -92,21 +97,37 @@ c..................................................................
 c     Now define the namep and namei array as used in ONETWO
 c..................................................................
 
-      write(*,*) 'frinitz: nprim,nimp = ',nprim,nimp
+CMPIINSERT_IF_RANK_EQ_0
+      WRITE(*,*) 'frinitz: nprim,nimp = ',nprim,nimp
+CMPIINSERT_ENDIF_RANK
 
+      do ib=1,kb
+         ibion(ib)=0 !initialize; find in the scan below
+      enddo
+      
+      do ib=1,nbeams  !BH171014: Enabling beams with different species.
       kk=0
       do 500 k=1,ntotal
         ! exclude e for the stopping cross-section:
         if (k.eq.kelecg .or. k.eq.kelecm) go to 500 
-        kk=kk+1
+        kk=kk+1   !Counts non-electron, i.e.,ion species in cql3d list
         if (kk.gt.nprim) go to 500
-        if (k.eq.kfrsou) ibion=kk
+!        if (k.eq.kfrsou) ibion=kk  Modifying for more than one NB species
+        if (k.eq.kfrsou(ib)) ibion(ib)=kk
         namep(kk)=kspeci(1,k)
+CMPIINSERT_IF_RANK_EQ_0
+        WRITE(*,*)'frinitz: k,namep(primary_ion), ib,ibion(ib)=',
+     &   k,trim(namep(kk)), ib,ibion(ib)
+CMPIINSERT_ENDIF_RANK
  500  continue
-      if(ibion.le.0)then
-        WRITE(*,*)'frinitz: ibion=0, probably kfrsou=0; Set to proper k'
+      if(ibion(ib).le.0)then
+CMPIINSERT_IF_RANK_EQ_0
+        WRITE(*,*)'frinitz:ibion()=0, prob kfrsou()=0; Set to proper k'
+CMPIINSERT_ENDIF_RANK
         STOP
       endif
+      enddo  !On ib
+
 cBH081022      kk=0
 cBH081022      do 510 k=ntotal+1-nimp,ntotal
 cBH081022        kk=kk+1
@@ -118,9 +139,11 @@ cBH081022:  Presently set up for only one species. (Else, more coding).
 cBH081022:  Take impurities to be distinct species with atw.gt.4.
 
       if (nimp.gt.1) then
-         write(*,*)
+CMPIINSERT_IF_RANK_EQ_0
+         WRITE(*,*)
          WRITE(*,*)'STOP:  NBI (Freya setup) only for nimp.le.1.'
-         STOP
+CMPIINSERT_ENDIF_RANK
+         STOP 'frinitz: nimp>1'
       endif
       do kk=1,nimp
          do k=1,ntotal
@@ -132,11 +155,6 @@ c BH081022:  Add code here, if need nimp.gt.1.
          enddo
       enddo
                
-               
-
-      write(*,*) 'frinitz:namep(1),namep(2),namei(1),ibion   ',
-     +            namep(1),namep(2),namei(1),ibion
-
 
 c----------------------------------------------------------------
 c     determine atomic weights of primary ions
@@ -161,10 +179,12 @@ c----------------------------------------------------------------
      +     trim(namep(i)).eq.'HE' .or. 
      +     trim(namep(i)).eq.'He') atw(i)=4.
      
-        write(*,*) 'frinitz: i, trim(namep(i)), atw(i)',
+CMPIINSERT_IF_RANK_EQ_0
+        WRITE(*,*)'frinitz/primary_ion list: i, trim(namep(i)), atw(i)',
      +                       i, trim(namep(i)), atw(i)
+CMPIINSERT_ENDIF_RANK
         if(atw(i).eq.zero) call frwrong(1)
- 3410 continue
+ 3410 continue !i=1,nprim
 
 
 c----------------------------------------------------------------
@@ -229,10 +249,12 @@ c----------------------------------------------------------------
  3430 continue
 
       if(nimp.gt.0) then
+CMPIINSERT_IF_RANK_EQ_0
          do i=1,nimp
-            write(*,*)'frinitz: trim(namei(i)),atw(nprim+i)',
+         WRITE(*,*)'frinitz/impurity list: trim(namei(i)),atw(nprim+i)',
      +                          trim(namei(i)),atw(nprim+i)
          enddo
+CMPIINSERT_ENDIF_RANK
       endif
 
       return

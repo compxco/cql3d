@@ -25,7 +25,7 @@ c...
         call dcopy(iyjx2,f(0,0,kelecg,l_),1,temp2(0,0),1)
       endif
       call bcast(tam4,zero,jx)
-      do 20 i=1,iy
+      do 20 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
         do 10 j=1,jx
           tam4(j)=tam4(j)+vptb(i,lr_)*temp2(i,j)*cynt2(i,l_)
  10     continue
@@ -35,7 +35,7 @@ c...
         xlndneg=xlndneg+tam4(j)*cint2(j)
  30   continue
       call bcast(tam4,zero,jx)
-      do 50 i=1,iy
+      do 50 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
         do 40 j=1,jx
           tam4(j)=tam4(j)+x(j)*coss(i,l_)*temp2(i,j)*cynt2(i,l_)
  40     continue
@@ -50,7 +50,7 @@ c...
       if (cqlpmod .ne. "enabled") then
         thta=fmass(ngen)*clite2/(temp(ngen,lr_)*ergtkev)
         ovthesq=fmass(ngen)/(temp(ngen,lr_)*ergtkev)
-      else
+      else ! (cqlpmod.eq."enabled")
         thta=fmass(ngen)*clite2/(temppar(ngen,ls_)*ergtkev)
         ovthesq=fmass(ngen)/(temppar(ngen,ls_)*ergtkev)
       endif
@@ -60,7 +60,7 @@ c...
           do 70 i=1,itl
             drift=ovthesq*xllaveg*x(j)*coss(i,l_)*vnorm2
             f(i,j,ngen,l_)=fmxwl*(1.+drift)
-            f(iy-i+1,j,ngen,l_)=fmxwl*(1.-drift)
+            f(iy_(l_)-i+1,j,ngen,l_)=fmxwl*(1.-drift)
  70       continue
           do 75 i=itl+1,itu-1
             f(i,j,ngen,l_)=fmxwl
@@ -69,7 +69,7 @@ c...
           do 80 i=1,itl
             drift=2.*thta*(sqrt(1.+cnorm2i*xllaveg*x(j)*coss(i,l_))-1.)
             f(i,j,ngen,l_)=fmxwl*(1.+drift)
-            f(iy-i+1,j,ngen,l_)=fmxwl*(1.-drift)
+            f(iy_(l_)-i+1,j,ngen,l_)=fmxwl*(1.-drift) !YuP[2021-03-11] iy-->iy_(l_)
  80       continue
           do 85 i=itl+1,itu-1
             f(i,j,ngen,l_)=fmxwl
@@ -78,7 +78,7 @@ c...
  90   continue
       call dcopy(iyjx2,f(0,0,ngen,l_),1,temp2(0,0),1)
       call bcast(tam4,zero,jx)
-      do 110 i=1,iy
+      do 110 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
         do 100 j=1,jx
           tam4(j)=tam4(j)+vptb(i,lr_)*temp2(i,j)*cynt2(i,l_)
  100    continue

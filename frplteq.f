@@ -1,23 +1,32 @@
 
 c
       subroutine frplteq(xpts,ypts,zpts,rpts,vx,vy,vz,ipts,curdep,
-     1     nfrplt,frplt)
+     1     nfrplt,frplt,k)
+      !YuP[2018-01-24] added species identification k
       implicit integer (i-n), real*8 (a-h,o-z)
-      save
+      !save
       include 'param.h'
       include 'comm.h'
 CMPIINSERT_INCLUDE
 
 
       character*8 textt,frplt
-      common /plttextt/ textt(200)
+!not used      common /plttextt/ textt(200)
 
-      dimension xpts(*),ypts(*),zpts(*),rpts(*),vx(*),vy(*),vz(*)
+      !real*8 xpts(*),ypts(*),zpts(*),rpts(*),vx(*),vy(*),vz(*)
+      real*8 xpts(ipts),ypts(ipts),zpts(ipts),rpts(ipts)
+      real*8 vx(ipts),vy(ipts),vz(ipts)
+      integer ipts,nfrplt,k !IN
+      real*8 curdep !Not used? Why needed?
 
       REAL*4 RBOT,RTOP,ZBOT,ZTOP
-      REAL*4 RTAB1(LFIELDA),RTAB2(LFIELDA)
+      REAL*4 :: R40=0.,R45=5.
+      REAL*4 :: R4MP2=-0.2
+      REAL*4 RTAB1(LFIELD),RTAB2(LFIELD) !local
+      !YuP[2021-04] Changed to lfield
+
       REAL*4 RPG1,RPG2, xyplotmax
-      REAL*4 :: R40=0.
+      character*64 tt_
 
       data nconskp /2/
 
@@ -38,11 +47,34 @@ CMPIINSERT_IF_RANK_NE_0_RETURN
 
       if (noplots.eq."enabled1") return
 
+      if (noplots.ne."enabled1" .and. n.gt.0) then !YuP[2022-11-17] Added if()
+        !In some cases frnfreya-->frplteq can be called at each time step.
+        !Don't make this plot at every time step; 
+        !Plot only at those selected with nplt3d(i),
+        !when n.eq.nplt3d(i), iplt3d becomes ne.0.
+        iplt3d=0
+        do i=1,nplota
+          if(n.eq.nplt3d(i)) then
+             iplt3d=i
+             !tplt3d(i)=timet
+          endif
+        enddo
+        if (iplt3d.eq.0)then 
+          return
+        endif
+      endif  !YuP[2022-11-17]
+
+
       if (frplt.eq."disabled") return
       
       if (frplt.eq."write_op") goto 200 !Skip plotting but save data into freya_points.txt
       
-      call micfrplt
+      write(tt_,'(a,i3,a,i6,a,1pe11.4)')'Species k=',k,
+     &  ';  Time step n=',n,
+     &  ';  t(sec)=',timet
+      !YuP[2018-01-24] added species identification k, for plots
+      
+      !call micfrplt ! YuP: what for? commented
       
 c---- PLOTS in (R,Z) ---------------------------------------------------   
       rmincon1=rmincon
@@ -61,7 +93,7 @@ c---- PLOTS in (R,Z) ---------------------------------------------------
         zbot=.01+(.9-delz)/2.
         ztop=.99-(.9-delz)/2.
       endif
-
+      write(*,*)'frplteq: rbot,rtop,zbot,ztop',rbot,rtop,zbot,ztop
       CALL PGPAGE
       CALL PGSVP(rbot,rtop,zbot,ztop)
       RBOT=rmincon
@@ -80,6 +112,7 @@ c---- PLOTS in (R,Z) ---------------------------------------------------
       CALL PGLAB('Major radius (cms)','Vert height (cms)',
      +           'NBI Deposition')
       endif
+      CALL PGMTXT('B',R45,R40,R40,tt_) !YuP[2018-01-24] added 'Species k='
       xyplotmax=0. ! to set limits in (X,Y) plots
       do 10 l=1,lrz,nconskp
         l1=l
@@ -121,7 +154,7 @@ c       if eqsym.ne."none", still need to plot lower flux surface
  
       if(ncontr.gt.1) then
         ! YuP[2015/05/03] Add LCFS, if available
-        ncontr_= min(ncontr,LFIELDA)
+        ncontr_= min(ncontr,LFIELD)
         r_surf= MAXVAL(rcontr)
         xyplotmax= max(xyplotmax,r_surf)
         do ilim=1,ncontr_
@@ -137,7 +170,7 @@ c       if eqsym.ne."none", still need to plot lower flux surface
       endif
       if(nlimiter.gt.1) then
         ! YuP[2016] Add "last surface" (plasma border), if available
-        nline= min(nlimiter,LFIELDA)
+        nline= min(nlimiter,LFIELD)
         r_surf= MAXVAL(rlimiter)
         xyplotmax= max(xyplotmax,r_surf)
         do ilim=1,nline
@@ -189,8 +222,10 @@ c---- PLOTS in (X,Y) (top view) -------------------------------------------
       CALL PGBOX('BCNST',R40,0,'BCNST',R40,0)
       CALL PGLAB('X (cms)','Y (cms)',
      +           'NBI Deposition')
+      CALL PGMTXT('B',R45,R40,R40,tt_) !YuP[2018-01-24] added 'Species k='
+     
       ! Plot circles for the largest and smallest FP surfaces.
-      nline=LFIELDA ! could be other number, but RTAB1 has LFIELDA size
+      nline=LFIELD ! could be other number, but RTAB1 has LFIELD size
       r_surf=rpcon(lrz)  ! R radius of largest FP surf, outboard
       do iline=1,nline
          tora= (iline-1)*twopi/(nline-1)
@@ -222,7 +257,7 @@ c---- PLOTS in (X,Y) (top view) -------------------------------------------
  
       if(ncontr.gt.1) then
         ! YuP[2016] Add "last surface" (plasma border), if available
-        nline=LFIELDA ! could be other number, but RTAB1 has LFIELDA size
+        nline=LFIELD ! could be other number, but RTAB1 has LFIELD size
         r_surf= MAXVAL(rcontr)
         do iline=1,nline
           tora= (iline-1)*twopi/(nline-1)
@@ -235,7 +270,7 @@ c---- PLOTS in (X,Y) (top view) -------------------------------------------
       endif
       if(nlimiter.gt.1) then
         ! YuP[2016] Add "last surface" (plasma border), if available
-        nline=LFIELDA ! could be other number, but RTAB1 has LFIELDA size
+        nline=LFIELD ! could be other number, but RTAB1 has LFIELD size
         r_surf= MAXVAL(rlimiter)
         do iline=1,nline
           tora= (iline-1)*twopi/(nline-1)
@@ -270,8 +305,14 @@ c--------------------------------------------------------------------
  200  continue ! to skip plots
  
       if (frplt.eq."plotwrit" .or. frplt.eq."write_op") then
-
-         open(unit=19,file="freya_points.txt",status="replace")
+      
+         if(k.le.9)then !YuP[2021-07-13] Added species number into filename
+           write(tt_,'(a,i1)')  '_species',k 
+         else
+           write(*,*)'Writing Freya birth points: max 9 species'
+         endif
+         open(unit=19,file='freya_points'//trim(tt_)//'.txt',
+     &        status="replace")
          write(19,1000) 
      1        'Freya birth points: pnt number,x,y,Z,R,vx,vy,vz (cgs)'
          do i=1,ipts

@@ -14,9 +14,10 @@ c.......................................................................
 c     1. Set lambda=vptb=cos(theta_0)*tau to 1.0
 c.......................................................................
 
-      do 100 i=1,iy
-        vptb(i,lr_)=1.0
- 100  continue
+!      do 100 i=1,iymax !YuP[2021-03-11] iy-->iymax
+!        vptb(i,lr_)=1.d0
+! 100  continue
+        vptb(:,:)=1.d0 !YuP: all indexes, to be sure
 
       return
       end

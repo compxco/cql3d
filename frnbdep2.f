@@ -2,7 +2,7 @@ c
 c
 c     ONETWO DIVERGENCE
       subroutine frnbdep2(psi,mi,mj,r,z,potsid,mf,rzpat,nrpat,nzpat,me,
-     &  mb,sgxn,vbeam,hxfrac,iopt)
+     &  mb,sgxn,vbeam,hxfrac,iopt,ibstart) !Not used in cql3d
       implicit integer (i-n), real*8 (a-h,o-z)
 c-----------------------------------------------------------------------
 c     calculates neutral beam deposition on (r,z) grid.  grid size
@@ -63,7 +63,7 @@ c     if user defined new (r,z) grid, interpolate psi(i,j) onto it
       endif
 c
 c     begin loop over beam and beam energy
-      do 200 ib=1,mb
+      do 200 ib=ibstart,mb
         do 201 ie=1,me
 c
 c     get an estimate of the support of rzpat
@@ -120,7 +120,7 @@ CMPIINSERT_IF_RANK_NE_0_RETURN
       else
         write(nout,1010) rr(1),rr(nrpat),zz(1),zz(nzpat)
       endif
-      do 300 ib=1,mb
+      do 300 ib=ibstart,mb
         do 301 ie=1,me
           write(nout,1000) (isupp(i,ie,ib),i=1,4)
           write(nout,1010) hxfrac(ie,ib)

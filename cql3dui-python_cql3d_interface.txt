@@ -1,0 +1,16 @@
+~/cql3d/git/cql3d
+
+A simple user-interface for the Bounce-Averaged Fokker-Planck code CQL3D.
+Author: Matthew Poulos (CompX) Email: poulos@compxco.com
+
+See https://pypi.org/project/CQL3DUI/
+Can install python3 interface to cql3d with:
+pip install cql3dui
+
+260122
+Upgraded to version CQL3DUI 0.0.10
+pip install --upgrade cql3dui |tee log_cql3dui_upgrade_260122
+
+Launch:
+cqlui
+

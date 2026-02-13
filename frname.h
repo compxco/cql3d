@@ -32,7 +32,7 @@ c     ONETWO DIVERGENCE
      &  ,ne_tk,ds_tk,fe_tk
 c     Remove NBI source at psi outside of psicutoff:     
      +  ,psicutoff
-
+     +  ,src_nbi_e ![2022-06-30] Add source to e_general matching NBI sources
 
 cRemoved namelist, not used, BH070308:
 c tfusbb,iddcal,fdbeam,nbinject,rfmode,rfon,rftime,rfpow,

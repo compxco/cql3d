@@ -22,7 +22,7 @@ c................................................................
      &  ,hicmz(kz,ke,kb,3)
      &  ,ftrapfi(kz,ke,kb),ftrapfit(k_,ke,kb)
      &  ,angmpf(k_,ke,kb),angmpz(kz,ke,kb)
-     &  ,ibeam,ibion,inubplt,mfm1
+     &  ,ibeam,ibion(kb),inubplt,mfm1
 cBH170808     &  ,psif(kf),rowpsi(k_)  psif(kf) not used in fr routines
 cBH170808             routines, and conflicts with real*8 function psif.
 cBH170808             NBI test case showed NO CHANGE.
@@ -98,6 +98,7 @@ c................................................................
 c     ONETWO DIVERGENCE
 
       common/mhd1/ p(ki,kj),xxx(ki),yyy(kj)
+      common/beams/ kblspec(kb),nbeams1(kb)
 c................................................................
 
 

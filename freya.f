@@ -9,7 +9,8 @@ c     61 ELEMENTS IN CALLING SEQUENCE. THEREFORE THE COMMUNICATION WILL
 c     BE THROUGH FRCOMM
 c..................................................................
 
-      subroutine freya(ipts,mi,mj,codeid,rin,rmax,zax,zmin,zmax)
+      subroutine freya(ipts,mi,mj,codeid,rin,rmax,zax,zmin,zmax,
+     1                 kbsp,ibstart)
       implicit integer (i-n), real*8 (a-h,o-z)
       save
       integer, intent(out) :: ipts
@@ -44,43 +45,43 @@ c     the input quantities to freya are:
 c
 c     mb              Number of neutral beam injectors (.le.kb)
 c     anglev(ib)      Vertical angle (degrees) between optical axis
-c     and horizontal plane; a positive value indicates
-c     particles move upward
+c       and horizontal plane; a positive value indicates
+c       particles move upward
 c     angleh(ib)      Horizontal angle (degrees) between optical axis and
-c     vertical plane passing through pivot point and
-c     toroidal axis; a zero value denotes perpendicular
-c     injection, while a positive value indicates par-
-c     ticles move in the co-current direction
+c       vertical plane passing through pivot point and
+c       toroidal axis; a zero value denotes perpendicular
+c       injection, while a positive value indicates par-
+c       ticles move in the co-current direction
 c     nsourc          Number of sources per beamline.
-c     If 1, source is centered on beamline axis.
-c     If nsourc=2, distinguish between the beamline
-c     axis and the source centerline (optical axis).
-c     The two sources are assumed to be mirror images
-c     through the beamline axis.
-c     In either case, the exit grid plane is perpendicula
-c     to the beamline axis, and contains the source
-c     exit grid center(s).
-c     If nsourc=2, the alignment of the sources w.r.t.
-c     the beamline axis is specified through bhofset,
-c     bvofset, and bleni (described further below).
+c       If 1, source is centered on beamline axis.
+c       If nsourc=2, distinguish between the beamline
+c       axis and the source centerline (optical axis).
+c       The two sources are assumed to be mirror images
+c       through the beamline axis.
+c       In either case, the exit grid plane is perpendicula
+c       to the beamline axis, and contains the source
+c       exit grid center(s).
+c       If nsourc=2, the alignment of the sources w.r.t.
+c       the beamline axis is specified through bhofset,
+c       bvofset, and bleni (described further below).
 c     bvofset(ib)     Vertical offset from beamline axis to center
-c     of each source (cm; used only for nsourc=2)
+c       of each source (cm; used only for nsourc=2)
 c     bhofset(ib)     Horizontal offset from beamline axis to center
-c     of each source (cm; used only for nsourc=2)
+c       of each source (cm; used only for nsourc=2)
 c     bleni(ib)       Length along source centerline (source optical axis)
-c     source to intersection point with the beamline axis
+c       source to intersection point with the beamline axis
 c     sfrac1(ib)      Fraction of source current per beamline coming
-c     from upper source (used only for nsourc=2)
+c       from upper source (used only for nsourc=2)
 c     bcur(ib)        Total current (a) in ion beam (used only if bptor
-c     is zero)
+c       is zero)
 c     bptor(ib)       Total power (w) through aperture into torus; when
-c     nonzero, bptor takes precedence over bcur
+c       nonzero, bptor takes precedence over bcur
 c     bshape(ib)      Beam shape
 c     'circ' : circular
 c     'rect' : rectangular
 c     bheigh(ib)      Height of source (cm)
 c     bwidth(ib)      Width of source (cm); diameter for
-c     circular source.
+c       circular source.
 c     bhfoc(ib)       Horizontal focal length of source (cm)
 c     bvfoc(ib)       Vertical focal length of source (cm)
 c     bhdiv(ib)       Horizontal divergence of source (degrees)
@@ -88,29 +89,30 @@ c     bvdiv(ib)       Vertical divergence of source (degrees)
 c     ebkev(ib)       Maximum particle energy in source (keV)
 c     fbcur(ie,ib)    Fraction of current at energy ebkeV/ie
 c     iborb           Flag for modeling orbit effects on beam-
-c     generated fast ions
-c     1, model orbit effects
-c     0, do not model orbit effects
+c       generated fast ions
+c       1, model orbit effects
+c       0, do not model orbit effects  
+c       [BH170808: More choices in onetwo, now]
 c     npart           Number of particles followed into plasma
-c     (suggest 10000)
+c       (suggest 10000)
 c     npskip          Ratio of number of particles followed into plasma
-c     to number of source particles (suggest 1)
+c       to number of source particles (suggest 1)
 c     naptr           Total number of aperatures encountered by a particle
-c     as is moves from the source into the plasma chamber
-c     Maximum is specified by parameter nap (=10).
-c     First set of aperatures encountered by the particle
-c     are assumed centered on the source axis, and subseq
-c     aperatures are centered on the beamline axis; the
-c     distinction is made through ashape.
+c       as is moves from the source into the plasma chamber
+c       Maximum is specified by parameter nap (=10).
+c       First set of aperatures encountered by the particle
+c       are assumed centered on the source axis, and subseq
+c       aperatures are centered on the beamline axis; the
+c       distinction is made through ashape.
 c     ashape(iap,ib)  Aperture shape.
-c     Prefix 's-' indicates source axis centered.
-c     Prefix 'b-' indicates beamline axis centered.
-c     's-circ'          'b-circ'
-c     's-rect'          'b-rect'
-c     's-vert'          'b-vert'
-c     's-horiz'         'b-horiz'
-c     'b-d3d'
-c     (circ=circular aperature, rect=rectagular,
+c       Prefix 's-' indicates source axis centered.
+c       Prefix 'b-' indicates beamline axis centered.
+c       's-circ'          'b-circ'
+c       's-rect'          'b-rect'
+c       's-vert'          'b-vert'
+c       's-horiz'         'b-horiz'
+c       'b-d3d'
+c       (circ=circular aperature, rect=rectagular,
 c     vert=limits vertical height of source particles,
 c     horiz=limits horizontal height of source particles,
 c     d3d= special DIII-D polygonal aperature)
@@ -118,70 +120,70 @@ c     'circ' : circular
 c     'rect' : rectangular
 c     aheigh(iap,ib)  Height of aperture (cm)
 c     awidth(iap,ib)  Width of aperture (cm); diameter for circular
-c     aperture
+c       aperture
 c     alen(iap,ib)    Length from source to aperature for 's-type' aperatur
-c     and from exit grid plane along beamline axis for
-c     'b-type' aperatures.
+c       and from exit grid plane along beamline axis for
+c       'b-type' aperatures.
 c     blenp(ib)       Distance along beamline axis from source exit
-c     plane to the fiducial "pivot" point.
+c       plane to the fiducial "pivot" point.
 c     rpivot(ib)      Radial position of pivot (cm)
 c     zpivot(ib)      Axial position of pivot (cm)
-c     atw(k)          atomic mass of ion species k
+c     atw(k)          atomic mass of ion species k=1:nion=nprim+nimp
 c     codeid          flux surface geometry
-c     "onedee"      : elliptical
-c     anything else : nonelliptical
+c       "onedee"      : elliptical
+c       anything else : nonelliptical
 c     elong           elongation (height/width) of elliptical
-c     cross-section plasma
+c       cross-section plasma
 c     ibion           ion index of beam species
 c     mf              number of flux zones
 c     mi              number of radial mesh points for nonelliptical
-c     plasma
+c       plasma
 c     mj              number of axial mesh points for nonelliptical
-c     plasma
-c     nion            number of ion species
+c       plasma
+c     nion            number of ion species = nprim+nimp
 c     norb            flag controlling output of orbit information
-c     >0, write out extensive orbit information
-c     to unit norb
-c     0, omit output of orbit information
-c     <0, write out abbreviated orbit information
-c     to unit iabs(norb)
+c       >0, write out extensive orbit information
+c       to unit norb
+c       0, omit output of orbit information
+c       <0, write out abbreviated orbit information
+c       to unit iabs(norb)
 c     pinsid(i)       poloidal magnetic flux (G-cm2) along horizontal
-c     chord inside and through the magnetic axis vs.
-c     a uniform mesh in major radius; pinsid is needed
-c     only if iborb=1
+c       chord inside and through the magnetic axis vs.
+c       a uniform mesh in major radius; pinsid is needed
+c       only if iborb=1
 c     potsid(i)       poloidal magnetic flux (G-cm2) along horizontal
-c     chord outside and through the magnetic axis vs.
+c       chord outside and through the magnetic axis vs.
 c     a uniform mesh in major radius; potsid(1) and
-c     potsid(mf) are needed if codeid.ne.'onedee';
-c     the entire potsid array is needed if iborb=1
+c       potsid(mf) are needed if codeid.ne.'onedee';
+c       the entire potsid array is needed if iborb=1
 c     psi(i,j)        poloidal magnetic flux (G-cm2) at mesh point i,j
-c     (needed only if codid.ne.'onedee')
+c       (needed only if codid.ne.'onedee')
 c     psivol(i)       volume (cm3) of flux zone i; depending upon
-c     whether codeid.eq.'onedee' or not, psivol is
-c     chosen such that either r or sqrt(psi-psiax)
-c     varies a constant amount from one flux surface
-c     to the next
+c       whether codeid.eq.'onedee' or not, psivol is
+c       chosen such that either r or sqrt(psi-psiax)
+c       varies a constant amount from one flux surface
+c       to the next
 c     rinsid(i)       major radius (cm) along horizontal chord inside
-c     and through the magnetic axis vs. a uniform mesh
-c     in sqrt(psi-psiax); rinsid is needed only if
+c       and through the magnetic axis vs. a uniform mesh
+c       in sqrt(psi-psiax); rinsid is needed only if
 c     iborb=1
 c     rotsid(i)       major radius (cm) along horizontal chord outside
-c     and through the magnetic axis vs. a uniform mesh
+c       and through the magnetic axis vs. a uniform mesh
 c     in sqrt(psi-psiax); rotsid(1) and rotsid(mf) are
-c     needed if codeid.eq.'onedee'; the entire rotsid
-c     array is needed if iborb=1
+c       needed if codeid.eq.'onedee'; the entire rotsid
+c       array is needed if iborb=1
 c     r(i)            maj radius mesh point i for nonelliptical plasma (cm)
 c     rin             major radius of inside of vacuum vessel (cm)
 c     rmax            maximum radial position of plasma (cm)
 c     rpivot(ib)      radial position of pivot point (cm)
 c     sfrac1(ib)      fraction of source current per beamline coming
-c     from upper source (used only for nsourc=2)
+c       from upper source (used only for nsourc=2)
 c     sofset(ib)      vertical offset from optical axis to center
-c     of each source (cm; used only for nsourc=2)
+c       of each source (cm; used only for nsourc=2)
 c     ONETWO DIVERGENCE: use w instead of z
 c     w(j)            axial mesh point j for nonelliptical plasma (cm)
 c     zax             axial position of magnetic axis (cm) for
-c     elliptical plasma
+c       elliptical plasma
 c     zmin            minimum axial position of plasma (cm)
 c     zmax            maximum axial position of plasma (cm)
 c     zpivot(ib)      axial position of pivot point (cm)
@@ -189,6 +191,12 @@ c     zne(i)          electron density in zone i (cm-3)
 c     zni(i,k)        density of ion species k in zone i (cm-3)
 c     zte(i)          electron temperature in zone i (kev)
 c     zzi(i,k)        charge number of ion species k in zone i
+!YuP: in zfreya.f:
+!          zni(mfm1,nion) - local density of nion-th ion species
+!                           (cm**-3)
+!          zzi(mfm1,nion) - local average charge state of nion-th ion
+!                           species
+!          Z_eff(i=1,...mfm1) array is stored in zzi(i,nion+1)
 c     ONETWO DIVERGENCE
 c     zeffctv(i)      z-effective (used with iexcit=-1)
 c     iexcit       switch that controls the following
@@ -196,24 +204,24 @@ c     ONETWO DIVERGENCE
 c     iexcit=-1 uses Stearn's average cross sections:otw. like =0
 c     iexcit = 0   (default mode) normal freya run
 c     iexcit = 1   use hexnb instead of crsecs to get cross sections
-c     but neglect presence of excited sates in beam
+c       but neglect presence of excited sates in beam
 c     iexcit = 2   use hexnb with excited beam states allowed.
 c     inubpat     switch controlling 2-d beam deposition calculation
-c     0, (default) bypass 2-d deposition
-c     1, determine beam deposition on standard (r,w) grid
-c     and output deposition of 3rd excited state
-c     components to file 'beamdep'
-c     2, same as inubpat=1, except bin deposition on
-c     modified (r,w) grid whose dimensions are given by
-c     'npat' (see below).
-c     note:  if inubpat.gt.0, iexcit must be set equal to 2.
-c     this will automatically be checked, iexcit rese
-c     (if needed), and a message output to the crt.
+c       0, (default) bypass 2-d deposition
+c       1, determine beam deposition on standard (r,w) grid
+c       and output deposition of 3rd excited state
+c       components to file 'beamdep'
+c       2, same as inubpat=1, except bin deposition on
+c       modified (r,w) grid whose dimensions are given by
+c       'npat' (see below).
+c       note:  if inubpat.gt.0, iexcit must be set equal to 2.
+c       this will automatically be checked, iexcit rese
+c       (if needed), and a message output to the crt.
 c     npat        modified (r,w) dimension array for optional use if
-c     inubpat.gt.0, containing:
-c     npat(1)=number of new 'r' elements
-c     npat(2)=number of new 'w' elements
-c     default:  npat(1)=mi, npat(2)=mj
+c       inubpat.gt.0, containing:
+c       npat(1)=number of new 'r' elements
+c       npat(2)=number of new 'w' elements
+c       default:  npat(1)=mi, npat(2)=mj
 c
 c     the output quantities are:
 c
@@ -237,6 +245,9 @@ c     fber(ie,ib)     fraction of ions trapped for which error was detec
 c     hibrz(i,ie,ib)  normalized hot ion birth rate
 c     hdepz(i,ie,ib)  normalized hot ion deposition rate
 c     ipts            number of birth points to be plotted
+            !YuP[2022] Actually, not only for plotting; ipts is used in 
+            !call freyasou(... ipts input: to form the source(), 
+            !see "do 100 ipar=1,ipts" )
 c     xpts(ii)          x coordinate of birth point
 c     ypts(ii)          y coordinate of birth point
 c     zpts(ii)          w coordinate of birth point
@@ -249,12 +260,13 @@ c     wb01(ie,ib)     orbit width of fb01 ions (cm)
 c     wb00(ie,ib)     orbit width of fb00 ions (cm)
 c     zetaz(i,ie,ib)  average pitch angle cosine of deposited hot ions
 c     angmpz(i,ie,ib) toroidal angular momentum density deposition rate.
-c     (i.e. ang. momtm. deposited in shell per second /volume of she
-c     angmpz contains only the toroidal component of ang momentum.
+c       (i.e. ang. momtm. deposited in shell per second /volume of she
+c       angmpz contains only the toroidal component of ang momentum.
 c---------------------------------------------------------------------
 c     ONETWO DIVERGENCE
       include 'param.h'
       include 'frcomm.h'
+CMPIINSERT_INCLUDE
 
 c     Automatic arrays for local dynamic mem, for case where NUBEAM
 c     particle birth point list is used. nbirth_pts from frcomm.h
@@ -279,10 +291,8 @@ c     particle birth point list is used. nbirth_pts from frcomm.h
      *  thetp(kb), thetpp(kb),
      *  costp(kb), sintp(kb), costpp(kb), sintpp(kb),
      *  vbeam(ke,kb), iatype(nap,kb)
-c      dimension sgvxne(kz),sgxn(kz,ke,kb),sgxnmi(ke,kb),hxfrac(ke,kb)
       real*8 sgvxne(kz),sgxn(kcmp1,kz,kbe,ksge),
      *       sgxnmi(ke,kb),hxfrac(ke,kb)
-c      real*8 sgxn1(kcmp1,kz,kbe,ksge)
       dimension wt(kz), zeta_(kz),angmtp(kz),nmbrz(kz)
       dimension rzpat(kix2,kjx2,ke,kb)
       data pio180 /0.017453293d0/
@@ -293,8 +303,11 @@ c   kimp-> 2 for namei
 c
       integer ne_tk
       real*8 fe_tk, de_tk
-      real*8 sgxnloc(kbe)
+      real*8 sgxnloc(4) !YuP[2022-12-15] Was (kbe)
       real*8 zangrot(kz), znis(kz,kion), zzis(kz,kion)
+      
+      real*8 texit,tenter !to be found in subr.timtor
+      real*8 atwb,zax,zmin,zmax,elongi,rmajor,rin,rmax !IN for inject1
 c      
       if (read_birth_pts.eq."enabled") then
       if (.NOT. ALLOCATED(x_nub)) then     
@@ -308,43 +321,48 @@ c
 c----------------------------------------------------------------------
 c     general freya initialization
       call bcast(rzpat,zero,kix2*kjx2*ke*kb)   !rzpat not used w cql3d
-      mb=nbeams
+      mb=(ibstart-1)+nbeams1(kbsp)    !Maximum is parameter kb
       elong=0.d0
       norb=0
+      nout=6
 c
-      do ib=1,ke
-       do i=1,kb
-         bneut(ib,i)=0.d0
-         vbeam(ib,i)=0.d0
-         sgxnmi(ib,i)=0.d0
-         hxfrac(ib,i)=0.d0
-       enddo
-      enddo
-      do i=1,kz
-       do j=1,ke
-         do k=1,kb
-           hibrz(i,j,k)=0.d0
-           hdepz(i,j,k)=0.d0
-           ftrapfi(i,j,k)=0.d0
+      if (ibstart.eq.1) then
+      do ib=1,kb
+         do i=1,ke
+            bneut(i,ib)=0.d0
+            vbeam(i,ib)=0.d0
+            sgxnmi(i,ib)=0.d0
+            hxfrac(i,ib)=0.d0
          enddo
-       enddo
       enddo
-      do i=1,kz
-       do j=1,ke
-         do k=1,kb
-          sgxn(1,i,j,k)=0.d0
-          sgxn(2,i,j,k)=0.d0
-          sgxn(3,i,j,k)=0.d0
-          sgxn(4,i,j,k)=0.d0
-        enddo
-       enddo
+      do l=1,kz
+         do i=1,ke
+            do ib=1,kb
+               hibrz(l,i,ib)=0.d0
+               hdepz(l,i,ib)=0.d0
+               ftrapfi(l,i,ib)=0.d0
+            enddo
+         enddo
       enddo
+!      do l=1,kz
+!         do i=1,ke
+!            do ib=1,kb
+!               sgxn(1,l,i,ib)=0.d0
+!               sgxn(2,l,i,ib)=0.d0
+!               sgxn(3,l,i,ib)=0.d0
+!               sgxn(4,l,i,ib)=0.d0 !YuP[2022-12-15]: BUG? 
+!               !See above declaration: real*8 sgxn(kcmp1,kz,kbe,ksge)
+!            enddo
+!         enddo
+!      enddo
+      sgxn=0.d0 !YuP[2022-12-15] replaced the above.
+      endif  !On ibstart.eq.1
       pzone=0.D0
       rzone=0.D0
 c
 c----------------------------------------------------------------------
 c     set up some data for optional (r,w) deposition calculation
-      inubpat=0  !Not used with cql3d
+      inubpat=0  !Then, frnbdep2 is Not used with cql3d
       if(inubpat.gt.0) then
         call setrz(npat,r(1),r(mi),w(1),w(mj),drpat,dzpat,nrpat,nzpat)
         iexcit=2
@@ -356,8 +374,10 @@ c     if nubeam list case, make sure only 1 beam
          nbeams=1
          mb=1
          if (codeid.eq.'onedee') then
+CMPIINSERT_IF_RANK_EQ_0      
             WRITE(*,*)'Freya: nubeam list not setup for this codeid'
             WRITE(*,*)'STOP'
+CMPIINSERT_ENDIF_RANK
             STOP
          endif
       endif
@@ -365,7 +385,7 @@ c     if nubeam list case, make sure only 1 beam
 c
 c     turn off orbit calculation in case of counter-injection; present
 c     orbit model applies only for co-injection
-      do 5 ib=1,mb
+      do 5 ib=ibstart,mb
  5    if(angleh(ib).lt.5.) iborb = 0
 c
 c     initialize flux surface quantities
@@ -399,7 +419,7 @@ c990131      elong  = amax1(elong,1.e-6)
       endif
 c
 c     calculate sines and cosines of various angles
-      do 15 ib=1,mb
+      do 15 ib=ibstart,mb
         cangv(ib)=cos(anglev(ib)*pio180)
         cangh(ib)=cos(angleh(ib)*pio180)
         sangv(ib)=sin(anglev(ib)*pio180)
@@ -408,31 +428,34 @@ c     calculate sines and cosines of various angles
 c
 c     calculate beam power; account for neutralizer efficiency
 c
-      atwb = atw(ibion)
+      
+      
       bntot = zero
-      do 20 ib=1,mb
+      do 20 ib=ibstart,mb
+        atwb = atw(ibion(ib))
         do 21 ie=1,3
           ebeam(ie,ib) = ebkev(ib)/ie
           ebx = ebeam(ie,ib)/atwb
 c     ONETWO DIVERGENCE   - delete reference to ionization efficiency
 c     routines.
-      call logint(ebx,beff)  ! JK  BH140501: Check if any diff.
+          beff=1.d0 ! output of subr.logint; set to any value here.
+          call logint(ebx,beff)  ! JK
 c          beff=1.
           ebev = 1.e3*ebx
           vbeam(ie,ib) = 1.384e6*sqrt(ebev)  !adjstd for mass, cm/sec
           bion(ie,ib)  = 0.625e19*fbcur(ie,ib)*bcur(ib) ! molecular src
                                        !rate (as I understand, BH)
                                        !bcur need not be set 
-                                       !in nml, if bptor.ne.0.
+                                       !in nml, if bptor(ib).ne.0.
                                        !In this case, bneut, bpow are
                                        !set for default bcur()=110.,
                                        !and renormalize for bptor below.
           bneut(ie,ib) = ie*beff*bion(ie,ib)  !ion rates at energy/ie.
           bpow(ie,ib)  = ebeam(ie,ib)*bneut(ie,ib)/0.625e16
-c          write(*,*)'freya: ibion,atw(ibion),ie,ib,vbeam(ie,ib)',
-c     &                      ibion,atw(ibion),ie,ib,vbeam(ie,ib)
- 21     bntot = bntot + bneut(ie,ib)
- 20   continue
+          !write(*,*)'freya:ib,fbcur(ie,ib)',ib,fbcur(ie,ib)
+          bntot = bntot + bneut(ie,ib)
+ 21   continue !ie
+ 20   continue !ib
 c
 c.......................................................................
 cBH130329:  If read_birth_pts="enabled", then read in beam birth points 
@@ -444,6 +467,8 @@ c           Else:  freya calculation.
 c.......................................................................
 
       if (read_birth_pts.eq."enabled") then
+         ib=1                 !Nubeam list only set up for 1 beam
+         atwb= atw(ibion(ib)) !YuP[2018-01-25] Added: atwb is the input below
 c        read_nubeam_data reads data file and returns it
 c        through the argument list.
 c        NOTE:  The NUBEAM birth points are actually shifted from
@@ -452,11 +477,15 @@ c        GC starting position of the particle.  That is, these
 c        are birth points for particle guiding centers.
          ncalls=ncalls+1
          if (ncalls.gt.nbirth_pts_files) then
-            write(*,*)'FREYA WARNING: Insufficient birth_pts_files'
-            write(*,*)'FREYA WARNING: Stepping back to last file'
+CMPIINSERT_IF_RANK_EQ_0      
+            WRITE(*,*)'FREYA WARNING: Insufficient birth_pts_files'
+            WRITE(*,*)'FREYA WARNING: Stepping back to last file'
+CMPIINSERT_ENDIF_RANK
             ncalls=ncalls-1
          else
-            write(*,*)'Freya: read_birth_pts case, ncalls=',ncalls   
+CMPIINSERT_IF_RANK_EQ_0      
+            WRITE(*,*)'Freya: read_birth_pts case, ncalls=',ncalls   
+CMPIINSERT_ENDIF_RANK
          endif
          filenm=trim(birth_pts_files(ncalls))
          call read_nubeam_data(filenm,nbirth_pts,atwb,
@@ -467,7 +496,7 @@ c        are birth points for particle guiding centers.
      +                   pabs_cmpts_nub)
 
 c        pinj_nub=Injected power (Watts) = freya bptor
-         bptor(1)=pinj_nub
+         bptor(1)=pinj_nub !here: read_nubeam_data case
 c        Set bcur,bion,bneut,bpow from Nubeam list
 c        This is setup according to freya bptor, as above.
 c        Here, bcur, here, refers to absorbed power, since
@@ -476,7 +505,7 @@ c        through components.  [Fix later].
          bntot=0d0
          ib=1                   !Nubeam list only set up for 1 beam
          do ie=1,3
-            bcur(ib)= bcur(ib)+birth_rate_cmpts_nub(ie)*1.6022e-19
+            bcur(ib)= bcur(ib)+birth_rate_cmpts_nub(ie)*1.6022e-19 !Nubeam case
             bneut(ie,ib)=birth_rate_cmpts_nub(ie)
             bion(ie,ib)=bneut(ie,ib)/ie
             bpow(ie,ib)=pabs_cmpts_nub(ie)
@@ -487,7 +516,7 @@ c        through components.  [Fix later].
 
       endif    ! On read_birth_pts.eq."enabled"
 
-      if (read_birth_pts.ne."enabled") then  !Skip, if nubeam case
+      if (read_birth_pts.ne."enabled") then  !That is, birth pts calc'd
       
 c     ONETWO DIVERGENCE
 c..................................................................
@@ -511,62 +540,103 @@ c
       do i=1,kz
        zangrot(i)=0.d0
       enddo
-c
-c... In CQL3D, for nprim=1, nimp=1, main ions in zni(j,1), (j,2)
-c    and zzi(j,1) and zzi(j,2) with general and maxwellian
-c    distributions, respectively. The impurity ion is in 
-c    zni(j,3) and zzi(j,3). Also, Zeff has been copied into
-c    zzi(j,nion+2=4). So, for this case we slip
-c    the arrays such that (j,3) - > (j,2) for the impurity
-c
-      if(nprim.eq.1 .and. nimp.eq.1) then
-       do j=1,kz
-         znis(j,1)=zni(j,2)
-         znis(j,2)=zni(j,3)
-         zzis(j,1)=zzi(j,2)
-         zzis(j,2)=zzi(j,3)
-         zzis(j,3)=zzi(j,4)  ! Zeff profile
-       enddo
-      else
-       do j=1,kz
-         do i=1,kion
-           znis(j,i)=zni(j,i)
-           zzis(j,i)=zzi(j,i)
+
+! Populate profiles for primary and impurity ions (ki= 1 : nprim+nimp)
+! Save the value of Zeff into zzis(nion+1) == zzis(nprim+nimp+1)
+
+!OLD      if(nprim.eq.1 .and. nimp.eq.1) then
+!OLD       do j=1,kz
+!OLD         znis(j,1)=zni(j,2) !Maxw
+!OLD         znis(j,2)=zni(j,3) !Impur
+!OLD         zzis(j,1)=zzi(j,2) !Maxw
+!OLD         zzis(j,2)=zzi(j,3) !Impur
+!OLD         zzis(j,3)=zzi(j,4)  ! Zeff profile: see frsetup: 
+!OLD       enddo
+!OLD      else  !on nprim/nimp
+!OLD       do j=1,kz
+!OLD         do i=1,kion
+!OLD           znis(j,i)=zni(j,i)
+!OLD           zzis(j,i)=zzi(j,i)
+!OLD         enddo
+!OLD       enddo
+!OLD      endif
+
+!NEW:
+      !This is how it is treated in sub.nbsgxn:
+!      do ki=1,nion ! Note: nion=nprim+nimp
+!        if (ki .le. nprim) then
+!          znipm(ki) = znis(j,ki) !ki=1:nprim [Primary ion species]
+!        else !ki= (nprim+1):(nprim+nimp)
+!          kk = ki - nprim
+!          zniim(kk) = znis(j,ki) !ki=(nprim+1):(nprim+nimp) [Impurity]
+!        endif
+!      enddo
+
+       !YuP[2021-01-11] Now generalized to
+       do j=1,mfm1 !kz (radial grid)
+         do kk=1,nion ! Note: nion=nprim+nimp
+           !---> see frstup on nprim <--- 
+           znis(j,kk)=zni(j,kk) !Density for all ions, kk=1:nprim+nimp
+           zzis(j,kk)=zzi(j,kk)
          enddo
+         zzis(j,nion+1)=zzi(j,nion+1) !save Zeff
        enddo
-      endif
+            
 c
-      write(*,*) 'calling nbsgxn ...'
-      write(*,*) 'iexcit = ',iexcit
-c       write(*,*) 'zte:'
-c       write(*,'(5(2x,1pe14.5))') (zte(j),j=1,kz)
-c       write(*,*) 'zti:'
-c       write(*,'(5(2x,1pe14.5))') (zti(j),j=1,kz)
-c       write(*,*) 'zne:'
-c       write(*,'(5(2x,1pe14.5))') (zne(j),j=1,kz)
-c       write(*,*) 'zni(j,1-3):'
-c       write(*,'(5(2x,1pe14.5))') (znis(j,1),j=1,kz)
-c       write(*,'(5(2x,1pe14.5))') (znis(j,2),j=1,kz)
-c       write(*,'(5(2x,1pe14.5))') (znis(j,3),j=1,kz)
-c       write(*,*) 'zzi(j,1-3):'
-c       write(*,'(5(2x,1pe14.5))') (zzis(j,1),j=1,kz)
-c       write(*,'(5(2x,1pe14.5))') (zzis(j,2),j=1,kz)
-c       write(*,'(5(2x,1pe14.5))') (zzis(j,3),j=1,kz)
+CMPIINSERT_IF_RANK_EQ_0      
+      WRITE(*,*) 'iexcit = ',iexcit
+c       WRITE(*,*) 'zte:'
+c       WRITE(*,'(5(2x,1pe14.5))') (zte(j),j=1,1)
+       WRITE(*,*) 'zti(flux zone=1):'
+       WRITE(*,'(5(2x,1pe14.5))') (zti(j),j=1,1) !j is radial zone here
+       WRITE(*,*) 'zne:'
+       WRITE(*,'(5(2x,1pe14.5))') (zne(j),j=1,1) !zne(mfm1) (cm**-3)
+       WRITE(*,*) 'zni(j,1):'
+       WRITE(*,'(5(2x,1pe14.5))') (znis(j,1),j=1,1)
+       WRITE(*,*) 'zni(j,2):'
+       WRITE(*,'(5(2x,1pe14.5))') (znis(j,2),j=1,1)
+       WRITE(*,*) 'zni(j,3):'
+       WRITE(*,'(5(2x,1pe14.5))') (znis(j,3),j=1,1)      
+c       WRITE(*,*) 'zzi(j,1):'
+c       WRITE(*,'(5(2x,1pe14.5))') (zzis(j,1),j=1,1)
+c       WRITE(*,*) 'zzi(j,2):'
+c       WRITE(*,'(5(2x,1pe14.5))') (zzis(j,2),j=1,1)
+c       WRITE(*,*) 'zzi(j,3):'
+c       WRITE(*,'(5(2x,1pe14.5))') (zzis(j,3),j=1,1)
+c       WRITE(*,*) 'zzi(j,4):'
+c       WRITE(*,'(5(2x,1pe14.5))') (zzis(j,4),j=1,1)
+CMPIINSERT_ENDIF_RANK
 c       stop
 c
-        call nbsgxn (iexcit,namep,namei,mb,mfm1,ne_tk,nprim,
-     .             nimp,nion,atwb,atw,ebkev,fe_tk,ibion,vbeam,
-     .             zne,znis,zte,zti,zzis,de_tk,dtemax,dnemax,dzemax,
-     .             hxfrac,sgxn,sgxnmi)
-c      do ib=1,mb
+c
+c     calculate macroscopic cross sections
+c
+        do ib=ibstart,mb !YuP[2018-01-25] Corrected/added loop in beams
+          ibion_ib=ibion(ib) ! Input (corrected below: ibion->ibion_ib)
+          ! Input ibion_ib is a scalar !
+          atwb= atw(ibion_ib) ! atwb==atw_beam is the input
+          write(*,*) 'calling nbsgxn ... with ibion_ib=',ibion_ib,
+     &                '  atw(ibion_ib)=',atw(ibion_ib),'  ne_tk=',ne_tk
+          !write(*,'(a,1p3e11.2)') '  bef.nbsgxn sgxnmi=',sgxnmi(1:ke,1)
+          call nbsgxn(iexcit,namep(1:kprim),namei(1:kimp),
+     &         mb,mfm1,ne_tk,nprim,
+     .         nimp,nion,atwb,atw(1:kion),ebkev(1:kb),fe_tk,ibion_ib,
+     &         vbeam(1:ke,1:kb),
+     .         zne(1:kz),znis(1:kz,1:kion),zte(1:kz),zti(1:kz),
+     &         zzis(1:kz,1:kion),de_tk,dtemax,dnemax,dzemax,
+     .         hxfrac(1:ke,1:kb),sgxn(1:4,1:kz,1:kbe,1:ksge),
+     &         sgxnmi(1:ke,1:kb),ibstart)
+          !write(*,'(a,1p3e11.2)') '  aft.nbsgxn sgxnmi=',sgxnmi(1:ke,1)
+        enddo ! ib
+        
+c      do ib=ibstart,mb
 c       do j=1,3
-c         write(*,'(2i3,2x,1p1e12.4,a12)') j,ib,sgxnmi(j,ib),' sgxnmi'
+c         WRITE(*,'(2i3,2x,1p1e12.4,a12)') j,ib,sgxnmi(j,ib),' sgxnmi'
 c       enddo
 c      enddo
 c      stop
 c
 c... old coding (JK)
-c
 c      if(iexcit.le.0)then
 c     ONETWO DIVERGENCE
 c        call crsecs(atw,ebkev,ibion,ke,kz,mb,mfm1,nion,vbeam,
@@ -592,10 +662,14 @@ c
 c     calculate total plasma volume
       volume = 0.
       do i=1,mfm1
-c        write(*,*)'freya: i,psivol(i)=',i,psivol(i)
+CMPIINSERT_IF_RANK_EQ_0      
+        !write(*,*)'freya: i,psivol(i)=',i,psivol(i)
+CMPIINSERT_ENDIF_RANK
         volume = volume + psivol(i)
       enddo
-      write(*,*)'freya: volume(sum of psivol)=',volume
+CMPIINSERT_IF_RANK_EQ_0      
+      WRITE(*,*)'freya: volume(sum of psivol)=',volume
+CMPIINSERT_ENDIF_RANK
       !Note: psivol is based on eqvol() which is calc-ed by subr.eqvolpsi.
       !Can be a little different from alternative definition
       ! of flux surface volume as setup in subr.tdrmshst. 
@@ -611,9 +685,26 @@ cBH110309      iskip =       1 + (npart-1)/1500
                   !according to code comment
       iskip =       1 + (npart-1)/maxp
       ic    = 0
-      ipts  = 0
-         
-      do 200 ib=1,mb  ! 386 lines down to line 989
+      ipts  = 0 !To be accumulated over all {ib,ie}
+            !YuP/note: ipts is used in 
+            !call freyasou(... ipts input: to form the source(), 
+            !see "do 100 ipar=1,ipts" )
+            
+      x0=0.d0  !YuP[2022-11-28] added
+      y0=0.d0  !YuP[2022-11-28] added
+      z0=0.d0  !YuP[2022-11-28] added
+      vx0=0.d0 !YuP[2022-11-28] added
+      vy0=0.d0 !YuP[2022-11-28] added
+      vz0=0.d0 !YuP[2022-11-28] added
+      isourc=0 !YuP[2022-11-28] Reset at each new call of frnfreya/freya
+      dummy=RANDOM_my(ranseed) !YuP[2022-11-28] Reset at each new call
+      !YuP: The above resetting is needed in case of updating 
+      !of NBI deposition, when plasma parameters change.
+      !A simple test for update of NBI deposition:
+      !If plasma ne, Te, Ze are NOT changed, 
+      !then NBI deposition should remain exactly same at each new update.
+
+      do 200 ib=ibstart,mb   !to line 996
 
       if (read_birth_pts.ne."enabled") then  !Skip, if nubeam case
 c
@@ -638,8 +729,10 @@ cBH130915: Not sure of effect of this change. Reverting:do 40  i=1,naptr
             if(ashape(i,ib).eq.'b-vert')  iatype(i,ib)=7
             if(ashape(i,ib).eq.'b-horiz') iatype(i,ib)=8
             if(ashape(i,ib).eq.'b-d3d')   iatype(i,ib)=9
-c        write(*,*) 'ashape(i,ib) = ',i,ib,ashape(i,ib)
-c        write(*,*) 'iatype(i,ib) before rotate = ',iatype(i,ib)
+CMPIINSERT_IF_RANK_EQ_0      
+c        WRITE(*,*) 'ashape(i,ib) = ',i,ib,ashape(i,ib)
+c        WRITE(*,*) 'iatype(i,ib) before rotate = ',iatype(i,ib)
+CMPIINSERT_ENDIF_RANK
  40      continue
 c     
 c     Some angles for subroutine rotate
@@ -651,29 +744,29 @@ c     Some angles for subroutine rotate
         sintpp(ib)=sin(thetpp(ib))
 c
         endif  !on read_birth_pts.ne."enabled"
-c
+c        
 c----------------------------------------------------------------------
 c     begin loop over beam energy components, ie
 c----------------------------------------------------------------------
         do 201 ie=1,3  !340 lines down
 c         beam fractions
-          fap(ie,ib)   = 0.
-          fwall(ie,ib) = 0.
-          forb(ie,ib)  = 0.
-          fb11(ie,ib)  = 0.
-          fb10(ie,ib)  = 0.
-          fb01(ie,ib)  = 0.
-          fb00(ie,ib)  = 0.
-          fber(ie,ib)  = 0.
+          fap(ie,ib)   = 0.d0 !YuP[2022-12-13] Added d0
+          fwall(ie,ib) = 0.d0
+          forb(ie,ib)  = 0.d0
+          fb11(ie,ib)  = 0.d0
+          fb10(ie,ib)  = 0.d0
+          fb01(ie,ib)  = 0.d0
+          fb00(ie,ib)  = 0.d0
+          fber(ie,ib)  = 0.d0
           do 110 i=1,mfm1
-             ftrapfi(i,ie,ib)=0.
-             hibrz(i,ie,ib) = 0.
-             hdepz(i,ie,ib) = 0.
-             angmpz(i,ie,ib) = 0.
-             hicmz(i,ie,ib,1) = 0.
-             hicmz(i,ie,ib,2) = 0.
-             hicmz(i,ie,ib,3) = 0.
-             zetaz(i,ie,ib) = 0.
+            ftrapfi(i,ie,ib)=0.d0
+            hibrz(i,ie,ib) = 0.d0
+            hdepz(i,ie,ib) = 0.d0
+            angmpz(i,ie,ib) = 0.d0
+            hicmz(i,ie,ib,1) = 0.d0
+            hicmz(i,ie,ib,2) = 0.d0
+            hicmz(i,ie,ib,3) = 0.d0
+             zetaz(i,ie,ib) = 0.d0
  110      continue
           do 310 i=1,mfm1
              nmbrz(i)=0
@@ -704,24 +797,40 @@ c YuP[171103] Moved this line inside if()            if(newpar.eq.0) go to 120
 c
           if (read_birth_pts.ne."enabled") then  !Skip if nubeam list
              ! FREYA normal calculations
+             mlost=0 !YuP[2021-01-11] Added. Normally, it is found 
+                     !by sub.rotate below. Need to initialize it here,
+                     !in case of "goto 120" jump, at next line.
+             !if(ib.eq.2)WRITE(*,*)'freya ipar,newpar=',ipar,newpar
              if(newpar.eq.0) go to 120 ! YuP[171103] moved from above
 c
 c... generate neutral particle at beam source
 c
+!             if(ipar.eq.1)then
+!              write(*,*)'bef.sorspt1 x0,y0,z0=',x0,y0,z0
+!              write(*,*)'isourc,ie',isourc,ie
+!             endif
              call sorspt1(bshape,bheigh,bwidth,bhfoc,bvfoc,bhdiv,
-     .            bvdiv,ib,ie,isourc,nsourc,sfrac1,vbeam,x0,y0,z0,
-     .            vx0,vy0,vz0)
+     .            bvdiv,ib,ie,isourc,nsourc,sfrac1,vbeam(1:ke,1:kb),
+     .            x0,y0,z0,vx0,vy0,vz0)
+!             if(ipar.eq.1)then
+!              write(*,*)'AFT.sorspt1 x0,y0,z0=',x0,y0,z0
+!              write(*,*)'isourc,ie=',isourc,ie
+!             endif
+c
+c            call sorspt(bshape,bheigh,bwidth,bhfoc,bvfoc,bhdiv,bvdiv,
+c     &        ib,ie,isourc,ke,nsourc,sfrac1,vbeam,x0,y0,z0,vx0,vy0,
+c     +        vz0)
 c
 c... transform coordinates and advance particle to pivot point
 c
-            call rotate(naptr,iatype,aheigh,awidth,alen,bhofset,
+             call rotate(naptr,iatype,aheigh,awidth,alen,bhofset,
      &        bvofset,cangv,cangh,ib,isourc,costp,sintp,costpp,
      &        sintpp,blenp,nsourc,sangv,sangh,rpivot,zpivot,mlost,
      &        x0,y0,z0,vx0,vy0,vz0)
-c      write(*,*)'freya,rotate:x0,y0,z0,vx0,vy0,vz0',x0,y0,z0,vx0,vy0,vz0
+c      WRITE(*,*)'freya,rotate:x0,y0,z0,vx0,vy0,vz0',x0,y0,z0,vx0,vy0,vz0
 c
 c     skip injection if particle is lost at aperture
-cCheck inj  write(*,*)'freya: ie,ipar,npar,mlost',ie,ipar,npar,mlost
+cCheck inj  WRITE(*,*)'freya: ie,ipar,npar,mlost',ie,ipar,npar,mlost
 c 120        if(mlost.ne.0) go to 160
   120       continue
             if (mlost .ne. 0)  go to 160
@@ -744,17 +853,30 @@ c
             if (iexcit.le.0) then
              call inject_old(atw,codeid,drutpi,droti,dri,dzi,
      &             elongi,ib,ie,mfm1,mim1,mjm1,newpar,potsid(1),
-     &             psi,r,rmajor,rin,rmax,sgxn,sgxnmi,x0,y0,z0,
-     &             vx0,vy0,vz0,vbeam,w,zax,zmin,zmax,izone,
+     &             psi,r,rmajor,rin,rmax,
+     &             sgxn(1:4,1:kz,1:kbe,1:ksge),sgxnmi(1:ke,1:kb),
+     &             x0,y0,z0,vx0,vy0,vz0,
+     &             vbeam(1:ke,1:kb),w,zax,zmin,zmax,izone,
      &             pzone,rzone,rpos,xpos,ypos,zpos)
             else
+             atwb=atw(ibion(ib)) !YuP[2018-01-25] Added: atwb is the input
+         !if(ipts.eq.1)then
+         !write(*,'(a,1p3e11.2)') '   bef.inject1 sgxnmi=',sgxnmi(1:ke,1)
+         !endif
              call inject1(atwb,codeid,de_tk,drutpi,droti,dri,ds_tk,dzi,
      &             elongi,ib,ie,kb,kbe,ksge,ke,kz,ki,mfm1,mim1,
-     &             mjm1,ne_tk,newpar,nout,potsid(1),psi,r,rmajor,rin,
-     &             rmax,sgxn,sgxnloc,sgxnmi,x0,y0,z0,vx0,vy0,vz0,
-     &             vbeam,w,zangrot,zax,zmin,zmax,izone,
-     &             pzone,rzone,rpos,xpos,ypos,zpos,myid,tenter,
+     &             mjm1,ne_tk,newpar,nout,potsid(1),
+     &             psi(1:ki,1:kj),r(1:ki),rmajor,rin,rmax,
+     &             sgxn(1:4,1:kz,1:kbe,1:ksge),
+     &             sgxnloc(1:4),sgxnmi(1:ke,1:kb),
+     &             x0,y0,z0,vx0,vy0,vz0,
+     &             vbeam(1:ke,1:kb),w(1:kj),zangrot(1:kz),
+     &             zax,zmin,zmax,izone,
+     &             pzone,rzone,rpos,xpos,ypos,zpos,tenter,
      &             smax,texit)
+         !if(ipts.eq.1)then
+         !write(*,'(a,1p3e11.2)') '   aft.inject1 sgxnmi=',sgxnmi(1:ke,1)
+         !endif
             endif
 
 c           Shift from particle birth point to guiding center point
@@ -769,7 +891,9 @@ c           need to skip to next particle for the given ie.
               ii=ii+1
               if (ie_nub(ii).eq.ie) exit
               if (ii.gt.npart) then
+CMPIINSERT_IF_RANK_EQ_0      
                 WRITE(*,*)'Freya: Nubeam list inconsistency'
+CMPIINSERT_ENDIF_RANK
                 STOP
               endif
             enddo
@@ -791,10 +915,11 @@ c
 c
 c... skip birth data if:  particle missed plasma
 c
+            !if(ie.eq.1)WRITE(*,*)'freya-5 ipts,izone=',ipts,izone
             if(izone.ge.mf) go to 170
+            
 c     For removing NBI source at all psi outside of psicutoff: 
           !print*,'Rpos,Zpos, pzone,psicutoff=',rpos,zpos,pzone,psicutoff
-          !pause
             if(psicutoff.ne.0.d0  .and. (-pzone).lt.psicutoff) go to 170
             ! pzone is increasing from center to edge.
             ! equilpsi is decreasing, and psicutoff is based on equilpsi
@@ -805,9 +930,9 @@ c
             hicmz(izone,ie,ib,1) = hicmz(izone,ie,ib,1) + sgxnloc(1)
             hicmz(izone,ie,ib,2) = hicmz(izone,ie,ib,2) + sgxnloc(2)
             hicmz(izone,ie,ib,3) = hicmz(izone,ie,ib,3) + sgxnloc(3)
-c           write(*,*) 'hibrz(1,1,2) = ',hibrz(1,1,2)
-c          write(*,*) 'hibrz = ',hibrz(izone,ie,ib)
-c          write(*,*) 'hicmz-1 = ',hicmz(izone,ie,ib,1)
+c           WRITE(*,*) 'hibrz(1,1,2) = ',hibrz(1,1,2)
+c          WRITE(*,*) 'hibrz = ',hibrz(izone,ie,ib)
+c          WRITE(*,*) 'hicmz-1 = ',hicmz(izone,ie,ib,1)
 c
 c... Calculate pitch angle cosine at birth point; accumulate average
 c    pitch angle cosine. Calculate toroidal angular momentum deposited
@@ -816,21 +941,23 @@ c990131            zetai = amin1(zetai,1.)
 c990131            zetai = amax1(zetai,-1.)
             zetai = (-ypos*vx0+xpos*vy0)/(rpos*vbeam(ie,ib))    ! Original
             vplane = SQRT (vx0**2+vy0**2)                       ! Onetwo
-cBH130914            zetai  = csgn*(xpos*vy0-ypos*vx0)/(rpos*vplane)     ! Onetwo
+cBH130914   zetai  = csgn*(xpos*vy0-ypos*vx0)/(rpos*vplane)     ! Onetwo
             zetai = min(zetai,one)
             zetai = max(zetai,-one)
             vtroid=zetai*vbeam(ie,ib)                           ! Original
-cBH130914            vtroid = csgn*zetai*vplane                          ! Onetwo
+cBH130914   vtroid = csgn*zetai*vplane                          ! Onetwo
             vrad   = -SQRT (1.0 - zetai**2) * vplane            ! Onetwo
             angmtm=rpos*vtroid*atwb*1.673e-24
             angmpz(izone,ie,ib) = angmpz(izone,ie,ib) + angmtm  ! Onetwo
             if(iborb.ne.1) then
               zetaz(izone,ie,ib) = zetaz(izone,ie,ib) + zetai
-c              angmpz(izone,ie,ib)=angmpz(izone,ie,ib) + angmtm
+c             angmpz(izone,ie,ib)=angmpz(izone,ie,ib) + angmtm
             endif
 c
 c... save occasional birth point for subsequent plotting
-c
+            !YuP[2022] Actually, not only for plotting; ipts is used in 
+            !call freyasou(... ipts input: to form the source(), 
+            !see "do 100 ipar=1,ipts" )
             ic = ic + 1
             if(mod(ic-1,iskip).eq.0) then
               ipts = ipts+1
@@ -845,7 +972,7 @@ c
 c
 c... calculate (r,w) grid location
 c
-            if(inubpat.gt.0)then
+            if(inubpat.gt.0)then !See above: inubpat=0 ==> Not used with cql3d
               i=(rpos-r(1))/drpat + one
               j=(zpos-w(1))/dzpat + one
               rzpat(i,j,ie,ib) = rzpat(i,j,ie,ib) + one
@@ -911,15 +1038,22 @@ c     end loop over particles
 c----------------------------------------------------------------------
 c
             newpar = 0
- 180     continue
+ 180     continue !ipar=1,npar 
+
+CMPIINSERT_IF_RANK_EQ_0      
+      WRITE(*,*) '  freya: ie,ib,npar = ',ie,ib,npar 
+      !npar is different for each {ie,ib}: npar=(bneut(ie,ib)/bntot)*npart
+      WRITE(*,*) '  freya: ipts,iskip=',ipts,iskip
+      ! ipts is accumulated over all ie=1:3 and all ib
+CMPIINSERT_ENDIF_RANK
 
 c
 c... normalize average pitch angle cosine. normalize momentum and birth
 c    mode in each shell to a single particle.
 c
-            write(*,*) '** end loop over particles **'
+            !if(ib.eq.2)WRITE(*,*) 'after do180.  ie,npar=',ie,npar
 c          do i=1,mfm1
-c        write(*,'(3i4,2x,1p1e10.4,a16)')i,ie,ib,hibrz(i,ie,ib),' hibrz'
+c        WRITE(*,'(3i4,2x,1p1e10.4,a16)')i,ie,ib,hibrz(i,ie,ib),' hibrz'
 c          enddo
 c          stop
 c
@@ -961,7 +1095,7 @@ c
           if(xloss1.ge.1.) go to 201
 c
 c         do i = 1, mfm1
-c         write(*,'(i4,2x,1p2e12.4,a12)') i, psivol(i), hibrz(i,ie,ib),
+c         WRITE(*,'(i4,2x,1p2e12.4,a12)') i, psivol(i), hibrz(i,ie,ib),
 c     .        ' hibrz-pre'
 c         enddo
           do 190 i=1,mfm1
@@ -989,39 +1123,42 @@ c
           fb00(ie,ib) = fb00(ie,ib)/nparx
           fber(ie,ib) = fber(ie,ib)/nparx
 c
- 201    continue  ! end loop over energy components
-        write(*,*) '** end loop over energy components **'
- 200  continue  ! end loop over beams
+ 201    continue  ! end loop over energy components (ie)
+ 200  continue  ! end loop over beams (ib index)
 c
 c----------------------------------------------------------------------
 c
 c     end loop over beams and components
 c
 c----------------------------------------------------------------------
-      write(*,*) 'end loop over beams...'
-      write(*,*) 'ie,ib,ipar = ',ie,ib,ipar
 c
       if (read_birth_pts.ne."enabled") then
 c
-       write(*,*) 'hibrz(i,1,1),hibrz(i,2,1),hibrz(i,3,1)'
-       do i=1,mfm1
-         write(*,'(i4,2x,0p9f9.4)') i, hibrz(i,1,1),
-     >        hibrz(i,2,1),hibrz(i,3,1),
-     >        hibrz(i,1,2),hibrz(i,2,2),hibrz(i,3,2),
-     >        hibrz(i,1,3),hibrz(i,2,3),hibrz(i,3,3)
-       enddo
+CMPIINSERT_IF_RANK_EQ_0      
+!       write(*,*) 'hibrz(i,1,1),hibrz(i,2,1),hibrz(i,3,1)'
+!       do i=1,mfm1
+!         write(*,'(i4,2x,0p9f9.4)') i, hibrz(i,1,1),
+!     >        hibrz(i,2,1),hibrz(i,3,1),
+!     >        hibrz(i,1,2),hibrz(i,2,2),hibrz(i,3,2),
+!     >        hibrz(i,1,3),hibrz(i,2,3),hibrz(i,3,3)
+!       enddo
+CMPIINSERT_ENDIF_RANK
 c       stop
 c
 c... renormalize currents and powers to bptor
 c
-      do 240 ib=1,mb
+      do 240 ib=ibstart,mb
         if(bptor(ib).gt.0.) then
           bptorx = 0.
           do 210 ie=1,3
  210      bptorx = bptorx + (1.-fap(ie,ib))*bpow(ie,ib)
           if(bptorx.gt.0.) then
             xnorm = bptor(ib)/bptorx
-            bcur(ib) = xnorm*bcur(ib)
+            !YuP/commented bcur(ib)=xnorm*bcur(ib) !case bptor>0. YuP[2022-11]Redefined-BAD?
+            !YuP[2022-11-23] BAD? This line above redefines bcur() from
+            !namelist. Then, if frnfreya is called again (e.g., to update
+            !NBI deposition if plasma n&T is changed) the value of bcur is
+            !different.  
             do 220 ie=1,3
               bion(ie,ib) = xnorm*bion(ie,ib)
               bneut(ie,ib) = xnorm*bneut(ie,ib)
@@ -1046,34 +1183,40 @@ c       following printout.  For that purpose, it will be useful
 c       (in the future) to adjust the calculation of izone, perhaps
 c       to base it on the rho coordinate and rotsid,  and to
 c       fill in the rotsid() array.
-      write(*,*)
-      write(*,*)'freya, hot ion birth rate vs rotsid, for ib=1, ie=1:3'
-c      write(*,*) (rotsid(i),i=1,mfm1) 
-c      write(*,*) (hibrz(i,1,1),i=1,mfm1)
-c      write(*,*) (hibrz(i,2,1),i=1,mfm1)
-c      write(*,*) (hibrz(i,3,1),i=1,mfm1)
+CMPIINSERT_IF_RANK_EQ_0      
+!      write(*,*)
+!      write(*,*)'freya, hot ion birth rate vs rotsid, for ib=1, ie=1:3'
+!      write(*,*) (rotsid(i),i=1,mfm1) 
+!      write(*,*) (hibrz(i,1,1),i=1,mfm1)
+!      write(*,*) (hibrz(i,2,1),i=1,mfm1)
+!      write(*,*) (hibrz(i,3,1),i=1,mfm1)
 c
-      write(*,*)
-      write(*,*) 'fap(ie=1:3)',(fap(i,1),i=1,3)
-      write(*,*) 'fwall(ie=1:3)',(fwall(i,1),i=1,3)
-      write(*,*) 'forb(ie=1:3)',(forb(i,1),i=1,3)
-      write(*,*)
-c      write(*,*)
-c      write(*,*)'freya:i,xpts(i),ypts(i),zpts(i),rpts(i),vx(i),vy(i),vz(i)'
+!      WRITE(*,*)
+      WRITE(*,*) 'fap(ie=1:3)',(fap(i,1),i=1,3)
+      WRITE(*,*) 'fwall(ie=1:3)',(fwall(i,1),i=1,3)
+      WRITE(*,*) 'forb(ie=1:3)',(forb(i,1),i=1,3)
+!      WRITE(*,*)
+c      WRITE(*,*)
+c      WRITE(*,*)'freya:i,xpts(i),ypts(i),zpts(i),rpts(i),vx(i),vy(i),vz(i)'
 c      do i=1,5
-c         write(*,*) i,xpts(i),ypts(i),zpts(i),rpts(i),vx(i),vy(i),vz(i)
-c         write(*,*) i,xpts(i),ypts(i),zpts(i),rpts(i),vx(i),vy(i),vz(i)
+c         WRITE(*,*) i,xpts(i),ypts(i),zpts(i),rpts(i),vx(i),vy(i),vz(i)
+c         WRITE(*,*) i,xpts(i),ypts(i),zpts(i),rpts(i),vx(i),vy(i),vz(i)
 c      enddo
+CMPIINSERT_ENDIF_RANK
 c
 c     calculate neutral beam deposition density on (r,w) grid
-      if (inubpat.eq.1 .and. codeid.ne.'onedee') then
-        call frnbdep2(psi,mi,mj,r,w,potsid,mf,rzpat,nrpat,nzpat,
-     &  ke,mb,sgxn,vbeam,hxfrac,inubpat)
+      if (inubpat.eq.1 .and. codeid.ne.'onedee') then !Normally inubpat=0
+        !See above: inubpat=0  !Then, frnbdep2 is Not used with cql3d
+        stop 'freya-->frnbdep2 should not be used'
+        !If want to use, need to correct sgxn shape
+!        call frnbdep2(psi,mi,mj,r,w,potsid,mf,rzpat,nrpat,nzpat,
+!     &  ke,mb,sgxn,vbeam,hxfrac,inubpat,ibstart)
       endif
 c
       return
       end subroutine freya
-
+!=======================================================================
+!=======================================================================
 
       subroutine read_nubeam_data(filenm,nbirth_pts,atwb,
      +                   nbirth_cmpts_nub,nshine_nub,
@@ -1232,12 +1375,13 @@ c     printout birth_rates, as check for consistency
 
       subroutine zone(drutpi,ki,mfm1, mim1, mjm1,dri,dzi,psiax,psi,r,z,
      +     xpos,ypos,zpos,pzone,izone)
+      ! Only used when read_birth_pts="enabled"
       implicit integer (i-n), real*8 (a-h,o-z)
       save
          
 c      dimension psi(ki,*),r(*),z(*)
       dimension psi(ki,*),r(*),z(*)
-
+      real*8 wk_r(4),wk_z(4), wk_p(4,4)
 
       rpos=sqrt(xpos**2+ypos**2)
  120  i=(rpos-r(1))*dri+1.
@@ -1255,10 +1399,21 @@ c      dimension psi(ki,*),r(*),z(*)
       pzone=(area3*psi(i,j)+area4*psi(i+1,j)+area1*psi(i+1,j+1)
      1  +area2*psi(i,j+1))*dri*dzi
       go to 126
- 124  call pfit(psi(i-1,j-1), r(i-1), z(j-1), rpos, zpos, ki, pzone,
-     *  dum, dum)
- 126  pzone = max(pzone,psiax)
-      izone = sqrt(pzone-psiax)*drutpi + 1.
+ 124  continue
+      !YuP[2018-01-24] Small mod. of input for pfit:
+      ! Note: subroutine pfit(p,x,y, xv, yv, nx, f, dfdx,dfdy)
+      ! It uses: p(4,4),x(4),y(4)
+      dum=0.d0   ! will be output (not used here)
+      pzone=0.d0 ! will be output
+      wk_r(1:4)=r(i-1:i+2)
+      wk_z(1:4)=z(j-1:j+2)
+      wk_p(1:4,1:4)=psi(i-1:i+2,j-1:j+2)
+      !!write(*,*)'freya/pfit',rpos,zpos,wk_p
+      call pfit(wk_p, wk_r, wk_z, rpos, zpos, ki, pzone, dum, dum)
+cyup      call pfit(psi(i-1,j-1), r(i-1), z(j-1), rpos, zpos, ki, pzone,
+cyup     *  dum, dum)
+ 126  pzone= max(pzone,psiax)
+      izone= INT(sqrt(pzone-psiax)*drutpi + 1.d0)  !YuP[2022-12] INT()
 
       return
       end subroutine zone

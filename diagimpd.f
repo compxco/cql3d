@@ -55,7 +55,9 @@ c..................................................................
 
 
       !call dcopy(iyjx2,f(0,0,k,l_),1,temp2(0,0),1)
-      temp2(0:iy+1,0:jx+1)= f(0:iy+1,0:jx+1,k,l_)
+      temp2(0:iymax+1,0:jx+1)= f(0:iymax+1,0:jx+1,k,l_)
+            !YuP[2021-03-11] Changed iy-->iymax 
+            !(just in case if iy is changed by iy=iy_(l_) somewhere)
       sgain(1,k)=0.
       sgain(2,k)=0.
       sgain(3,k)=0.
@@ -86,7 +88,8 @@ c     Krook operator terms are integrated over velocity space.
 c     Simultaneously, compute new density.
 c..................................................................
 
-      do 10 i=1,iy
+      do 10 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
+        !Note that for meshy="fixed_mu" iy_(l_) can be less than iy
         do 2 j=1,jx
           tam4(j)=tam4(j)+vptb(i,lr_)*temp2(i,j)*cynt2(i,l_)
 c
@@ -119,14 +122,14 @@ c..................................................................
 c     Ion source (freyasou) or electron_KO (sourceko) gain..
 c..................................................................
 
-      sgain(3,k)=xlncur(k,lr_)*dtreff
+      sgain(3,k)=xlncur(k,l_)*dtreff !YuP[2022-02-11] now l_ (was lr_)
 
 c..................................................................
 c     Compute:
 c     (1) losses at high velocity terminator
 c     (2) normalized flux as a function of velocity
 c..................................................................
-      do 6 i=1,iy
+      do 6 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
         do 5 j=1,jx
           vflux(j,k,l_)=vflux(j,k,l_)+one_*gfi(i,j,k)*cynt2(i,l_)
  5      continue
@@ -143,9 +146,15 @@ c..................................................................
 c     Compute normalized flux
 c..................................................................
 
-      do 7 j=1,jx
-        vflux(j,k,l_)=vflux(j,k,l_)*tauee(lr_)/xlndn00(k,lr_)
- 7    continue
+      if(cqlpmod.ne."enabled")then !YuP[2021-03-30] CQL3D/CQLP treatment
+        do j=1,jx
+         vflux(j,k,l_)=vflux(j,k,l_)*tauee(lr_)/xlndn00(k,lr_) !CQL3D
+        enddo
+      else !cqlpmod.eq."enabled"
+        do j=1,jx
+         vflux(j,k,l_)=vflux(j,k,l_)*tauee(ls_)/xlndn00(k,lr_) !CQLP
+        enddo
+      endif
 
       if (n .eq. 0 .or. n/nchec*nchec .ne. n)  go to 90
 
@@ -202,7 +211,8 @@ c..................................................................
       if (ineg.ne."enabled1") then
                 !If source is present, jmin_nosource.gt.1 will be found.
       do j=jx,1,-1 ! Scan from largest v towards zero
-        source_j=sum(abs(source(:,j,k,lr_))) ! Sum over i (all i-range)
+        !source_j=sum(abs(source(:,j,k,lr_))) ! Sum over i (all i-range)!before[2022-02-11]
+        source_j=sum(abs(source(:,j,k,l_))) !Sum over i ![2022-02-11]
         if (source_j .ne.zero) then !source is present for this j-level
           jmin_nosource= j+1 ! Smallest j above which there is no source
           goto 409
@@ -210,7 +220,7 @@ c..................................................................
       enddo
  409  continue
       
-      do 411 i=1,iy
+      do 411 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
       do 410 j=1,jx
          if ( temp2(i,j) .le. zero) then ! Found f(i,j)<=0.
             ! Set f to zero at this local point.
@@ -229,7 +239,7 @@ c..................................................................
 
       f011=temp2(1,1)
       fmin=1.d-20*f011
-      do i=1,iy
+      do i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
       do j=1,jx
          if ( temp2(i,j) .le. fmin) then ! Found f(i,j)<=fmin
             ! Set f to zero at this local point.
@@ -273,7 +283,7 @@ c     calculate line average density of f
 c     add 1.1*fmin to f
           fadd=1.1*abs(fmin)
           do 520 j=1,jx
-            do 521 i=1,iy
+            do 521 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
               temp1(i,j)=fadd+temp1(i,j)
  521        continue
  520      continue
@@ -283,7 +293,7 @@ c     recalculate density
 c         renormalize f to old density
           ffac=xline0/xline1
           do 530 j=1,jx
-            do 531 i=1,iy
+            do 531 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
               temp1(i,j)=ffac*temp1(i,j)
  531        continue
  530      continue

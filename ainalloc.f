@@ -14,7 +14,10 @@ c     successful is whether code is entered, then exited without
 c     a code stopping fault (e.g. Segmentation fault). See istat_tot
 c     comments below.
 c..................................................................
-      write(*,*)'ainalloc:  Entering ainalloc'
+      write(*,*)'ainalloc: Entering ainalloc.'
+      write(*,*)'  lz,lrz,lrors,lrzmax,lsmax='
+     &   ,lz,lrz,lrors,lrzmax,lsmax
+      write(*,*)'ainalloc:  lfield=',lfield
       
       ! YuP-101220: Moved allocation of cqlb()-cqlf() to vlh and vlf 
 
@@ -40,13 +43,13 @@ c..................................................................
       lniy=iy*lrors
       lniyrmx=iy*lrzmax
       lniyrsp=iy*(lrors+1)
-      lnlzmx=lza*lrzmax
+      lnlzmx=lz*lrzmax
       lnoncrs=nonch*lrors
       lnoncsx=nonch*lrors
       lnoncmx=nonch*lrzmax
-      lnlfield=lfielda*lrzmax
-      lnincz=incza*lrzmax
-      lninczp=inczpa*lrzmax
+      lnlfield=lfield*lrzmax
+      lnincz=0 !incza*lrzmax
+      lninczp=0 !inczpa*lrzmax
       lnjx=jx*lrzmax
       lnlzmxp=lz*(mx+1)*lrzmax
       lniylzlra=iy*lz*lrzmax
@@ -54,7 +57,7 @@ c..................................................................
       lnxngrs=jx*ngen*lrors
       lnxngrs5=jx*ngen*lrors*5
       lnyngmx=iy*ngen*lrzmax
-      lnlzgne=lz*(ngen+1)*negyrga*lrzmax
+      lnlzgne=lz*(ngen+1)*negyrg*lrzmax
       lnylzm2=iy*lz*(mx+1+1)*lrzmax
       lnylzm=iy*lz*(mx+1)*lrz
       lnylzm1=iy*lz*(mx+1)*lrzmax
@@ -86,12 +89,12 @@ c     Temporary add (bobh 960724)
       lnjxngi=jx*ngen*12
       lnrhs=1
 cBH070525      if (implct.eq."enabled") lnrhs=iyjx
-cBH080425       if (implct.eq."enabled") lnrhs=iyjx*lrza
+cBH080425       if (implct.eq."enabled") lnrhs=iyjx*lrz
       if (implct.eq."enabled") lnrhs=iyjx
       if (soln_method.eq.'it3dv' .or. soln_method.eq.'it3drv')
-     +     lnrhs=iyjx*lrza
-      lnjnsl=jx*ngen*nsoa*lrzmax
-      lnjmpn=jx*(msxr+1)*nena*2
+     +     lnrhs=iyjx*lrz
+      lnjnsl=jx*ngen*nso*lrzmax
+      lnjmpn=jx*(msxr+1)*nen*2
 
 c     New pointer use in this code: fully pointered variables, currv_*,
 c       pwrrf,pwrrfs
@@ -171,7 +174,8 @@ c..................................................................
       istat_tot=istat_tot+istat
       call bcast(velsou2(0,0,1,0),zero,SIZE(velsou2))
       
-      allocate(source(0:iy+1,0:jx+1,ngen,lrz),STAT=istat)
+      !allocate(source(0:iy+1,0:jx+1,ngen,lrz),STAT=istat) !before[2022-02-11]
+      allocate(source(0:iy+1,0:jx+1,ngen,lrors),STAT=istat) !YuP[2022-02-11]
       istat_tot=istat_tot+istat
       call bcast(source(0,0,1,1),zero,SIZE(source))
       
@@ -183,9 +187,9 @@ c..................................................................
       istat_tot=istat_tot+istat
       call bcast(egylosa,zero,SIZE(egylosa))
       
-      allocate(i0tran(i0param+1,lz,lrz),STAT=istat)
-      istat_tot=istat_tot+istat
-      call ibcast(i0tran,0,SIZE(i0tran))
+!      allocate(i0tran(i0param+1,lz,lrz),STAT=istat) 
+!YuP[2021-04] moved to subr.sourceko [used locally only]
+!      call ibcast(i0tran,0,SIZE(i0tran))
       
       allocate(cal(iy,jx,ngen,lrors),STAT=istat)
       istat_tot=istat_tot+istat
@@ -390,40 +394,143 @@ cBH090826:    still the dyp5(0,j) needs to exist.
       allocate(idx(iy,0:lrors),STAT=istat)
       istat_tot=istat_tot+istat
       call ibcast(idx,0,SIZE(idx))
-      !---- (lza,lrzmax) arrays (at pol. angle grid) ---!
-      allocate(imax(lza,lrzmax),STAT=istat)
+      
+      !YuP[2021-03-18] Added more pointers over lrors FPE grid.
+      !These were statically dimensioned in comm.h 
+      allocate(inew_(lrors),STAT=istat)
+      allocate(inewjx_(lrors),STAT=istat)
+      allocate(ieq_(lrors+1),STAT=istat)   !!!(lrors+1)
+      allocate(iytr(lrors),STAT=istat)
+      
+      allocate(consn(lrors),STAT=istat)
+      allocate(consn0(lrors),STAT=istat)
+      allocate(currmtp(lrors),STAT=istat)
+      allocate(currmt(lrors),STAT=istat)
+      allocate(sgaint1(lrors),STAT=istat)
+      allocate(thb(lrors),STAT=istat)
+      allocate(rovsloc(lrors),STAT=istat)
+      allocate(sptzr(lrors),STAT=istat)
+      allocate(twoint(lrors),STAT=istat)
+      allocate(currmtz(lrors),STAT=istat)
+      allocate(currmtpz(lrors),STAT=istat)
+      allocate(vfluxz(lrors),STAT=istat)
+      
+      allocate(nefiter_(lrors),STAT=istat) ! counts iterations of el.field for each flux surface 
+      !YuP[2021-04-09] Now pointer
+      nefiter_(:)=0
+      write(*,*)' shape(nefiter_)=', shape(nefiter_)
+
+      allocate(jchang(ngen,lrors),STAT=istat)
+      allocate(currm(ngen,lrors),STAT=istat)
+      allocate(energym(ngen,lrors),STAT=istat)
+      
+      !YuP[2021-04-09] collected RE-related arrays, made them into pointers
+      allocate(jxcrit(ngen,lrors),STAT=istat)
+      allocate(ucrit(ngen,lrors),STAT=istat)
+      allocate(denra(ngen,lrors),STAT=istat)
+      allocate(curra(ngen,lrors),STAT=istat)
+      allocate(fdenra(ngen,lrors),STAT=istat)
+      allocate(fcurra(ngen,lrors),STAT=istat)
+      jxcrit=0
+      ucrit=0.d0
+      denra=0.d0
+      curra=0.d0
+      fdenra=0.d0
+      fcurra=0.d0
+      write(*,*)' shape(jxcrit)=', shape(jxcrit)
+      
+      !YuP[2021-03-30] made tauee,taueeh,starnue as pointers.
+      !It seems the only reason why we need them 
+      !over full grid (lrzmax or lsmax) is because of printout in tdoutput.
+      !Anyway, they are set over full grid in the CQL3D or CQLP, 
+      !see, e.g. starnue(lr_) or starnue(ls_)
+      if(cqlpmod.ne."enabled")then
+       allocate(tauee(lrzmax),STAT=istat)
+       allocate(taueeh(lrzmax),STAT=istat)
+       allocate(starnue(lrzmax),STAT=istat)
+       allocate(zeff(lrzmax),STAT=istat)
+       allocate(zeff4(lrzmax),STAT=istat)
+      else !cqlpmod.eq."enabled"
+       allocate(tauee(lsmax),STAT=istat)
+       allocate(taueeh(lsmax),STAT=istat)
+       allocate(starnue(lsmax),STAT=istat)
+       allocate(zeff(lsmax),STAT=istat)
+       allocate(zeff4(lsmax),STAT=istat)
+      endif
+      tauee(:)=0.0
+      taueeh(:)=0.0
+      starnue(:)=0.0
+      zeff(:)=0.d0
+      zeff4(:)=0.d0
+      write(*,*)' shape(zeff)=', shape(zeff)
+      
+      do l=1,lrors ! FPE grid (can be smaller than full grid)
+        !n_(l)=0       ! allocated in ainsetpa
+        !time_(l)=0.d0 ! allocated in ainsetpa
+         consn(l)=0.0
+         consn0(l)=0.0
+         currmtp(l)=0.0
+         currmt(l)=0.0
+         sgaint1(l)=0.0
+         thb(l)=0.0
+         rovsloc(l)=0.0
+         sptzr(l)=0.0
+         twoint(l)=0.0
+         currmtz(l)=0.0
+         currmtpz(l)=0.0
+         vfluxz(l)=0.d0
+         iytr(l)=0
+        !tbnd(l)=0.0 ! in namelist: dimensioned as (lrorsa)
+        !irzplt(l)=0 ! in namelist: dimensioned as (lrorsa)
+      enddo
+      jchang(:,:)=0
+      currm(:,:)=0.0
+      energym(:,:)=0.0
+      !YuP[2021-03-18] done
+      write(*,*)' shape(jchang)=', shape(jchang)
+      
+      
+      !---- (lz,lrzmax) arrays (at pol. angle grid) ---!
+      allocate(imax(lz,lrzmax),STAT=istat)
       istat_tot=istat_tot+istat
       call ibcast(imax,0,SIZE(imax))
-      allocate(dz(lza,lrzmax),STAT=istat)
+      allocate(dz(lz,lrzmax),STAT=istat)
       istat_tot=istat_tot+istat
       call bcast(dz,zero,SIZE(dz))
-      allocate(pol(lza,lrzmax),STAT=istat)
+      allocate(pol(lz+1,lrzmax),STAT=istat) !YuP[2021-04-09] lz-->lz+1
+      write(*,*)' shape(pol)=', shape(pol)
       istat_tot=istat_tot+istat
       call bcast(pol,zero,SIZE(pol))
-      allocate(solrz(lza,lrzmax),STAT=istat)
+      allocate(solrz(lz,lrzmax),STAT=istat)
+      write(*,*)' shape(solrz)=', shape(solrz)
       istat_tot=istat_tot+istat
       call bcast(solrz,zero,SIZE(solrz))
-      allocate(solzz(lza,lrzmax),STAT=istat)
+      allocate(solzz(lz,lrzmax),STAT=istat)
+      write(*,*)' shape(solzz)=', shape(solzz)
       istat_tot=istat_tot+istat
       call bcast(solzz,zero,SIZE(solzz))
-      allocate(thtab(lza,lrzmax),STAT=istat)
+      allocate(thtab(lz,lrzmax),STAT=istat)
+      write(*,*)' shape(thtab)=', shape(thtab)
       istat_tot=istat_tot+istat
       call bcast(thtab,zero,SIZE(thtab))
-      allocate(z(lza,lrzmax),STAT=istat)
+      allocate(z(lz+1,lrzmax),STAT=istat) !YuP[2021-04-09] lz-->lz+1
+      write(*,*)' shape(z)=', shape(z)
+      !YuP[2021-04-09] See wploweq: lz+1 can get to lz+1
       istat_tot=istat_tot+istat
       call bcast(z,zero,SIZE(z))
-      allocate(zmid(lza,lrzmax),STAT=istat)
+      allocate(zmid(lz,lrzmax),STAT=istat)
       istat_tot=istat_tot+istat
-      call bcast(zmid,zero,SIZE(z))
-      allocate(bbpsi(lza,lrzmax),STAT=istat)
+      call bcast(zmid,zero,SIZE(zmid))
+      allocate(bbpsi(lz+1,lrzmax),STAT=istat) !YuP[2021-04-09] lz-->lz+1
+      write(*,*)' shape(bbpsi)=', shape(bbpsi)
       istat_tot=istat_tot+istat
       call bcast(bbpsi,zero,SIZE(bbpsi))
-      allocate(bpolz(lza,lrzmax),STAT=istat)
+      allocate(bpolz(lz,lrzmax),STAT=istat)
       istat_tot=istat_tot+istat
-      call bcast(bpolz,zero,SIZE(bbpsi))
-      allocate(btorz(lza,lrzmax),STAT=istat)
+      call bcast(bpolz,zero,SIZE(bpolz))
+      allocate(btorz(lz,lrzmax),STAT=istat)
       istat_tot=istat_tot+istat
-      call bcast(btorz,zero,SIZE(bbpsi))
+      call bcast(btorz,zero,SIZE(btorz))
       
       allocate(consnp(nonch,lrors),STAT=istat)
       istat_tot=istat_tot+istat
@@ -431,11 +538,14 @@ cBH090826:    still the dyp5(0,j) needs to exist.
       allocate(ptime(nonch,lrors),STAT=istat)
       istat_tot=istat_tot+istat
       call bcast(ptime,zero,SIZE(ptime))
+      
 cBH120315: Prevent out of bounds reference:
 cBH120315:      allocate(sptzrp(nonch,lrors),STAT=istat)
       allocate(sptzrp(nonch,max(lrors,lrzmax)),STAT=istat)
+      write(*,*)' shape(sptzrp)=', shape(sptzrp)
       istat_tot=istat_tot+istat
       call bcast(sptzrp,zero,SIZE(sptzrp))
+      
       allocate(pefld(nonch,lrors),STAT=istat)
       istat_tot=istat_tot+istat
       call bcast(pefld,zero,SIZE(pefld))
@@ -448,51 +558,47 @@ cBH120315:      allocate(sptzrp(nonch,lrors),STAT=istat)
       allocate(restnp(nonch,lrzmax),STAT=istat)
       istat_tot=istat_tot+istat
       call bcast(restnp,zero,SIZE(restnp))
-      allocate(vpov(nonch,lrzmax),STAT=istat)
+      allocate(vpov(nonch,lrors),STAT=istat) ! Not used
       istat_tot=istat_tot+istat
       call bcast(vpov,zero,SIZE(vpov))
-      allocate(es(lfielda,lrzmax),STAT=istat)
+      allocate(es(lfield,lrzmax),STAT=istat) !YuP[2021-04] lfielda-->lfield
       istat_tot=istat_tot+istat
       call bcast(es,zero,SIZE(es))
-      allocate(bpsi(lfielda,lrzmax),STAT=istat)
+      allocate(bpsi(lfield,lrzmax),STAT=istat) !YuP[2021-04] lfielda-->lfield
       istat_tot=istat_tot+istat
       call bcast(bpsi,zero,SIZE(bpsi))
-      allocate(d2bpsi(lfielda,lrzmax),STAT=istat)
+      allocate(d2bpsi(lfield,lrzmax),STAT=istat) !YuP[2021-04] lfielda-->lfield
       istat_tot=istat_tot+istat
       call bcast(d2bpsi,zero,SIZE(d2bpsi))
-      allocate(d2solrz(lfielda,lrzmax),STAT=istat)
+      allocate(d2solrz(lfield,lrzmax),STAT=istat) !YuP[2021-04] lfielda-->lfield
       istat_tot=istat_tot+istat
       call bcast(d2solrz,zero,SIZE(d2solrz))
-      allocate(d2solzz(lfielda,lrzmax),STAT=istat)
+      allocate(d2solzz(lfield,lrzmax),STAT=istat) !YuP[2021-04] lfielda-->lfield
       istat_tot=istat_tot+istat
       call bcast(d2solzz,zero,SIZE(d2solzz))
-      allocate(d2bpolz(lfielda,lrzmax),STAT=istat)
+      allocate(d2bpolz(lfield,lrzmax),STAT=istat) !YuP[2021-04] lfielda-->lfield
       istat_tot=istat_tot+istat
       call bcast(d2bpolz,zero,SIZE(d2bpolz))
-      allocate(d2btorz(lfielda,lrzmax),STAT=istat)
+      allocate(d2btorz(lfield,lrzmax),STAT=istat) !YuP[2021-04] lfielda-->lfield
       istat_tot=istat_tot+istat
       call bcast(d2btorz,zero,SIZE(d2btorz))
-      allocate(d2thtpol(lfielda,lrzmax),STAT=istat)
+      allocate(d2thtpol(lfield,lrzmax),STAT=istat) !YuP[2021-04] lfielda-->lfield
       istat_tot=istat_tot+istat
       call bcast(d2thtpol,zero,SIZE(d2thtpol))
-      allocate(d2es(lfielda,lrzmax),STAT=istat)
+      allocate(d2es(lfield,lrzmax),STAT=istat)   !YuP[2021-04] lfielda-->lfield
       istat_tot=istat_tot+istat
       call bcast(d2es,zero,SIZE(d2es))
-      allocate(thtpol(lfielda,lrzmax),STAT=istat)
+      allocate(thtpol(lfield,lrzmax),STAT=istat) !YuP[2021-04] lfielda-->lfield
       istat_tot=istat_tot+istat
       call bcast(thtpol,zero,SIZE(thtpol))
-      allocate(esfi(incza,lrzmax),STAT=istat)
-      istat_tot=istat_tot+istat
-      call bcast(esfi,zero,SIZE(esfi))
-      allocate(psiesfi(incza,lrzmax),STAT=istat)
-      istat_tot=istat_tot+istat
-      call bcast(psiesfi,zero,SIZE(psiesfi))
-      allocate(psifi(inczpa,lrzmax),STAT=istat)
-      istat_tot=istat_tot+istat
-      call bcast(psifi,zero,SIZE(psifi))
-      allocate(espsifi(inczpa,lrzmax),STAT=istat)
-      istat_tot=istat_tot+istat
-      call bcast(espsifi,zero,SIZE(espsifi))
+!YuP[2021-04] Not used:      allocate(esfi(incza,lrzmax),STAT=istat)
+!YuP[2021-04] Not used:      call bcast(esfi,zero,SIZE(esfi))
+!YuP[2021-04] Not used:      allocate(psiesfi(incza,lrzmax),STAT=istat)
+!YuP[2021-04] Not used:      call bcast(psiesfi,zero,SIZE(psiesfi))
+!YuP[2021-04] Not used:      allocate(psifi(inczpa,lrzmax),STAT=istat)
+!YuP[2021-04] Not used:      call bcast(psifi,zero,SIZE(psifi))
+!YuP[2021-04] Not used:      allocate(espsifi(inczpa,lrzmax),STAT=istat)
+!YuP[2021-04] Not used:      call bcast(espsifi,zero,SIZE(espsifi))
       allocate(soupp(jx,lrzmax),STAT=istat)
       istat_tot=istat_tot+istat
       call bcast(soupp,zero,SIZE(soupp))
@@ -529,9 +635,19 @@ cBH120315:      allocate(sptzrp(nonch,lrors),STAT=istat)
       allocate(sincosba(iy,ngen,lrzmax),STAT=istat)
       istat_tot=istat_tot+istat
       call bcast(sincosba,zero,SIZE(sincosba))
-      allocate(densz(lz,ngen+1,negyrga,lrzmax),STAT=istat)
+      allocate(densz(lz,ngen+1,max(negyrg,1),lrzmax),STAT=istat)
+      !YuP[2021-04-12] changed negyrga-->max(negyrg,1) [default of negyrg is 0]
       istat_tot=istat_tot+istat
       call bcast(densz,zero,SIZE(densz))
+
+      !YuP[2021-04-14] Remaining arrays related to lz are pointers now:
+      allocate(den_of_s(lz),STAT=istat)
+      allocate(den_of_s1(lz),STAT=istat)
+      allocate(den_of_s2(lz),STAT=istat)
+      allocate(tz1(lz),STAT=istat)
+      allocate(tz2(lz),STAT=istat)
+      tz1(:)=0.d0
+      tz2(:)=0.d0
       
       mmx=mx
       if (softxry.ne.'disabled') mmx= max(msxr, mmx)
@@ -771,7 +887,8 @@ cBH      endif
       allocate(uoc(jx),STAT=istat)
       istat_tot=istat_tot+istat
       call bcast(uoc,zero,SIZE(uoc))
-      allocate(enerkev(jx,ngena),STAT=istat) !YuP[2018-01-08] added 2nd index (k)
+      allocate(enerkev(jx,ngen),STAT=istat) !YuP[2018-01-08] added 2nd index (k)
+      !YuP[2021-04-12] ngena-->ngen
       istat_tot=istat_tot+istat
       call bcast(enerkev,zero,SIZE(enerkev))
       allocate(gamma(jx),STAT=istat)
@@ -858,7 +975,7 @@ cBH      endif
       allocate(dxl(0:jfl),STAT=istat)
       istat_tot=istat_tot+istat
       call bcast(dxl,zero,SIZE(dxl))
-      allocate(fl(0:jfl),STAT=istat)
+      allocate(fl(0:jfl,1:lrors),STAT=istat) ![2022-03-19] Added 2nd dim lrors
       istat_tot=istat_tot+istat
       call bcast(fl,zero,SIZE(fl))
       allocate(fl1(0:jfl),STAT=istat)
@@ -950,10 +1067,10 @@ cBH      endif
       allocate(rhs(lnrhs),STAT=istat)
       istat_tot=istat_tot+istat
       call bcast(rhs,zero,SIZE(rhs))
-      allocate(sovt(jx,ngen,nsoa,lrzmax),STAT=istat)
+      allocate(sovt(jx,ngen,nso,lrzmax),STAT=istat) !YuP[2021-04] nsoa-->nso
       istat_tot=istat_tot+istat
       call bcast(sovt,zero,SIZE(sovt))
-      allocate(sigsxr(jx,0:msxr,nena,2),STAT=istat)
+      allocate(sigsxr(jx,0:msxr,nen,2),STAT=istat) !YuP[2021-04] nena-->nen
       istat_tot=istat_tot+istat
       call bcast(sigsxr,zero,SIZE(sigsxr))
       allocate(item1(iyjx2),STAT=istat)
@@ -1169,7 +1286,7 @@ cBH080910      exp5=>exm5(2:) !due different start extent
       if (tavg.ne."disabled") then
          allocate(favg(0:iy+1,0:jx+1,ngen,lrors),STAT=istat)
          istat_tot=istat_tot+istat
-         call bcast(favg(0,0,1,1),zero,SIZE(f))
+         call bcast(favg(0,0,1,1),zero,SIZE(favg))
       endif
 
       allocate(pentr(nonch,ngen,-1:15,lrors),STAT=istat)
@@ -1190,12 +1307,15 @@ cBH080910      exp5=>exm5(2:) !due different start extent
       allocate(entr(ngen,-1:15,lrors),STAT=istat)
       call bcast(entr(1,-1,1),zero,ngen*17*lrors)
 
-      allocate(xlndnz(ngen+1,negyrga),STAT=istat)
-      call bcast(xlndnz,zero,(ngen+1)*negyrga)
-      allocate(sounor(ngen,nsoa,lz,lrz),STAT=istat)
-      call bcast(sounor,zero,ngen*nsoa*lz*lrz)
+      allocate(entrintr(ngen,-1:15),STAT=istat) !YuP[2023-01]set as pointer
+      call bcast(entrintr(1,-1),zero,ngen*17)
+      allocate(xlndnz(ngen+1,max(negyrg,1)),STAT=istat)
+      !YuP[2021-04-12] changed negyrga-->max(negyrg,1) [default of negyrg is 0]
+      call bcast(xlndnz,zero,size(xlndnz))
+      allocate(sounor(ngen,nso,lz,lrz),STAT=istat) !YuP[2021-04] nsoa-->nso
+      call bcast(sounor,zero,ngen*nso*lz*lrz)
       
-      call bcast(sgain,zero,8*ngena)
+      call bcast(sgain,zero,8*ngena) ! Not a pointer
       
       allocate(truncd(jx),STAT=istat)
       call bcast(truncd,one,jx)

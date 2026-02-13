@@ -1,6 +1,6 @@
 c
 c
-      subroutine tdtrvint
+      subroutine tdtrvint ! CQL3D only (not CQLP)
       implicit integer (i-n), real*8 (a-h,o-z)
 
 c..............................................................

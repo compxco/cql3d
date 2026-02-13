@@ -23,7 +23,8 @@ c..................................................................
       eqsource="eqdsk"
       eqsym="average"
       fpsimodl="constant"
-      lfield=lfielda
+      lfield=250 !lfielda !YuP[2021-04] lfielda is not used anymore
+                 !Now all relevant arrays are pointers of size lfield
       methflag=10
 !BH171211      Changing the following defaults.  The nconteq="psigrid"
 !BH171211      approach basis a psigrid for various interpolations, 

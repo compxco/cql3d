@@ -47,15 +47,24 @@ c..................................................................
 !         endif
         !---------- See below for e-i and i-i collisions
         do kk=1,ntotal
-        t_kk_ev=(2./3.)*energy(kk,lr_)*1.d3 !Effective T[eV] for kk species
-        if (cqlpmod.eq."enabled") t_kk_ev=(2./3.)*enrgypa(kk,ls_)*1.d3
+          if (cqlpmod.eq."enabled") then !YuP[2021-02-24]
+          t_kk_ev=(2./3.)*enrgypa(kk,ls_)*1.d3
+          dens_kk=denpar(kk,ls_)
+          else
+          t_kk_ev=(2./3.)*energy(kk,lr_)*1.d3 !Effective T[eV] for kk species
+          dens_kk= reden(kk,lr_) !density [cm-3]
+          endif
         !Note that if kk=Maxw.species, energy is updated at each time step
         !as 1.5*temp(kk,lr) (or relativistic expression), if temp() is changed.
-        dens_kk= reden(kk,lr_) !density [cm-3]
+
         do k=1,ntotal
+          if (cqlpmod.eq."enabled") then !YuP[2021-02-24]
+          t_k_ev=(2./3.)*enrgypa(k,ls_)*1.d3
+          dens_k=denpar(k,ls_)
+          else
           t_k_ev=(2./3.)*energy(k,lr_)*1.d3 !Effective T[eV] for k species
-          if (cqlpmod.eq."enabled") t_k_ev=(2./3.)*enrgypa(k,ls_)*1.d3
           dens_k= reden(k,lr_) !density [cm-3]
+          endif
           if(kk.eq.kelecg .or. kk.eq.kelecm)then
              ! kk=electrons (general or Maxwellian)
              if(k.eq.kelecg .or. k.eq.kelecm)then
@@ -137,7 +146,7 @@ c..................................................................
       ! i.e. compute gama() internally, based on Killeen book, Eq.(2.1.5). 
       energ=ergtkev*energy(kelec,lr_)
       dense=reden(kelec,lr_)
-      if (cqlpmod .eq. "enabled") then
+      if (cqlpmod.eq."enabled") then
         energ=ergtkev*enrgypa(kelec,ls_)
         dense=denpar(kelec,ls_)
       endif
@@ -149,7 +158,7 @@ c..................................................................
       if (colmodl.eq.1 .or. (colmodl.eq.3 .and. kelecm.ne.0)) then
         dense=reden(kelecm,lr_)
         energ=reden(kelecm,lr_)*energy(kelecm,lr_)*ergtkev/dense
-        if (cqlpmod .eq. "enabled") then
+        if (cqlpmod.eq."enabled") then
           dense=denpar(kelecm,ls_)
           energ=enrgypa(kelecm,ls_)*ergtkev
         endif
@@ -159,7 +168,7 @@ c..................................................................
         km=kelecm
         energ=(reden(kelecg,lr_)*energy(kelecg,lr_)+reden(km,lr_)*
      1    energy(km,lr_))*ergtkev/dense
-        if (cqlpmod .eq. "enabled") then
+        if (cqlpmod.eq."enabled") then
           dense=denpar(kelec,ls_)+denpar(kelecm,ls_)
           energ=(denpar(kelecg,ls_)*enrgypa(kelecg,ls_)+denpar(km,ls_)*
      1      enrgypa(km,ls_))*ergtkev/dense
@@ -168,10 +177,10 @@ c..................................................................
       deby=sqrt(energ/(dense*6.*pi*charge**2)) !YuP: Should we add Zeff here?
       do i=1,ntotal
         si=energy(i,lr_)/fmass(i)
-        if (cqlpmod .eq. "enabled") si=enrgypa(i,ls_)/fmass(i)
+        if (cqlpmod.eq."enabled") si=enrgypa(i,ls_)/fmass(i)
         do k=1,ntotal
           sk=energy(k,lr_)/fmass(k)
-          if (cqlpmod .eq. "enabled") sk=enrgypa(k,ls_)/fmass(k)
+          if (cqlpmod.eq."enabled") sk=enrgypa(k,ls_)/fmass(k)
 c990131          sf=amax1(si,sk)
           sf=max(si,sk)
           vikf=sqrt(sf*ergtkev*2.)
@@ -229,7 +238,11 @@ c..................................................................
 
         if(gamafac.eq."enabled") then !Factor that gives an energy-dependence
          flamcql=exp(gama(kelecg,kelecg))
-         omegape=5.64e4*sqrt(reden(kelecg,lr_))
+         if (cqlpmod.eq."enabled") then !YuP[2021-02-24]
+          omegape=5.64e4*sqrt(denpar(kelecg,ls_))
+         else
+          omegape=5.64e4*sqrt(reden(kelecg,lr_))
+         endif         
          flamrp1=(2**.25)*fmass(kelecg)*clite2/(1.0546e-27*omegape)
          ! 1.0546e-27 is h^bar (Planck's constant /2pi) in [J*sec] 
          ! adjusted by 1e3*1e4 because m is in [gram]  and c is in [cm/sec]
@@ -283,8 +296,13 @@ c..................................................................
         !All these cases are considered below, for the k values.
         if(gamafac.eq."hesslow") then
           !Define norm-ed momentum, corresp. to thermal electrons:
-          p_Te2= 2.d0*temp(kelecg,lr_)/restmkev
-          p_Te = sqrt(2.d0*temp(kelecg,lr_)/restmkev) 
+         if (cqlpmod.eq."enabled") then !YuP[2021-02-24]
+          temp_kelecg=temppar(kelecg,ls_)
+         else
+          temp_kelecg=temp(kelecg,lr_)
+         endif
+          p_Te2= 2.d0*temp_kelecg/restmkev
+          p_Te = sqrt(2.d0*temp_kelecg/restmkev) 
           ! Could use temp(kelecm), if kelecm>0 ???
           ! Note: restmkev = 510.998902d0 keV
           !-1-> Consider interaction of e(general) with e(general)

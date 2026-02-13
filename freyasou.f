@@ -1,7 +1,7 @@
 c
 c
       subroutine freyasou(qx,qy,qz,qr,vx,vy,vz,iqts,curdep,
-     1  bmsprd,multiply,multiplyn)
+     1  bmsprd,multiply,multiplyn,ibstart)
       implicit integer (i-n), real*8 (a-h,o-z)
 
       include 'param.h'
@@ -38,7 +38,8 @@ c     NFREYA code as it exists in the transport code ONETWO. For the
 c     moment the value of psi at which the particles are born is
 c     assumed to be the same as the bounce average of psi. qx qy and
 c     qz are the locations of birth in a cartesian system, and vx,vy and
-c     and vz are the velocity coordinates. kfrsou is the species index.
+c     and vz are the velocity coordinates. 
+c     kfrsou(ibstart+1) is the species index.
 c
 c..................................................................
 c     psivalm(l) is the value of psi that delimits the EXACT OUTER EDGE
@@ -56,7 +57,7 @@ c..................................................................
 
       twopi2=twopi*twopi
       
-      k=kfrsou
+      k=kfrsou(ibstart)
         
       ! q/mc for source particles:
       qmc= charge*bnumb(k)/(fmass(k)*clight) 
@@ -109,7 +110,7 @@ c..................................................................
 c     iseed=123457        ***old**bh
 c     call rnset(iseed)   ***old**bh
 c     call rnnoa(mrans,ranvc)   ***old**bh
-        call frnnoa(mrans,ranvc)
+        call frnnoa(mrans,ranvc) !here: for multiply.ne."disabled"
         bmra=bmsprd*radmin
         call dscal(mrans,bmra,ranvc,1)
 
@@ -171,11 +172,17 @@ c..................................................................
            call eqfpsi(psibrth,fpsi_,fppsi_)
 !           Bpol_factor=0d0   !Test: zero Bpol effect, leaving only btor.
            Bpol_factor=1.d0
-           bxcomp=(-cursign*Bpol_factor*dpsidz*px(ipar)-bsign*fpsi_*
+           
+           if(rbrth.gt.1.d-8)then !YuP[2018-01-24] Added,similar to do_100 below
+             bxcomp=(-cursign*Bpol_factor*dpsidz*px(ipar)-bsign*fpsi_*
      1          py(ipar))/rbrth2
-           bycomp=(-cursign*Bpol_factor*dpsidz*py(ipar)+bsign*fpsi_*
+             bycomp=(-cursign*Bpol_factor*dpsidz*py(ipar)+bsign*fpsi_*
      1          px(ipar))/rbrth2
-           bzcomp=+cursign*Bpol_factor*dpsidr/rbrth
+             bzcomp=+cursign*Bpol_factor*dpsidr/rbrth
+           else ! in a mirror machine, can get to R=0
+             go to 60 ! skip, for now
+           endif
+           
            if (multiply.eq."disabled") then
               jpar=ipar
            else
@@ -216,7 +223,7 @@ c..................................................................
            qz(ipar)=pz(ipar)  ! Need to check multiply.eq."enabled" case
         endif ! fr_gyro
           
- 60   continue
+ 60   continue !ipar=1,ipts
 
       
 c      do ipar=1,10
@@ -235,46 +242,43 @@ c..................................................................
 
       if ((n+1).ge.nonvphi .and. (n+1).lt.noffvphi) then
         if (multiply.ne."disabled") stop 'rerun with multiply=disabled'
-        i1p(1)=4
-        i1p(2)=4
-        itab(1)=1
-        itab(2)=0
-        itab(3)=0
-        call  coeff1(lrzmax,equilpsp(1),vphipl,d2vphipl,i1p,1,workk)
-
-        do 70 ipar=1,ipts
-          psibrth=psipt(ipar)
-
-c         prevent possibility of unhealthy extrapolation
-          if (psibrth.lt.psilim) psibrth=psilim
-          if(psibrth.gt.(-equilpsp(1))) psibrth=-equilpsp(1)
-
-          psibrth=-psibrth
-
-
-          call terp1(lrzmax,equilpsp(1),vphipl,d2vphipl,psibrth,
+        sum_vphipl= sum(abs(vphipl(1:lrz))) !YuP[2022-11-17] To verify
+        if(sum_vphipl.gt.0.d0) then 
+          !YuP[2022-11-17] Added verification of vphipl - skip if no rotation
+          i1p(1)=4
+          i1p(2)=4
+          itab(1)=1
+          itab(2)=0
+          itab(3)=0
+          call  coeff1(lrzmax,equilpsp(1),vphipl,d2vphipl,i1p,1,workk)
+          do 70 ipar=1,ipts
+            psibrth=psipt(ipar)
+            !prevent possibility of unhealthy extrapolation
+            if (psibrth.lt.psilim) psibrth=psilim
+            if(psibrth.gt.(-equilpsp(1))) psibrth=-equilpsp(1)
+            psibrth=-psibrth
+            call terp1(lrzmax,equilpsp(1),vphipl,d2vphipl,psibrth,
      +      1,tab,itab)
-          if(rmag.gt.1.d-8)then
-            vphiplas=tab(1)*(pr(ipar)/rmag) ! rmag=0 in mirror machine
-            cosp=px(ipar)/pr(ipar)
-            sinp=py(ipar)/pr(ipar)
-            vphi=-sinp*vx(ipar)+cosp*vy(ipar)
-            vphip=vphi-vphiplas
-            vrp=cosp*vx(ipar)+sinp*vy(ipar)
-            vx(ipar)=vrp*cosp-vphip*sinp
-            vy(ipar)=vrp*sinp+vphip*cosp
-c           vz(ipar)=vz(ipar)
-          else
-            goto 70 ! skip, for now
-          endif
-
+            if(rmag.gt.1.d-8)then
+              vphiplas=tab(1)*(pr(ipar)/rmag) ! rmag=0 in mirror machine
+              cosp=px(ipar)/pr(ipar)
+              sinp=py(ipar)/pr(ipar)
+              vphi=-sinp*vx(ipar)+cosp*vy(ipar)
+              vphip=vphi-vphiplas
+              vrp=cosp*vx(ipar)+sinp*vy(ipar)
+              vx(ipar)=vrp*cosp-vphip*sinp
+              vy(ipar)=vrp*sinp+vphip*cosp
+              !vz(ipar)=vz(ipar)
+            else
+              goto 70 ! skip, for now
+            endif
 c          if (ipar.lt.10) then
 c             write(*,*)'freyasou: ipar,psibrth,vphiplas,'//
 c     +            'vx(ipar),vy(ipar),vz(ipar)=,',
 c     +            ipar,psibrth,vphiplas,vx(ipar),vy(ipar),vz(ipar)
 c          endif
-
- 70     continue ! ipar=1,ipts
+ 70       continue ! ipar=1,ipts
+        endif !(sum_vphipl.gt.0.d0) YuP[2022-11-17]skip if no rotation
       endif ! ((n+1).ge.nonvphi .and. (n+1).lt.noffvphi)
 
 c.......................................................................
@@ -301,9 +305,10 @@ c.......................................................................
 
       curnorm=0.
       do 200 ll=1,lrz
-        call tdnflxs(ll)
+        call tdnflxs(ll) !-> get l_,lr_, etc.
         llbrth(ll)=0
 cBH171014        call bcast(source(0,0,kfrsou,ll),zero,iyjx2)
+c       k=kfrsou(ibstart) ! already done at very beginning
         call bcast(source(0,0,k,ll),zero,iyjx2)
 
 c..................................................................
@@ -311,7 +316,7 @@ c     Begin loop over the birth particles.
 c     Determine the value of psi and R at birth
 c..................................................................
 
-        k=kfrsou
+        k=kfrsou(ibstart) ! already done at very beginning
         do 100 ipar=1,ipts
 
           if (lbrth(ipar).ne.ll) go to 100
@@ -525,7 +530,7 @@ c..................................................................
         asorz(k,1,lr_)=asor(k,1,lr_)
         curnorm=curnorm+dvol(lr_)*asor(k,1,lr_)
         call tdtoaray
- 200   continue ! ll
+ 200  continue !ll=1,lrz
 
 c_cray    call hpdeallc(pxptr,ier,0)
 c_cray    call hpdeallc(pyptr,ier,0)
@@ -556,6 +561,12 @@ c     Smooth the source if input variable smooth .ge. .001
 c..................................................................
      
       call frsmooth(k,curnorm)
+      if(curnorm.le.0.d0)then !YuP[2022-12] added warning
+CMPIINSERT_IF_RANK_EQ_0      
+      WRITE(*,'(a,1pe11.3)')' freyasou(565) WARNING: curnorm=',
+     &  curnorm
+CMPIINSERT_ENDIF_RANK
+      endif
 
 c..................................................................
 c     Compute the factor necessary to scale asor so that the source
@@ -565,6 +576,10 @@ c     curnorm.
 c..................................................................
 
       scalfact=curdep/curnorm
+CMPIINSERT_IF_RANK_EQ_0      
+      WRITE(*,'(a,1p3e11.3)')' freyasou(580) scalfact,curdep,curnorm=',
+     &  scalfact,curdep,curnorm
+CMPIINSERT_ENDIF_RANK
 
 c..................................................................
 c     Scale all the sources (at each flux surface) by scalfact*tr3.
@@ -574,19 +589,35 @@ c..................................................................
       do 300 ll=1,lrz
         call tdnflxs(ll)
         curbrth(ll)=dfloat(llbrth(ll))/dvol(lr_)*scalfact
-        call dscal(iyjx2,scalfact*tr3(ll),source(0,0,k,ll),1)
+        scal_s=scalfact*tr3(ll)
+        !call dscal(iyjx2,scal_s,source(0:iy+1,0:jx+1,k,ll),1) !issues in certain debug mode
+        do jj=0,jx+1      
+        do ii=0,iy+1
+          source(ii,jj,k,ll)=source(ii,jj,k,ll)*scal_s
+        enddo
+        enddo
         asor(k,1,lr_)=asorz(k,1,lr_)*scalfact*tr3(ll)
         xlncur(k,lr_)=asor(k,1,lr_)*zmaxpsi(lr_)
         xlncurt(lr_)=xlncur(k,lr_)
+        !YuP: note that asorz is NOT rescaled;
+        ! but - it seems it is not used further?
         call sourcpwr(k) !YuP[2020] Maybe no need to call here. 
                          !It is also called later from achiefn-->sourcee
         call tdtoaray
- 300  continue
+CMPIINSERT_IF_RANK_EQ_0      
+        sum_s=0.d0
+        do jj=0,jx+1      
+        do ii=0,iy+1
+          sum_s=sum_s+source(ii,jj,k,ll)
+        enddo
+        enddo
+        WRITE(*,'(a,i3,1pe12.4)') 
+     &   'freyasou_end. lr,sum_ij(source)=',ll,sum_s
+CMPIINSERT_ENDIF_RANK
+ 300  continue !ll
 
       return
-      end
-
-
+      end subroutine freyasou
 c======================================================================
 c======================================================================
 

@@ -11,7 +11,8 @@ c..................................................................
       include 'param.h'
       include 'comm.h'
 
-      do ll=0,lrorsa
+
+      do ll=0,lrors
         indxlr(ll)=ll
         indxls(ll)=ll
 cBH080305        mplot(ll)="disabled"
@@ -26,7 +27,7 @@ cBH080305        mplot(ll)="disabled"
 
 c     analegco="enabled" => ngauss should be .le. 0
       analegco="enabled"
-      elpar0=0.
+      elpar0=0.d0
       lmdpln_=lmidpln
       ipxy=min(51,iy)
       jpxy=min(101,jx+1)
@@ -49,16 +50,17 @@ c     analegco="enabled" => ngauss should be .le. 0
 c.......................................................................
 c     lrza arrays
 c.......................................................................
+      write(*,*)'aindflt1:  lfield=',lfield
       do ll=1,lrza
-        lorbit(ll)=lfielda
+        lorbit(ll)=lfield  !YuP[2021-04] lfielda-->lfield
         currxj0(ll)=0.0
       enddo
       currxj0(0)=0.0
 
 c.......................................................................
-c     lrorsa arrays
+c     lrors arrays
 c.......................................................................
-      do 105 ll=1,lrorsa
+      do 105 ll=1,lrors
         itl_(ll)=iy/2
         itu_(ll)=iy-itl_(ll)+1
         n_(ll)=0
@@ -78,6 +80,8 @@ c.......................................................................
       fr_gyrop="disabled"
       beamponp=zero
       beampoffp=zero
+      
+      src_nbi_ep="disabled" !YuP[2022-06-30] !Not ready
 
       nnz=nnza
       nnr=nnra

@@ -19,6 +19,7 @@ c     lr_ defines the effective index of the current flux surface.
 c     ls_ defines the effective index of the current orbit along B.
 c     lmdpln_ defines the orbit index of midplane (l_=lmdpln_) 
 c     on current lr_.
+!     In CQL3D case, lmdpln_=radial_index; in CQLP, lmdpln_=1 for any ll
 c..................................................................
 
 c
@@ -34,6 +35,7 @@ c
       n=n_(l_)
       iyy=iy_(l_) !-YuP-101215: Don't use iy=; it's in common /params/
                   ! Don't let overwrite the cqlinput value!
+                ! iy=iy_(l_) !TEST
       iyh=iyh_(l_)
       iyjx=iyjx_(l_)
       timet=time_(l_)

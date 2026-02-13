@@ -35,12 +35,17 @@ c**                    from 0. to pltlimm.
 c**            "energy", plot 1d plots verus energy (kev)
 c**                    from 0. to pltlimm (kev).
 cyup                   BUT, for 2d plots, use u/c units, not keV
+         if(cqlpmod .ne. "enabled")then
+           vth_l= vth(k,lr_)
+         else !(cqlpmod.eq."enabled") ! YuP[2021-02-26]
+           vth_l= vthpar(k,ls_)
+         endif
 
          if (pltlim.eq."disabled") then
             jxq=jx
             xmaxq=x(jxq)
             tx_='u/vnorm'        
-            vth_mark=vth(k,lr_)/vnorm
+            vth_mark=vth_l/vnorm
             do j=1,jxq-1
                TAM1(j)=0.5*(x(j)+x(j+1))
             enddo
@@ -49,7 +54,7 @@ cyup                   BUT, for 2d plots, use u/c units, not keV
             jxq=jlwr
             xmaxq=xlwr
             tx_='u/vnorm'        
-            vth_mark=vth(k,lr_)/vnorm
+            vth_mark=vth_l/vnorm
             do j=1,jxq-1
                TAM1(j)=0.5*(x(j)+x(j+1))
             enddo
@@ -59,7 +64,7 @@ cyup                   BUT, for 2d plots, use u/c units, not keV
             jxq=min(luf(pltlimm,x,jx),jx)
             xmaxq=x(jxq)
             tx_='u/vnorm'        
-            vth_mark=vth(k,lr_)/vnorm
+            vth_mark=vth_l/vnorm
             do j=1,jxq-1
                TAM1(j)=0.5*(x(j)+x(j+1))
             enddo
@@ -67,7 +72,7 @@ cyup                   BUT, for 2d plots, use u/c units, not keV
             jxq=min(luf(pltlimm,uoc,jx),jx)
             xmaxq=uoc(jxq)
             TX_='u/c\dlight\u'
-            vth_mark=vth(k,lr_)/clight
+            vth_mark=vth_l/clight
             do j=1,jxq-1
                TAM1(j)=0.5*(uoc(j)+uoc(j+1))
             enddo
@@ -80,7 +85,7 @@ cyup                   BUT, for 2d plots, use u/c units, not keV
                TAM1(j)=0.5*(enerkev(j,k)+enerkev(j+1,k)) 
             enddo
             TX_='Energy (keV)'
-            vth_mark=fmass(k)*vth(k,lr_)**2/ergtkev ! in keV units
+            vth_mark=fmass(k)*vth_l**2/ergtkev ! in keV units
          endif
          RXMAXQ=XMAXQ
       
@@ -135,6 +140,14 @@ cyup                   BUT, for 2d plots, use u/c units, not keV
         write(t_,186) k,lr_,n
         RILIN=RILIN+1.
         CALL PGMTXT('B',RILIN,R4MP2,R40,t_)
+        
+        if(cqlpmod.eq."enabled")then !YuP[2021-03-03] added for CQLP:
+        write(t_,10032) l_,sz(l_)
+10032   format("Index along B, l=",i4, 4x,  
+     &       "Parallel position s=",1pe14.6," cm")
+        RILIN=RILIN+1.
+        CALL PGMTXT('B',RILIN,R4MP2,R40,t_)
+        endif
         
         write(t_,1861) 
         RILIN=RILIN+2.

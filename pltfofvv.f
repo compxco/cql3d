@@ -118,7 +118,7 @@ c...............................................................
 
         do jp=1,jx
           tam2(jp)=0.
-          do ip=1,iy-1
+          do ip=1,iy_(l_)-1  !YuP[2021-03-11] iy-->iy_(l_)
             ip1=ip+1
             tam2(jp)=tam2(jp)+cynt2(ip,l_)*(temp3(ip,jp)
      1               +temp3(ip1,jp))

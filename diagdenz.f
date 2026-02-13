@@ -58,9 +58,9 @@ c..................................................................
  107      jegy(ny,2,k,lr_)=j
  108      continue
           if (jegy(ny,1,k,lr_) .ge. jegy(ny,2,k,lr_)) jegy(ny,1,k,lr_)=0
- 100    continue
- 103  continue
-      call bcast(xlndnz(1,1),zero,(ngen+1)*negyrga)
+ 100    continue ! ny=1,negyrg
+ 103  continue ! k=1,ngen
+      call bcast(xlndnz,zero,size(xlndnz)) !shape: (ngen+1,max(negyrg,1))
 
 c..................................................................
 c     xlndnz(k,ny) will eventually hold the line integrated density
@@ -71,7 +71,7 @@ c..................................................................
       if (cqlpmod .ne. "enabled") then
         iorbstr=1
         iorbend=lz
-      else
+      else ! (cqlpmod.eq."enabled")
         iorbstr=l_
         iorbend=l_
       endif
@@ -79,7 +79,7 @@ c..................................................................
         call dcopy(iyjx2,f(0,0,k,l_),1,temp3(0,0),1)
         do 11 l=iorbstr,iorbend
           ileff=l
-          if (cqlpmod .eq. "enabled") ileff=ls_
+          if (cqlpmod.eq."enabled") ileff=ls_
           call cfpleg(0,ileff,1)
           do 40 ny=1,negyrg
             if (jegy(ny,1,k,lr_).eq.0 .or. eegy(ny,2,k,lr_).lt.1.e-15)
@@ -109,7 +109,7 @@ c..................................................................
       do 20 l=iorbstr,iorbend
         densz(l,ngen+1,nw,lr_)=0.0
         ileff=l
-        if (cqlpmod .eq. "enabled") ileff=ls_
+        if (cqlpmod.eq."enabled") ileff=ls_
         do 30 k=1,ngen
           densz(l,ngen+1,nw,lr_)=densz(l,ngen+1,nw,lr_)
      1      +densz(l,k,nw,lr_)*bnumb(k)

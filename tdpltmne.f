@@ -22,7 +22,9 @@ c     real*4 variables (and function rbound) for pgplot:
 
       REAL*4 :: R4P2=.2,R4P8=.8,R4P6=.6,R41P3=1.3,R41P44=1.44,R4P5=.5
       REAL*4 :: R40=0.,R41=1.,R42=2.,R43=3.,R44=4.,R45=5.,R46=6.
-      REAL*4 :: R47=7.,R48=8.,R45P2=5.2
+      REAL*4 :: R47=7.,R48=8.,R45P2=5.2,R41P2=1.2
+      REAL*4 :: R4P9=.9,R41P8=1.8
+
 
       character*16 t_horiz
       
@@ -65,27 +67,40 @@ c..................................................................
 
 
       do 300 k=1,ntotal
-        if (k.gt.ngen .and. k.ne.kelec .and. n.gt.1) go to 300
-        CALL PGPAGE
-        CALL PGSVP(R4P2,R4P8,R4P2,R4P6)
-
-        CALL PGSAVE
-        CALL PGSCH(R41P44)
-        CALL PGMTXT('T',R46,R4P5,R4P5,'DENSITIES (/CC) OF SPECIES')
-        CALL PGUNSA
+        !YuP[2022-07-14]if (k.gt.ngen .and. k.ne.kelec .and. n.gt.1) go to 300
+        !Commented line above, so - Do not skip plots of profiles for 
+        !Maxwellian species. They can be changed in case of time-dependent
+        !settings for profiles or in case of impurities (e.g. pellet).
+        CALL PGPAGE 
 
         write(t_,3002) k,kspeci(1,k),kspeci(2,k),n
-        CALL PGMTXT('T',R43,R40,R40,t_)
  3002   format("species no. ",i2,4x,a8,2x,a8,2x," time step n=",i4)
-        do 19 l=1,lrzmax
-          tr1(l)=reden(k,l)
-          tr2(l)=0.0
-          tr3(l)=0.0
-          if (zmaxpsi(l).ne.0.0 .and. k.le.ngen) then
-            tr2(l)=xlndnv(k,l)/zmaxpsi(l)
-            tr3(l)=xlndnr(k,l)/zmaxpsi(l)
-          endif
- 19     continue   
+         do 19 ll=1,lrzmax
+            tr1(ll)=reden(k,ll) !the midplane density
+            !reden is reset to gn=SUM[f(i,j,k,ll)*cynt2(i,ll)*cint2(j)]
+            ! at every time step, in diaggnde,L~500
+            tr2(ll)=0.0
+            tr3(ll)=0.0
+            if(k.le.ngen) then
+              ! <n>_FSA,
+              !tr2(ll)=den_fsa(k,ll) !flux-surface average n_FSA[#/cm^3]
+              if (zmaxpsi(ll).ne.0.0 .and. k.le.ngen) then
+                tr2(ll)=xlndn(k,ll)/zmaxpsi(ll) ! n_FSA (ZOW only)
+              endif
+              ! Also Find the midplane density n0:
+              dens0=0.d0
+              do j=1,jx
+              do i=1,iy
+                 if(gone(i,j,k,ll).eq.zero)then !YuP[07-14-2014]
+                 ! Only "count particles" that are NOT in the loss cone
+                 ! (gone array is set to -1 in the loss cone).
+                    dens0=dens0+f(i,j,k,ll)*cynt2(i,ll)*cint2(j)
+                 endif
+              enddo
+              enddo
+              tr3(ll)=dens0 !the midplane density/skipping loss cone/
+            endif
+ 19     continue  ! surface index
         fmin=0.
         fmax=0.
         call aminmx(tr1(1),1,lrzmax,1,fmin,fmax,kmin,kmax)
@@ -100,77 +115,155 @@ c..................................................................
         fmin=0.0 ! Set lower limit to 0.
         if(fmax.le.0.0) fmax=1.0 !YuP[2019-10-28]To prevent Y1=Y2 args in PGSWIN
         !YuP: Sometimes the density of added Z=50 impurity is 0., initially
-
-        DO I=1,LRZMAX
-           RLRZAP1(I)=tr(i)
-        ENDDO
         RPG1=fmin
         RPG2=fmax
-        CALL PGSWIN(RLRZAP1(1),RLRZAP1(lrzmax),RPG1,RPG2)
-        CALL PGBOX('BCNST',R40,0,'BCNST',R40,0)
+
         DO I=1,LRZMAX
+           RLRZAP(I)=rpcon(i) ! outermost-midplane R of flux surf.
+           RLRZAP1(I)=tr(i)
            RLRZAP11(I)=tr1(i)
-        ENDDO
-        CALL PGLINE(lrzmax,RLRZAP1(1),RLRZAP11(1))
-        CALL PGSLS(2)
-        DO I=1,LRZMAX
            RLRZAP12(I)=tr2(i)
-        ENDDO
-        CALL PGLINE(lrzmax,RLRZAP1(1),RLRZAP12(1))
-        CALL PGSLS(3)
-        DO I=1,LRZMAX
            RLRZAP13(I)=tr3(i)
         ENDDO
-        CALL PGLINE(lrzmax,RLRZAP1(1),RLRZAP13(1))
-        CALL PGSLS(1)
-        write(t_,4050) pltvs
- 4050   format(a8)
+
+      ! If the horizontal coord is rho, set the limits to [0.,1.]
+      RPGmin=RLRZAP1(1)
+      RPGmax=RLRZAP1(LRZMAX)
+      if(RPGmin.le.0.2) RPGmin=0. ! Lower limit in plots: extend to 0.
+      if(RPGmax.ge.0.5 .and. RPGmax.lt.1.) RPGmax=1. ! Upper limit: extend to 1.
+       
+        ! FIRST SUBPLOT 
+        CALL PGSVP(R4P2,R4P8,R4P6,R4P9) !(.2,.8,.6,.9)
+        CALL PGSAVE
+        CALL PGSCH(R41P2)
+        CALL PGMTXT('T',R43,R4P5,R4P5,'DENSITIES (/CC) OF SPECIES')
+        CALL PGSCH(R41)
+        if (k.le.ngen) then !Note: for Maxw.species, we only have n0
+          CALL PGMTXT('T',R42,R40,R40,
+     +   'Solid(black) n0; --(red) <n>_FSA; -.-(green) n0/skipLossCone')
+        endif
+        CALL PGUNSA
+        CALL PGMTXT('T',R41,R40,R40,t_)
+        IF ( RPG2-RPG1 .le. 1.e-16 ) THEN ! YuP [02-23-2016]
+           RPG2= RPG1+1.e-16
+        ENDIF
+        CALL PGSWIN(RPGmin,RPGmax,RPG1,RPG2)
+        CALL PGBOX('BCNST',R40,0,'BCNST',R40,0)
+        CALL PGSLW(lnwidth+1) ! line thickness/width of line,
+        ! in units of 0.005 inch (0.13 mm) in range 1-201.
+        CALL PGSLS(1)  ! 1-> solid; 2-> dashed; 3-> -.-.- ;
+        CALL PGSCI(1)  ! Color index: 1 is default (black); select from 1-15
+        CALL PGLINE(lrzmax,RLRZAP1(1),RLRZAP11(1)) ! reden: solid
+        !-------------
+        if(k.le.ngen) then !FSA and noLoss are for general species only
+        CALL PGSLW(lnwidth) ! line thickness/width
+        CALL PGSLS(2)  ! 1-> solid; 2-> dashed; 3-> -.-.- ;
+        CALL PGSCI(2)  ! Color index: 2=red
+        CALL PGLINE(lrzmax,RLRZAP1(1),RLRZAP12(1)) ! dashed
+        !-------------
+        CALL PGSLW(lnwidth) ! line thickness/width
+        CALL PGSLS(3)  ! 1-> solid; 2-> dashed; 3-> -.-.- ;
+        CALL PGSCI(3)  ! Color index: 3=green
+        CALL PGLINE(lrzmax,RLRZAP1(1),RLRZAP13(1)) ! dash-dot
+        endif
+        !-------------
+        ! Restore:
+        CALL PGSLW(lnwidth) ! line thickness/width
+        CALL PGSLS(1)  ! 1-> solid
+        CALL PGSCI(1)  ! Color index: 1 is default (black); select from 1-15
         CALL PGSAVE
         CALL PGSCH(R41P44)
-        CALL PGLAB(t_,'density (/cm\u3\d)',' ')
+        CALL PGLAB(' ','density (/cm\u3\d)',' ') ! Label for vert.axis.
+        ! Label for horizontal axis (better control of position):
+        CALL PGMTXT('B',R41P8,R4P5,R4P5,t_horiz) 
         CALL PGUNSA
 
+        ! SECOND SUBPLOT 
+        CALL PGSVP(R4P2,R4P8,R4P2,R4P5) !(.2,.8,.2,.5)!----> 2nd subplot
+        RPGmin=min(RLRZAP(1),rmag)
+        IF ( RPG2-RPG1 .le. 1.e-16 ) THEN ! YuP [02-23-2016]
+           RPG2= RPG1+1.e-16
+        ENDIF
+        CALL PGSWIN(RPGmin,RLRZAP(lrzmax),RPG1,RPG2)
+        CALL PGBOX('BCNST',R40,0,'BCNST',R40,0)
+        CALL PGSLW(lnwidth+1) ! line thickness/width of line,
+        ! in units of 0.005 inch (0.13 mm) in range 1-201.
+        CALL PGSLS(1)  ! 1-> solid; 2-> dashed; 3-> -.-.- ;
+        !CALL PGSCI(1)  ! Color index: 1 is default (black); select from 1-15
+        CALL PGLINE(lrzmax,RLRZAP(1),RLRZAP11(1)) ! reden: solid
+        !-------------
+        if(k.le.ngen) then !FSA and noLoss are for general species only
+        CALL PGSLW(lnwidth) ! line thickness/width
+        CALL PGSLS(2)  ! 1-> solid; 2-> dashed; 3-> -.-.- ;
+        CALL PGSCI(2)  ! Color index: 1 is default (black); select from 1-15
+        CALL PGLINE(lrzmax,RLRZAP(1),RLRZAP12(1)) ! dashed
+        !-------------
+        CALL PGSLW(lnwidth) ! line thickness/width
+        CALL PGSLS(3)  ! 1-> solid; 2-> dashed; 3-> -.-.- ;
+        CALL PGSCI(3)  ! Color index: 1 is default (black); select from 1-15
+        CALL PGLINE(lrzmax,RLRZAP(1),RLRZAP13(1)) ! dash-dot
+        endif
+        !-------------
+        ! Restore:
+        CALL PGSLW(lnwidth) ! line thickness/width
+        CALL PGSLS(1)  ! 1-> solid
+        CALL PGSCI(1)  ! Color index: 1 is default (black); select from 1-15
+        CALL PGSAVE
+        CALL PGSCH(R41P44)
+        CALL PGLAB(' ', 'density (/cm\u3\d)',' ')
+        ! Label for horizontal axis (better control of position):
+        CALL PGMTXT('B',R41P8,R4P5,R4P5, 'R (=rpcon)  (cm)') 
+        CALL PGUNSA
 
- 300  continue
+ 300  continue ! k
+
+      
 
       do 400 k=1,ntotal
-        if (k.gt.ngen .and. n.ge.1) go to 400
+        !YuP[2022-07-14]if (k.gt.ngen .and. n.ge.1) go to 400
+        !Commented line above, so - Do not skip plots of profiles for 
+        !Maxwellian species. They can be changed in case of time-dependent
+        !settings for profiles or in case of impurities (e.g. pellet).
 
         CALL PGPAGE
-        CALL PGSVP(R4P2,R4P8,R4P2,R4P6)
+        CALL PGSLS(1)  ! 1-> solid
 
-        CALL PGSAVE
-        CALL PGSCH(R41P44)
-        CALL PGMTXT('T',R46,R4P5,R4P5,'ENERGIES OF SPECIES IN KEV')
-        if(k.le.ngen) CALL PGMTXT('T',R45P2,R4P5,R4P5,
-     1                '(Solid: <..>_FSA)')
-        CALL PGUNSA
-        write(t_,3002) k,kspeci(1,k),kspeci(2,k),n
-        CALL PGMTXT('T',R43,R40,R40,t_)
-
-        if (n .eq. 0) then
-          do 18 l=1,lrzmax
-            tr1(l)=energy(k,l) ! FSA, solid line
-            tr2(l)=0
+        if (n .eq. 0) then  ! n=0
+          do 18 ll=1,lrzmax
+            tr1(ll)=energy(k,ll) ! n=0, any species: FSA
+            tr2(ll)=0
 c     tr3 set to zero so no need to change following plot statements
-            tr3(l)=0
+            tr3(ll)=0
  18       continue
-          if (k .le. ngen) then
-            do 181 ll=1,lrz
-              tr2(lrindx(ll))=energym(k,ll) ! midplane, dashed line
- 181        continue
+          ! Set plots of midplane energy at n=0 : 
+          if (k .le. ngen) then ! general species
+            do ll=1,lrz
+              tr2(lrindx(ll))=energym(k,ll) ! n=0 kgen: midplane
+            enddo
+          else ! thermal species
+            do ll=1,lrz
+              tr2(lrindx(ll))=energy(k,ll) ! n=0 kmaxw: midplane=FSA
+              !could be skipped, but then we will have only FSA curve 
+              !for thermal species, which is a dashed line.
+            enddo         
           endif
         else if (k .le. ngen) then ! and n>0
-          do 182 l=1,lrzmax
-            tr1(l)=energy(k,l) ! FSA, solid line
-            tr2(l)=0.0
-            tr3(l)=0.0
- 182      continue
-          do 183 l=1,lrz
-            ilr=lrindx(l)
-            tr2(ilr)=energyv(k,ilr) !?? FSA, transport related,  dashed line
+          do ll=1,lrzmax
+            tr1(ll)=energy(k,ll) ! n>0 kgen: FSA, solid line
+            tr2(ll)=0.0
+            tr3(ll)=0.0
+          enddo
+          do ll=1,lrz
+            ilr=lrindx(ll)
+            tr2(ilr)=energym(k,ilr) ! n>0 kgen: midplane,  dashed line
             tr3(ilr)=energyr(k,ilr) !?? FSA, transport related,  dot-dashed line
- 183      continue
+          enddo
+        else if (k .gt. ngen) then ! and n>0 !Maxw.species
+          do ll=1,lrzmax
+            tr1(ll)=1.5*temp(k,ll) !For Maxw. species, temp() can evolve
+            tr2(ll)=1.5*temp(k,ll) !Maxw., midplane = FSA
+            tr3(ll)=0.0
+          enddo
         endif
 
         fmin=0.
@@ -183,46 +276,111 @@ c     tr3 set to zero so no need to change following plot statements
         call aminmx(tr3(1),1,lrzmax,1,fmin1,fmax1,kmin,kmax)
         if (fmin1.lt.fmin) fmin=fmin1
         if(fmax1.gt.fmax) fmax=fmax1
-        fmax=fmax*1.05 ! extend range, in case the profile is flat
-
-        DO I=1,LRZMAX
-           RLRZAP1(I)=tr(i)
-           RLRZAP11(I)=tr1(i)
-           RLRZAP12(I)=tr2(i)
-           RLRZAP13(I)=tr3(i)
-        ENDDO
+        fmax=fmax*1.05 ! extend range, in case the profile is flat	
         RPG1=fmin
         RPG2=fmax
-        RPG1=min(fmin,0.)		
-        CALL PGSWIN(RLRZAP1(1),RLRZAP1(lrzmax),RPG1,RPG2)
-        CALL PGBOX('BCNST',R40,0,'BCNST',R40,0)
-        
-        CALL PGSLS(1)  !solid
-        CALL PGLINE(lrzmax,RLRZAP1(1),RLRZAP11(1))
-        
-        CALL PGSLS(2)  !Set dashed line style
-        CALL PGLINE(lrzmax,RLRZAP1(1),RLRZAP12(1))
-        
-        CALL PGSLS(3)  !Set dot-dash line style
-        CALL PGLINE(lrzmax,RLRZAP1(1),RLRZAP13(1))
-        
-        CALL PGSLS(1)  !Re-set solid line style for annotation
-        
-        write(t_,4050) pltvs
+        RPG1=min(fmin,0.)
+
+        DO I=1,LRZMAX
+           RLRZAP(I)=rpcon(i) ! outermost-midplane R of flux surf.
+           RLRZAP1(I)=tr(i)   ! rho or psi
+           RLRZAP11(I)=tr1(i) ! Dashed: energy(k,ll) FSA
+           RLRZAP12(I)=tr2(i) ! Solid: midplane
+           RLRZAP13(I)=tr3(i)
+        ENDDO
+      ! If the horizontal coord is rho, set the limits to [0.,1.]
+      RPGmin=RLRZAP1(1)
+      RPGmax=RLRZAP1(LRZMAX)
+      if(RPGmin.le.0.2) RPGmin=0. ! Lower limit in plots: extend to 0.
+      if(RPGmax.ge.0.5 .and. RPGmax.lt.1.) RPGmax=1. ! Upper limit: extend to 1.
+
+        ! FIRST SUBPLOT 
+        CALL PGSVP(R4P2,R4P8,R4P6,R4P9) !(.2,.8,.6,.9)
         CALL PGSAVE
         CALL PGSCH(R41P44)
-        CALL PGLAB(t_,'energy (kev)',' ')
+        CALL PGSCI(1) !black
+        CALL PGMTXT('T',R43,R4P5,R4P5,'ENERGIES OF SPECIES IN KEV')
+        CALL PGSCH(R41)
+        if (k.le.ngen) then !Note: for Maxw.species, we only have n0
+           CALL PGMTXT('T',R42,R40,R40,
+     +         'Solid(black): midplane;  Dashed(red): <..>_FSA')
+        endif
+        CALL PGUNSA
+        write(t_,3002) k,kspeci(1,k),kspeci(2,k),n
+        CALL PGMTXT('T',R41,R40,R40,t_)
+        IF ( RPG2-RPG1 .le. 1.e-16 ) THEN ! YuP [02-23-2016]
+           RPG2= RPG1+1.e-16
+        ENDIF
+        CALL PGSWIN(RPGmin,RPGmax,RPG1,RPG2)
+        CALL PGBOX('BCNST',R40,0,'BCNST',R40,0)
+        !-----------------------------------------
+        CALL PGSLS(1)  !Set solid line style
+        CALL PGSCI(1) !black color
+        CALL PGLINE(lrzmax,RLRZAP1(1),RLRZAP12(1))
+        !-----------------------------------------
+        if(k.le.ngen) then !FSA and noLoss are for general species only
+        CALL PGSLS(2)  !Set dashed line style
+        CALL PGSCI(2) !red color
+        CALL PGLINE(lrzmax,RLRZAP1(1),RLRZAP11(1))
+        !-----------------------------------------
+        CALL PGSLS(4)  !Set dotted line style
+        CALL PGSCI(1) !black color
+        CALL PGLINE(lrzmax,RLRZAP1(1),RLRZAP13(1))
+        endif
+        !-----------------------------------------
+        CALL PGSLS(1)  !Re-set solid line style for annotation
+        CALL PGSCI(1) !black color
+        CALL PGSAVE
+        CALL PGSCH(R41P44)
+        CALL PGLAB(' ','energy (kev)',' ')
+        ! Label for horizontal axis (better control of position):
+        CALL PGMTXT('B',R41P8,R4P5,R4P5,t_horiz) 
+        CALL PGUNSA
+
+        ! SECOND SUBPLOT 
+        CALL PGSVP(R4P2,R4P8,R4P2,R4P5) !(.2,.8,.2,.5)
+        RPGmin=min(RLRZAP(1),rmag)
+        IF ( RPG2-RPG1 .le. 1.e-16 ) THEN ! YuP [02-23-2016]
+           RPG2= RPG1+1.e-16
+        ENDIF
+        CALL PGSCI(1) !black color
+        CALL PGSWIN(RPGmin,RLRZAP(lrzmax),RPG1,RPG2)
+        CALL PGBOX('BCNST',R40,0,'BCNST',R40,0)
+        !-----------------------------------------
+        CALL PGSLS(1)  !Set solid line style
+        CALL PGSCI(1) !black color
+        CALL PGLINE(lrzmax,RLRZAP(1),RLRZAP12(1))
+        !-----------------------------------------
+        if(k.le.ngen) then !FSA and noLoss are for general species only
+        CALL PGSLS(2)  !Set dashed line style
+        CALL PGSCI(2) !red color
+        CALL PGLINE(lrzmax,RLRZAP(1),RLRZAP11(1))
+        !-----------------------------------------
+        CALL PGSLS(4)  !Set dotted line style
+        CALL PGSCI(1) !black color
+        CALL PGLINE(lrzmax,RLRZAP(1),RLRZAP13(1))
+        endif
+        !-----------------------------------------
+        CALL PGSLS(1)  !Re-set solid line style for annotation
+        CALL PGSCI(1) !black color
+        CALL PGSAVE
+        CALL PGSCH(R41P44)
+        CALL PGLAB(' ','energy (kev)',' ')
+        ! Label for horizontal axis (better control of position):
+        CALL PGMTXT('B',R41P8,R4P5,R4P5, 'R (=rpcon)  (cm)') 
         CALL PGUNSA
 
  400  continue ! k
+ 
 
-      if (cqlpmod .eq. "enabled") then
+      if (cqlpmod.eq."enabled") then
 
         do 350 k=1,ntotal
           if (k.gt.ngen .and. k.ne.kelec .and. n.gt.1) go to 350
 
         CALL PGPAGE
         CALL PGSVP(R4P2,R4P8,R4P2,R4P6)
+        CALL PGSCI(1) !black color
 
         CALL PGSAVE
         CALL PGSCH(R41P44)
@@ -236,7 +394,7 @@ c     tr3 set to zero so no need to change following plot statements
  3051     format("r(",i2,")/a=",1pe11.4)
 
 
-          do 352 ll=1,lsmax
+          do 352 ll=1,lsmax ! Full grid for denpar
             tr1s(ll)=denpar(k,ll)
  352      continue   
           fmin=0.
@@ -246,7 +404,7 @@ c     tr3 set to zero so no need to change following plot statements
           fmin=0.d0 ! YuP: make lower limit =0.0
           fmax=fmax*1.05 ! extend range, in case the profile is flat
 
-        DO I=1,LSMAX
+        DO I=1,LSMAX ! Full grid for denpar vs z plots
            RLRORSA(I)=z(i,lrindx(1))
            RLRORSA1(I)=tr1s(i)
         ENDDO
@@ -281,15 +439,18 @@ c     tr3 set to zero so no need to change following plot statements
         CALL PGSAVE
         CALL PGSCH(R41P44)
         CALL PGMTXT('T',R46,R4P5,R4P5,'ENERGIES OF SPECIES IN KEV')
-        CALL PGMTXT('T',R45,R40,R40,
-     +         'Solid: midplane;  Dashed: <..>_FSA')
+        CALL PGSCH(R41)
+        if (k.le.ngen) then !Note: for Maxw.species, we only have n0
+           CALL PGMTXT('T',R45,R40,R40,
+     +         'Solid(black): midplane;  Dashed(red): <..>_FSA')
+        endif
         CALL PGUNSA
           write(t_,3050) k,kspeci(1,k),kspeci(2,k)
         CALL PGMTXT('T',R43,R40,R40,t_)
           write(t_,3051) lrindx(1),rz(lrindx(1))/radmin
         CALL PGMTXT('T',R42,R40,R40,t_)
 
-          do 452 ll=1,lsmax
+          do 452 ll=1,lsmax ! Full grid for enrgypa
             tr1s(ll)=enrgypa(k,ll) ! Midplane
  452      continue
           fmin=0.
@@ -299,24 +460,24 @@ c     tr3 set to zero so no need to change following plot statements
           fmin=0.d0 ! YuP: make lower limit =0.0
           fmax=fmax*1.05 ! extend range, in case the profile is flat
 	  
-        DO I=1,LSMAX
+        DO I=1,LSMAX  ! Full grid for enrgypa vs z plot
            RLRORSA(I)=z(i,lrindx(1))
            RLRORSA1(I)=tr1s(i)
         ENDDO
         RPG1=fmin
         RPG2=fmax
-      ! If the horizontal coord is rho, set the limits to [0.,1.]
-      RPGmin=RLRORSA(1)
-      RPGmax=RLRORSA(LSMAX)
-      if(RPGmin.le.0.2) RPGmin=0. ! Lower limit in plots: extend to 0.
-      if(RPGmax.ge.0.8 .and. RPGmax.lt.1.) RPGmax=1. ! Upper limit: extend to 1.
+        ! If the horizontal coord is rho, set the limits to [0.,1.]
+        RPGmin=RLRORSA(1)
+        RPGmax=RLRORSA(LSMAX)
+        if(RPGmin.le.0.2) RPGmin=0. ! Lower limit in plots: extend to 0.
+        if(RPGmax.ge.0.8 .and. RPGmax.lt.1.) RPGmax=1. ! Upper limit: extend to 1.
         
         IF ( RPG2-RPG1 .le. 1.e-16 ) THEN ! YuP [02-23-2016]
            RPG2= RPG1+1.e-16
         ENDIF
         CALL PGSWIN(RPGmin,RPGmax,RPG1,RPG2)
         CALL PGBOX('BCNST',R40,0,'BCNST',R40,0)
-        CALL PGLINE(lsmax,RLRORSA(1),RLRORSA1(1))
+        CALL PGLINE(lsmax,RLRORSA(1),RLRORSA1(1)) !Full grid: enrgypa vs z plot
 
           write(t_,4051)
 
@@ -325,7 +486,7 @@ c     tr3 set to zero so no need to change following plot statements
 
  450    continue ! k
 
-      endif
+      endif ! (cqlpmod.eq."enabled")
 
 c.......................................................................
 c     n > 0
@@ -342,22 +503,36 @@ c.......................................................................
         CALL PGSCH(R41P44)
         CALL PGMTXT('T',R48,R4P5,R4P5,'Electric field (V/cm)')
         CALL PGUNSA
-        n4=n ! add plot for present time step
+        n4=nch(1) ! add plot for present time step
+        !!YuP[2024-08-08] Note: tdpltmne is called AFTER solution is obtained,
+        !so that n (and time) is advanced for the next time step.
+        !Also, nch=n+1, so that when n=1 (after first step), 
+        !nch=2. When nstop (after last step), nch=nstop+1
+        !(this is from printout:)
+        write(*,*)'tdpltmne: n,nch,ptime,E',
+     &             n,nch(1),ptime(nch(1),1),pefld(nch(1),1) !'1' is for lr=1
+        !Why nch has extra point (i.e., nstop+1 points) --
+        !because first time the data for plots is recorded
+        ! at n=0 (from ainitial), before the first solution is found,
+        !then it is recordered after each solution is found, 
+        !so totally nstop+1 points 
+        
         t4=ptime(n4,1)
-        n3=max(1,NINT(n*2./3.)) ! add plot for step =n*2/3 
+        n3=max(1,NINT(n4*2./3.)) ! add plot for step =n*2/3 
         t3=ptime(n3,1)
-        n2=max(1,NINT(n*1./3.)) ! add plot for step =n*1/3 
+        n2=max(1,NINT(n4*1./3.)) ! add plot for step =n*1/3 
         t2=ptime(n2,1)
-        n1=1 ! add plot for initial time step
+        n1=2 ! add plot for initial time step 
+        !(nch=2 corr. to n=0-->1 step)
         t1=ptime(n1,1)
         fmin=0.
         fmax=0.
         DO I=1,LRZMAX
            RLRZAP1(I)=tr(i) ! rho or psi coord.
-           tr1(i)=pefld(n1,I) ! at n=n1 ! V/cm
-           tr2(i)=pefld(n2,I) ! at n=n2 ! V/cm
-           tr3(i)=pefld(n3,I) ! at n=n3 ! V/cm
-           tr4(i)=pefld(n4,I) ! at n=n4 ! V/cm
+           tr1(i)=pefld(n1,I) ! at n= n1-2 --> n1-1 step ! V/cm
+           tr2(i)=pefld(n2,I) ! at n= n2-2 --> n2-1 step ! V/cm
+           tr3(i)=pefld(n3,I) ! at n= n3-2 --> n3-1 step ! V/cm
+           tr4(i)=pefld(n4,I) ! at n= n4-2 --> n4-1 step ! V/cm
            RLRZAP11(I)=tr1(i)
            RLRZAP12(I)=tr2(i)
            RLRZAP13(I)=tr3(i)
@@ -382,25 +557,26 @@ c.......................................................................
         CALL PGSLS(2) !dashed --
         CALL PGSCI(2) !red color
         CALL PGLINE(lrzmax,RLRZAP1(1:lrzmax),RLRZAP11(1:lrzmax)) ! n=n1
-        write(t_,5004) n1,t1
+        write(t_,5004) n1-2,n1-1, t1-dtreff,t1 
+        !beginning and advanced step where E was applied
         CALL PGMTXT('T',R47,R40,R40,t_) !YuP[2019-12-20]
 
         CALL PGSLS(3) ! -.-
         CALL PGSCI(3) !green color
         CALL PGLINE(lrzmax,RLRZAP1(1:lrzmax),RLRZAP12(1:lrzmax)) ! n=n2
-        write(t_,5004) n2,t2
+        write(t_,5004) n2-2,n2-1, t2-dtreff,t2
         CALL PGMTXT('T',R46,R40,R40,t_) !YuP[2019-12-20]
         
         CALL PGSLS(4) ! ...
         CALL PGSCI(4) !blue color
         CALL PGLINE(lrzmax,RLRZAP1(1:lrzmax),RLRZAP13(1:lrzmax)) ! n=n3
-        write(t_,5004) n3,t3
+        write(t_,5004) n3-2,n3-1, t3-dtreff,t3
         CALL PGMTXT('T',R45,R40,R40,t_) !YuP[2019-12-20]
 
         CALL PGSLS(1) !solid
         CALL PGSCI(1) !black color
         CALL PGLINE(lrzmax,RLRZAP1(1:lrzmax),RLRZAP14(1:lrzmax)) ! n=n4
-        write(t_,5004) n4,t4
+        write(t_,5004) n4-2,n4-1, t4-dtreff,t4
         CALL PGMTXT('T',R44,R40,R40,t_) !YuP[2019-12-20]
 
         CALL PGSLS(1) !solid, restore
@@ -408,6 +584,7 @@ c.......................................................................
         write(t_,4050) pltvs ! pltvs="rho" or "psi"
         CALL PGLAB(t_,'E (V/cm)',' ')
         ! YuP[2019-12-20] Done E-field
+ 4050   format(a8)
         
 
         do 500 k=1,ngen
@@ -417,6 +594,7 @@ c.......................................................................
 
         CALL PGPAGE ! Current densities
         CALL PGSVP(R4P2,R4P8,R4P2,R4P6)
+
         CALL PGSAVE
         CALL PGSCH(R41P44)
         CALL PGMTXT('T',R48,R4P5,R4P5,
@@ -427,7 +605,7 @@ c.......................................................................
  5002 format("Species:",i2,
      &        " Current from sum[curr*darea]=",1pe14.6," A")
  5003 format(1pe11.3,"A")
- 5004 format("n=",i5, ";  t=",1pe14.6,"sec")
+ 5004 format("n=",i4,"-->",i4,";  t=",1pe11.3,"-->",1pe11.3,"sec")
         CALL PGMTXT('T',R48,R40,R40,t_)
 
         !YuP[2019-12-20] Added j_bs in same plots
@@ -461,7 +639,7 @@ c.......................................................................
         tr5i=0.d0 ! YuP[2019] to keep partially integrated values
         tr6i=0.d0 ! YuP[2019] to keep partially integrated values
         tr7i=0.d0 ! YuP[2019] to keep partially integrated values
-        do l=1,lrzmax
+        do l=1,lrzmax !In CQLP lrzmax=1; Should not be plotting any of these
             tr1(l)=currz(k,l)  !=curr(k,l)/3.9   [A/cm^2] 
             tr2(l)=currr(k,l)  !=curr(k,l)/3.e9 in case of transp=enabled
             tr3(l)=currv_(k,l) !=curr(k,l)/3.e9 in case of transp=enabled
@@ -513,18 +691,18 @@ c.......................................................................
         CALL PGMTXT('T',R44,R40,R40,
      &   'Solid/thin: Integral over f (curr() array)'//t_) !YuP[2019-12-20]
         
-        if(transp.eq.'enabled')then
+        if(transp.eq."enabled")then
         CALL PGSLS(2) ! dashed
         CALL PGSLW(lnwidth) ! thin line
         CALL PGSCI(1) ! black color
-        DO I=1,LRZMAX 
+        DO I=1,LRZMAX !In CQLP lrzmax=1; Should not be plotting any of these
            RLRZAP12(I)=tr2(i) !=curr(k,l)/3.e9  [A/cm^2], transp=enabled
         ENDDO
         CALL PGLINE(lrzmax,RLRZAP1(1),RLRZAP12(1))
         CALL PGSLS(3) ! dash-dot-dash
         CALL PGSLW(lnwidth)  ! thin line
         CALL PGSCI(1) ! black color
-        DO I=1,LRZMAX
+        DO I=1,LRZMAX !In CQLP lrzmax=1; Should not be plotting any of these
            RLRZAP13(I)=tr3(i) !=curr(k,l)/3.e9  [A/cm^2], transp=enabled
         ENDDO
         CALL PGLINE(lrzmax,RLRZAP1(1),RLRZAP13(1))
@@ -704,17 +882,16 @@ c
           write(t_,3051) lrindx(1),rz(lrindx(1))/radmin
         CALL PGMTXT('T',R42,R40,R40,t_)
  
-
-
-
-
-            do 551 ll=1,lsmax
-              tr1s(ll)=pcurr(nch(ll),k,ll)
-              tr2s(ll)=psis(ll)*pcurr(nch(1),k,1)
+            do 551 ll=1,lrors !YuP[2021-03] was 1,lsmax
+              tr1s(ll)=pcurr(nch(ll),k,ll) !YuP: Now over FPE grid
+               !YuP[2021-03]: pcurr is defined over FPE grid (lrors),
+               !which can be shorter than lsmax grid.
+               !psis(0:lrors) is used over FPE grid. Adjusted:
+              tr2s(ll)=psis(ll)*pcurr(nch(1),k,1) !YuP[2021-03]
  551        continue
-            ilsmx=lsmax
+            ilsmx=ls !YuP[2021-03] was lsmax ;  Need FPE grid here
             if (sbdry .eq. "periodic") then
-              ilsmx=lsmax+1
+              ilsmx=ls+1  !YuP[2021-03] was lsmax+1
               tr1s(ilsmx)=tr1s(1)
               tr2s(ilsmx)=tr2s(1)
             endif
@@ -728,8 +905,8 @@ c
             if(fmax.gt.0.) fmax=fmax*1.05 ! extend the upper range
 
 
-        DO I=1,LSMAX
-           RLRORSA(I)=z(i,lrindx(1))
+        DO I=1,lrors !YuP[2021-03] was 1,lsmax (was full grid; now FPE grid)
+           RLRORSA(I)=z(lsindx(i),lrindx(1)) !YuP[2021-03] Now over FPE grid
            RLRORSA1(I)=tr1s(i)
            RLRORSA2(I)=tr2s(i)
         ENDDO
@@ -738,11 +915,11 @@ c
         IF ( RPG2-RPG1 .le. 1.e-16 ) THEN ! YuP [02-23-2016]
            RPG2= RPG1+1.e-16
         ENDIF
-        CALL PGSWIN(RLRORSA(1),RLRORSA(LSMAX),RPG1,RPG2)
+        CALL PGSWIN(RLRORSA(1),RLRORSA(lrors),RPG1,RPG2) !YuP[2021]Now FPE grid
         CALL PGBOX('BCNST',R40,0,'BCNST',R40,0)
-        CALL PGLINE(lsmax,RLRORSA(1),RLRORSA1(1))
+        CALL PGLINE(lrors,RLRORSA(1),RLRORSA1(1)) !YuP[2021-03]Now over FPE grid
         CALL PGSLS(2)
-        CALL PGLINE(lsmax,RLRORSA(1),RLRORSA2(1))
+        CALL PGLINE(lrors,RLRORSA(1),RLRORSA2(1)) !YuP[2021-03]Now over FPE grid
         CALL PGSLS(1)
         write(t_,4051)
         CALL PGLAB(t_,'Curr Den (A/cm\u2\d',' ')
@@ -804,40 +981,42 @@ c
           if(syncrad.ne."disabled" .and. k.eq.kelecg) then
              
             CALL PGPAGE
-            CALL PGSVP(RR4P2,R4P8,R4P2,R4P6)            
+            CALL PGSVP(R4P2,R4P8,R4P2,R4P6)            
             CALL PGSAVE
             CALL PGSCH(R41P44)
-            CALL PGMTXT('T',R46,R4P5,R4P5,
-     +           'LOCAL RF POWER (WATTS per CC)')
+!            CALL PGMTXT('T',R46,R4P5,R4P5,
+!     +           'LOCAL RF POWER (WATTS per CC)')
             CALL PGUNSA
             write(t_,3002) k,kspeci(1,k),kspeci(2,k),n
             CALL PGMTXT('T',R43,R40,R40,t_)
-            write(t_,6004) psynct
- 6004       format(";","synchrotron radiated power =",e16.6," Watts")
+            write(t_,6004) psynct !Note: psynct=SUM_ll[dvol(ll)*psyncz(ll)]
+ 6004       format("Synchrotron radiated power =",1pe16.6," Watts")
             CALL  PGMTXT('T',R42,R40,R40,t_)
             
             do 79 ll=1,lrzmax
- 79            tr1(ll)=psyncz(ll)
-            fmin=0.
-            fmax=0.
+ 79            tr1(ll)=psyncz(ll) 
+            !Note: psyncz(lr_)=entr(kelecg,11,l_), see coefsyad(k),synchrad
+            fmin=0.d0
+            fmax=0.d0
             call aminmx(tr1(1),1,lrzmax,1,fmin,fmax,kmin,kmax)
-            if (fmin .ge. fmax) fmin=fmax-.1*abs(fmax)-1.e+1
-            if(fmax.gt.0.) fmax=fmax*1.05 ! extend the upper range
-               
+            !if (fmin .ge. fmax) fmin=fmax-.1*abs(fmax)-1.e+1
+            !if(fmax.gt.0.) fmax=fmax*1.05 ! extend the upper range
+            fmin= fmin-0.1*(fmax-fmin)
+            fmax= fmax+0.1*(fmax-fmin)
             DO I=1,LRZMAX
-               RLRZAP1(I)=tr(i)
+               RLRZAP1(I)=sngl(tr(i))
             ENDDO
             RPG1=fmin
             RPG2=fmax
-            IF ( RPG2-RPG1 .le. 1.e-16 ) THEN ! YuP [02-23-2016]
-               RPG2= RPG1+1.e-16
+            IF ( RPG2-RPG1 .le. 1.e-8 ) THEN ! YuP [02-23-2016]
+               RPG2= RPG1+1.e-8
             ENDIF
             CALL PGSWIN(RLRZAP1(1),RLRZAP1(lrzmax),RPG1,RPG2)
             CALL PGBOX('BCNST',R40,0,'BCNST',R40,0)
             DO I=1,LRZMAX
-               RLRZAP11(I)=tr1(i)
+               RLRZAP11(I)=sngl(tr1(i))
             ENDDO
-            CALL PGLINE(lrzmax,RLRZAP1(1),RLRZAP11(1))
+            CALL PGLINE(lrzmax,RLRZAP1(1:lrzmax),RLRZAP11(1:lrzmax))
             CALL PGLAB('Radius','Synch Power (W/cm\u3\d)',' ')
                
           endif ! syncrad.ne."disabled" .and. k.eq.kelecg
@@ -860,27 +1039,19 @@ c
  8001          format("Fusion reaction number ",i3)
                CALL PGMTXT('T',R46,R40,R40,t_)
                if (lsig.eq.1) then
-                  write(t_,*) "d+t=>alpha(3.5MeV)+n(14.1MeV)"
+                  write(t_,*) "D+T => alpha(3.5MeV)+n(14.1MeV)"
                elseif (lsig.eq.2) then
-                  write(t_,*) "d+he3=>alpha(3.6MeV)+p(14.7MeV)"
+                  write(t_,*) "D+He3 => alpha(3.6MeV)+p(14.7MeV)"
                elseif (lsig.eq.3) then
-                  write(t_,*) "d+d=>t(1.01Mev)+p(3.02MeV)"
+                  write(t_,*) "D+D => T(1.01Mev)+p(3.02MeV)"
                elseif (lsig.eq.4) then
-                  write(t_,*) "d+d=>he3(.82MeV)+n(2.45MeV)"
+                  write(t_,*) "D+D => He3(.82MeV)+n(2.45MeV)"
                endif
                CALL PGMTXT('T',R45,R40,R40,t_)
           
                write(t_,8002) fuspwrvt(lsig)
- 8002          format("fusion power =",1pe16.6," Watts")
-               CALL PGMTXT('T',R43,R40,R40,t_)
-
-cBH120314:  Have removed the isigsgv2 option and references to it, since
-cBH120314:  this functionality appears to have no physical use.
-cBH120314               if (isigsgv2.eq.1) then
-cBH120314                  write(t_,8003) fuspwrmt(lsig)
-cBH120314 8003           format("fusion power(equiv. Maxwln) =",1pe16.6," Watts")
-cBH120314                  CALL PGMTXT('T',R42,R40,R40,t_)
-cBH120314               endif                          
+ 8002          format("Fusion power(from all r.h.s.)=",1pe16.6," Watts")
+               CALL PGMTXT('T',R44,R40,R40,t_)
              
                do 801 ll=1,lrzmax
                   tr1(ll)=fuspwrv(lsig,ll)
@@ -890,16 +1061,13 @@ cBH120314               endif
                fmin=0.
                fmax=0.
                call aminmx(tr1(1),1,lrzmax,1,fmin,fmax,kmin,kmax)
-cBH120314               if (isigsgv2.eq.1) then
-cBH120314                 call aminmx(tr2(1),1,lrzmax,1,fmin1,fmax1,kmin,kmax)
-cBH120314                 fmin=min(fmin,fmin1)
-cBH120314                 fmax=max(fmax,fmax1)
-cBH120314               endif
-               if (fmin .ge. fmax) fmin=fmax-.1*abs(fmax)-1.e+1
+               !YuP/was if (fmin .ge. fmax) fmin=fmax-.1*abs(fmax)-1.e+1
+               !YuP[2023-12-01] Use fmin=0. 
+               fmin=0. 
                if(fmax.gt.0.) fmax=fmax*1.05 ! extend the upper range
             
                DO I=1,LRZMAX
-                  RLRZAP1(I)=tr(i)
+                  RLRZAP1(I)=tr(i) !rho
                ENDDO
                RPG1=fmin
                RPG2=fmax
@@ -909,19 +1077,22 @@ cBH120314               endif
                CALL PGSWIN(RLRZAP1(1),RLRZAP1(lrzmax),RPG1,RPG2)
                CALL PGBOX('BCNST',R40,0,'BCNST',R40,0)
                DO I=1,LRZMAX
-                  RLRZAP11(I)=tr1(i)
+                  RLRZAP11(I)=tr1(i) !==fuspwrv(lsig,ll) 
+                  !(from sigf()*Energy_in_reaction_lsig*1.602e-13 !W/cc
                ENDDO
                CALL PGLINE(lrzmax,RLRZAP1(1),RLRZAP11(1))
-               CALL PGSLS(2)
+               CALL PGSLS(2) !2-> dashed
                DO I=1,LRZMAX
-                  RLRZAP12(I)=tr2(i)
+                  RLRZAP12(I)=tr2(i) !Similar to tr1, but based
+                  !on Maxwellian D and T
                ENDDO
                CALL PGLINE(lrzmax,RLRZAP1(1),RLRZAP12(1))
-               CALL PGSLS(1)
+               CALL PGSLS(1) !1 - solid line
                CALL PGSAVE
                CALL PGSCH(R41P44)
                CALL PGLAB(t_,'Fusion Power (W/cm/u3/d',' ')
-               CALL PGUNSA        
+               CALL PGUNSA     !-- Done with radial profile.   
+               
 c...           mnt  Generate time-dependent plot of total fusion rates
                CALL PGPAGE
                CALL PGSVP(R4P2,R4P8,R4P2,R4P5)
@@ -993,5 +1164,6 @@ cBH120314               endif
 c     endif n>0, before 500 loop
       endif
 
+      CALL PGSCH(R41) ! restore to default font size      
       return
       end subroutine tdpltmne

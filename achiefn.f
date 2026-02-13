@@ -90,17 +90,22 @@ CMPIINSERT_IF_RANK_EQ_MPIWORKER
       !YuP[2020-02-06] Moved call_sourcee into MPI (at each ll index)
       !Determine particle sources...
 !YuP[2020-02-11] no need in n.ne.1   if (n.ne.1 .and. nefiter.eq.1) call sourcee
-      if (nefiter.eq.1) call sourcee
-        if (ioutput(1).ge.2) then !YuP[2020] diagnostic printout
-!         write(*,*)'achief[89/kopt0]sourcee: xlncur(1,lr_)=',
-!     +    n,xlncur(1,lr_)
-        endif
+      if (nefiter.eq.1) then
+        !call sourcee !before [2022-02-11]
+        if (l_ .eq. lmdpln_) call sourcee !after[2022-02-11]
+      endif
+!        if (ioutput(1).ge.2) then !YuP[2020] diagnostic printout
+!         write(*,*)'achief[89/kopt0]sourcee: xlncur(1,l_)=',
+!     +    n,xlncur(1,l_)
+!        endif
       ! Note: at n=0 sourcee is called from ainitial
       ! First call to achiefn is with n=0, then advanced in tdchief.
       !generate collisional F.P. coefficients...
        call cfpcoefc ! time-consuming calculations
       !call implicit time advancement routine if implct.eq."enabled"
+      !write(*,*)'achiefn before impavnc0',l_
       if (implct .eq. "enabled") call impavnc0(kopt)
+      !write(*,*)'achiefn aft impavnc0',l_
 CMPIINSERT_ENDIF_RANK
 
 c...........................................................
@@ -143,8 +148,8 @@ CMPIINSERT_IF_RANK_EQ_MPIWORKER
 !YuP[2020-02-11] no need in n.ne.1  if (n.ne.1 .and.(it_ampf.eq.1)) call sourcee !determine particle sources..(sourceko)
         if (it_ampf.eq.1) call sourcee !determine particle sources..(sourceko)
         !YuP[2020-01] Added (it_ampf.eq.1): Reuse sources from 1st iteration.
-!         write(*,*)'achief[139/kopt3]sourcee: xlncur(1,lr_)=',
-!     +    n,xlncur(1,lr_)
+!         write(*,*)'achief[139/kopt3]sourcee: xlncur(1,l_)=',
+!     +    n,xlncur(1,l_)
         ! Note: at n=0 sourcee is called from ainitial
         ! First call to achiefn is with n=0, then advanced in tdchief.
         ! MPI is in ll index.
@@ -173,8 +178,14 @@ c     Diagnostics ONLY COMPUTED for cases where transport
 c     is not considered (transp="disabled")
 c..................................................
 
-      if (transp.eq."disabled" .or. 
-     +  (cqlpmod.eq."enabled".and.n.ge.nontran)) then
+!YuP/was      if (transp.eq."disabled" .or. 
+!YuP/was     +  (cqlpmod.eq."enabled".and.n.ge.nontran)) then
+      if (transp.eq."disabled") then
+        !YuP[2021-03-12]Why special treatment of CQLP here?
+        !The problem is : In CQLP, when transp='enable',
+        !subr.ntdstore is called twice - here and in tdchief[line~1003].
+        !Then, nch(l_)=nch(l_)+1 in ntdstore is advanced at double pace.
+        !Commenting  .or.(cqlpmod.eq."enabled".and.n.ge.nontran)
         call diaggnde
 c..................................................
 c     Compute plasma resistivity for electron runs..
@@ -208,11 +219,13 @@ c..................................................
          enddo
       endif
 
-      if (lrzmax.eq.1) then
-        if (n.eq.nstop .or. iplot.ne.0) call tdoutput(2)
-        if (n.eq.nstop .or. iplot.ne.0) call pltmain
+      !YuP was: if (lrzmax.eq.1) then
+      if (lrzmax.eq.1 .and.(cqlpmod.ne."enabled") ) then
+         !YuP[2021-02-26] added (cqlpmod.ne."enabled")
+        if (n.eq.nstop .or. iplot.ne.0) call tdoutput(2) !here: lrzmax=1
+        if (n.eq.nstop .or. iplot.ne.0) call pltmain !here: lrzmax=1
         if (n.eq.nstop.and.pltra.eq."enabled") then
-           call pltrun
+           call pltrun  !here: lrzmax=1
         endif
 ccc        if (netcdfnm.ne."disabled" .and. nstop.ne.0) then
 ccc           call netcdfrw2(1) !YuP: Why here? Also called from tdchief
@@ -235,15 +248,18 @@ c..................................................
 c     plotting (and netcdf store) logic for 3-D code ..
 c     Used if transp="disabled".
 c..................................................
-      if (transp .eq. "disabled" .and. noplots.ne."enabled1") then
-c$$$      if (transp .eq. "disabled") then
-         if (lrzmax.gt.1) then
+      if (transp.eq."disabled" .and. noplots.ne."enabled1") then
+         if ((lrzmax.gt.1).or.(cqlpmod.eq."enabled")) then
+         !YuP[2021-03-03] added .or.(cqlpmod.eq."enabled")
+         !For CQLP, lrzmax is set to 1, but ls (where FPE is solved) is not 1
             if (n.ge.nstop) then
-               call pltmain
-               call netcdfmain
-               go to 999 !-> return/end
+              call pltmain !here:(lrzmax.gt.1)or(cqlpmod.eq."enabled"), nstop
+              call netcdfmain
+              go to 999 !-> return/end
             endif
-            if (iplot.ne.0) call pltmain
+            if (iplot.ne.0) then ! iplot>0 when n=nplot(i) for some i
+              call pltmain !here (lrzmax.gt.1)or(cqlpmod.eq."enabled"), n<nstop
+            endif
          endif
       endif
       

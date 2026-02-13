@@ -39,6 +39,14 @@ c.......................................................................
       call bcast(svtab,zero,SIZE(svtab))
       call bcast(tamm1,zero,SIZE(tamm1))
       call ibcast(iind,0,SIZE(iind))
+      
+      !YuP[2021-03-18] Added more pointers over lrors FPE grid.
+      !(Previously, these were statically dimensioned in comm.h). 
+      allocate(sigm(4,lrors),STAT=istat)
+      allocate(sigf(4,lrors),STAT=istat)
+      allocate(fuspwrv(4,lrors),STAT=istat)
+      allocate(fuspwrm(4,lrors),STAT=istat)
+      !YuP[2021-03-18] Need to check usage of these 4 arrays: change lr_ to l_ ?
 
       write(*,*)'sigalloc:  Leaving sigalloc'
 

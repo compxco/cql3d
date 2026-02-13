@@ -24,7 +24,10 @@ c..................................................................
           sem2(k,m)=sem2z(k,m,lr_)
           sthm1(k,m)=sthm1z(k,m,lr_)
           scm2(k,m)=scm2z(k,m,lr_)
-          szm1(k,m)=szm1z(k,m,lr_)
+          szm1(k,m)=szm1z(k,m,lr_) 
+          !for facz=exp(-(zl-zm1(kk,m,lr_))**2/zm2(kk,m,lr_))
+          !where zm1=zmax(lr_)*szm1(k,m)
+          !      zm2=(zmax(lr_)*szm2(k,m))**2
           szm2(k,m)=szm2z(k,m,lr_)
           asor(k,m,lr_)=asorz(k,m,lr_)
  3      continue

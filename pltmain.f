@@ -12,13 +12,17 @@ c     using PGPLOT + GRAFLIBtoPGPLOT.f routines (put in pltmain.f).
 c
       include 'param.h'
       include 'comm.h'
+CMPIINSERT_INCLUDE
+
       REAL*4 RILIN
       REAL*4 :: R40=0.,R41=1.
+      REAL*4 :: R4P2=.2,R4P8=.8,R4P6=.6,R4P9=.9 !.2,.8,.6,.9
       
-CMPIINSERT_INCLUDE
 
 CMPIINSERT_IF_RANK_NE_0_RETURN
  ! make plots on mpirank.eq.0 only
+ 
+      data isouplt/0/, idrrplt/0/ !for logic control
       
       if (noplots.eq."enabled1") return
       if (n.eq.0 .and. lrzmax.gt.1) return
@@ -31,13 +35,14 @@ CMPIINSERT_IF_RANK_NE_0_RETURN
       if (pltend.eq."last" .and. n.lt.nstop) goto 10
 
       CALL PGPAGE
+      CALL PGSVP(R4P2,R4P8,R4P2,R4P8) !(XLEFT,XRIGHT,YBOT,YTOP)!YuP[2021-01-18]
       CALL PGSCH(R41) ! restore to default font size
       !(sometimes font is too big from previous plot)
 
       RILIN=0.
       if (cqlpmod .ne. "enabled") then
          CALL PGMTXT('T',-RILIN,R40,R40,"LOCAL RADIAL QUANTITIES")
-      else 
+      else ! (cqlpmod.eq."enabled")
          CALL PGMTXT('T',-RILIN,R40,R40,"LOCAL PARALLEL QUANTITIES")
       endif
       RILIN=RILIN+1.
@@ -48,6 +53,11 @@ CMPIINSERT_IF_RANK_NE_0_RETURN
       write(t_,1501) lr_,lrz
       RILIN=RILIN+1.
       CALL PGMTXT('T',-RILIN,R40,R40,t_)
+      if(cqlpmod.eq."enabled") then !YuP[2021-03-02] Add line with l_ info
+        write(t_,1502) l_,sz(l_)
+        RILIN=RILIN+1.
+        CALL PGMTXT('T',-RILIN,R40,R40,t_)
+      endif
       write(t_,151) rovera(lr_),rr
       RILIN=RILIN+1.
       CALL PGMTXT('T',-RILIN,R40,R40,t_)
@@ -56,19 +66,25 @@ CMPIINSERT_IF_RANK_NE_0_RETURN
       CALL PGMTXT('T',-RILIN,R40,R40,t_)
  150  format("time step n=",i5,","5x,"time=",1pe12.4," secs")
  1501 format("flux surf=",i3,5x,"total flux surfs=",i3)
+ 1502 format("point on B, l=",i4,4x,"Parallel position s=",1pe14.6,"cm")
  151  format("r/a=",1pe10.3,5x,"radial position (R)=",1pe12.4," cms")
  153  format("rya=",1pe10.3,5x,"R=rpcon=",1pe10.3," cm")
  
-      if (cqlpmod .eq. "enabled") then
+      if (cqlpmod.eq."enabled") then
         write(t_,152) l_,sz(l_)
         RILIN=RILIN+1.
         CALL PGMTXT('T',-RILIN,R40,R40,t_)
- 152    format("orbit at s(",i5,") = ",1pe10.2)
+ 152    format("orbit at s(",i5,") = ",1pe10.2,"cm")
       endif
 
       vnormdc=vnorm/clight
-      vtedc=vthe(lr_)/clight
-      vtdvnorm=vthe(lr_)/vnorm
+      if(cqlpmod .ne. "enabled")then
+        vtedc=vthe(lr_)/clight
+        vtdvnorm=vthe(lr_)/vnorm
+      else !(cqlpmod.eq."enabled") ! YuP[2021-02-26]
+        vtedc=   vthpar(kelec,ls_)/clight
+        vtdvnorm=vthpar(kelec,ls_)/vnorm
+      endif
       if (tandem.eq."enabled") then ! YuP[08-2017] added, 
         ! for the case of ngen=2 tandem i+e runs:
         !In this case, enorm=enorme
@@ -90,29 +106,39 @@ CMPIINSERT_IF_RANK_NE_0_RETURN
         RILIN=RILIN+1.
         CALL PGMTXT('T',-RILIN,R40,R40,t_)
       do k=1,ntotal
-         vtdvnorm= vth(k,lr_)/vnorm
+         if(cqlpmod .ne. "enabled")then
+          vth_l= vth(k,lr_)
+         else !(cqlpmod.eq."enabled") ! YuP[2021-02-26]
+          vth_l= vthpar(k,ls_)
+         endif
+         vtdvnorm= vth_l/vnorm
          !YuP/note: For time-dependent profiles, 
          ! temp() can evolve in time, and so vth(k,*) can evolve, too.
          ! See profiles.f.
-         write(t_,'(a,i2,a,f15.7)') "k=",k, "  vth(k)/vnorm =", vtdvnorm
+         write(t_,'(a,i2,a,f15.7)') "k=",k, "  vth(k)/unorm =", vtdvnorm
          RILIN=RILIN+1.
          CALL PGMTXT('T',-RILIN,R40,R40,t_)
       enddo
 
  160  format("enorm (kev) = ",f11.3)
- 161  format("vnorm/c = ",f15.7)
- 162  format("vthe (sqrt(te/me))/c = ",f15.7)
- 163  format("vthe/vnorm = ",f15.7)
+ 161  format("unorm/c = ",f15.7)
+ 162  format("vthe (sqrt(Te/me))/c = ",f15.7)
+ 163  format("vthe/unorm = ",f15.7)
  
-      if (cqlpmod .eq. "enabled") then
-        zvthes=vth(kelec,l_)/clight
-        zvtheon=vth(kelec,l_)/vnorm
+      if (cqlpmod.eq."enabled") then
+        !YuP: Wrong? zvthes=vth(kelec,l_)/clight  
+        !YuP: Wrong? zvtheon=vth(kelec,l_)/vnorm
+        !YuP: vth() is a func of lr_, not l_ !!!
+        !YuP: We need to use vthpar !!!
+        vth_l= vthpar(kelec,ls_) !YuP[2021-03]
+        zvthes=  vth_l/clight    !YuP[2021-03]
+        zvtheon= vth_l/vnorm     !YuP[2021-03]
         write(t_,164) zvthes
         write(t_,165) zvtheon
         RILIN=RILIN+1.
         CALL PGMTXT('T',-RILIN,R40,R40,t_)
- 164    format(";","vthe(s) (sqrt(te/me))/c = ",f15.7)
- 165    format("vthe(s)/vnorm = ",f15.7)
+ 164    format(";","vthe(s) (sqrt(Te/me))/c = ",f15.7)
+ 165    format("vthe(s)/unorm = ",f15.7)
       endif
 
       ncplt=ncplt+1
@@ -123,23 +149,45 @@ c     time
 c
       !write(*,*)'------1 pltmain. n,l_=',n,l_
       if (pltend.ne."disabled" .and. nch(l_).ge.2) then
-        if (cqlpmod .ne. "enabled") call pltendn
-        if (cqlpmod .eq. "enabled") call pltends
+        if (cqlpmod.ne."enabled") call pltendn
+        if (cqlpmod.eq."enabled") call pltends
       endif
       !write(*,*)'------2 pltmain. n,l_=',n,l_
 c
 c     Plot ion source if marker is engaged.
 c
-      isouplt=0
-      if (pltso.eq."enabled" .or. pltso.eq."color") then
-        call souplt
+      !isouplt=0 !YuP[2021-08] changed to data isouplt/0/
+      if (pltso.eq."enabled" .or. pltso.eq."color".and.
+     +         n.ge.nonso(1,1) .and. n .le. noffso(1,1)) then
+        call souplt !At time steps within [nonso;noffso]
+                    !selected by nplot=*** setting
       elseif ( (pltso.eq."first" .or. pltso.eq."first_cl") .and.
      +         isouplt.eq.0 .and.
      +         n.ge.nonso(1,1) .and. n .le. noffso(1,1)) then
-        call souplt
+        call souplt !One time only
         isouplt=1
       endif
       !write(*,*)'------3 pltmain. n,l_=',n,l_
+           
+c
+c     Plot Drr(i,j) (radial diff.coeff from d_rr array) !YuP[2021-08]
+c
+      if(cqlpmod.ne."enabled")then !plot Drr - For CQL3D only
+      if(transp.eq."enabled")then 
+        !idrrplt=0 !See data idrrplt/0/ above.
+        if (pltdrr.eq."enabled" .or. pltdrr.eq."color" .and.
+     +           n.ge.nontran .and. n.le.nofftran) then
+          call drrplt !at time steps within [nontran;nofftran]
+                      !selected by nplot=*** setting
+        elseif ( (pltdrr.eq."first" .or. pltdrr.eq."first_cl") .and.
+     +           idrrplt.eq.0 .and.
+     +           n.ge.nontran) then
+          call drrplt !One time only
+          idrrplt=1 !inhibits from further calls
+        endif
+      endif !transp
+      endif
+            
 c
 c     Plot electron resistivity and related quantities.
 c
@@ -219,6 +267,7 @@ c
       if (pltstrm.ne."disabled" .and. n.ge.1) call pltstrml
       !write(*,*)'LEAVING pltmain. n,l_=',n,l_
       
+      CALL PGSCH(R41) ! restore to default font size      
       return
       end subroutine pltmain
 

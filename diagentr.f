@@ -88,7 +88,8 @@ c..................................................................
 
       if (lefct.eq.-1) then
         do 98 j=1,jx
-          do 97 i=1,iy
+          do 97 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
+            !Note that for meshy="fixed_mu" iy_(l_) can be less than iy
             da(i,j)=eal(i,j,k,1,l_)
             db(i,j)=ebl(i,j,k,1,l_)
             dc(i,j)=0.
@@ -98,7 +99,8 @@ c..................................................................
 
       elseif (lefct.eq.0) then
         do 101 j=1,jx
-          do 102 i=1,iy
+          do 102 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
+            !Note that for meshy="fixed_mu" iy_(l_) can be less than iy
             da(i,j)=eal(i,j,k,2,l_)
             db(i,j)=ebl(i,j,k,2,l_)
             dc(i,j)=0.
@@ -109,7 +111,8 @@ c..................................................................
       elseif (lefct.eq.1) then
         if (colmodl .eq. 1) go to 3000
         do 103 j=1,jx
-          do 1031 i=1,iy
+          do 1031 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
+            !Note that for meshy="fixed_mu" iy_(l_) can be less than iy
 !            da(i,j)=(1d0+0.5/(j+1)**2)*   !Kerbel Correction!
 !     1              cal(i,j,k,l_)-(eal(i,j,k,1,l_)+eal(i,j,k,2,l_))
             da(i,j)=cal(i,j,k,l_)-(eal(i,j,k,1,l_)+eal(i,j,k,2,l_))
@@ -155,8 +158,14 @@ c..................................................................
       elseif (lefct.eq.5) then
         if (n .lt. nonso(k,1) .or. n .gt. noffso(k,1)) go to 3000
         call bcast(tam1,zero,jx)
-        call dcopy(iyjx2,source(0,0,k,indxlr_),1,so,1)
-        do 99 i=1,iy
+        !call dcopy(iyjx2,source(0,0,k,indxlr_),1,so,1)!before[2022-02-11]
+        if (l_ .eq. lmdpln_) then !For CQLP, source is set at l_=1 only
+          call dcopy(iyjx2,source(0,0,k,l_),1,so,1) !after[2022-02-11]
+        else
+          so=0.d0
+        endif
+        do 99 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
+          !Note that for meshy="fixed_mu" iy_(l_) can be less than iy
           do 100 j=1,jx
             tam1(j)=tam1(j)+so(i,j)*cynt2(i,l_)*vptb(i,lr_)
  100      continue
@@ -176,13 +185,15 @@ c..................................................................
         endif
         call coefload(k)
         do 108 j=1,jx
-          do 109 i=1,iy
+          do 109 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
+            !Note that for meshy="fixed_mu" iy_(l_) can be less than iy
             temp1(i,j)=1./taulos(i,j,indxlr_)
  109      continue
  108    continue
  105    continue
         call bcast(tam1,zero,jx)
-        do 106 i=1,iy
+        do 106 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
+          !Note that for meshy="fixed_mu" iy_(l_) can be less than iy
           do 107 j=1,jx
             tam1(j)=tam1(j)-f(i,j,k,l_)*temp1(i,j)
      1        *vptb(i,lr_)*cynt2(i,l_)
@@ -202,7 +213,8 @@ c..................................................................
 
       elseif (lefct.eq.9) then
         call bcast(tam1,zero,jx)
-        do 112 i=1,iy
+        do 112 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
+          !Note that for meshy="fixed_mu" iy_(l_) can be less than iy
           do 113 j=1,jx
             tam1(j)=tam1(j)+vptb(i,lr_)*(f(i,j,k,l_)
      1        -f_(i,j,k,l_))*cynt2(i,l_)
@@ -242,11 +254,10 @@ c..................................................................
 c..................................................................
 c     Redefine the coefficients at the j+1/2 mesh points
 c..................................................................
-
       call coefmidv(da,1)
       call coefmidv(db,2)
       call coefmidv(dc,3)
-
+      
 c..................................................................
 c     If splitting scheme was utilized..
 c..................................................................
@@ -260,7 +271,8 @@ c     Collisional or RF powers, from fluxes
 c..................................................................
 
       !YuP: this (i,j)-loop is the main "drain" for cpu time
-      do 1001 i=1,iy 
+      do 1001 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
+        !Note that for meshy="fixed_mu" iy_(l_) can be less than iy 
         !09-09-2015 checked: almost no change when skipping i=1 and i=iy
         s_cynt2=cynt2(i,l_)
         if (cqlpmod .ne. "enabled") then
@@ -290,6 +302,11 @@ c..................................................................
       do 1004 j=1,jx-1
         tott=tott+tam1(j)*tcsgm1(j)  !tcsgm1=2*(clight/vnorm)**2*(gamma-1)
  1004 continue
+ 
+!      if(l_.eq.1 .or. l_.eq.10)then ! pol.index 1 and 10
+!      if(lefct.eq.-1) write(*,'(a,i3,e11.3)')
+!     &               'entr(-1)[Maxw_e]: l_,tott=',l_,tott
+!      endif
       
 c..................................................................
 c     Above collisional calc uses power=integral du**3*energy*df/dt.
@@ -391,7 +408,9 @@ c            write(*,*)'diagentr: entrintr(k,llefct)',entrintr(k,llefct)
             do ll=1,lrz
 cBH050616:  Added if statement since above zeroing of entrintr 
 cBH050616:  is not working?
-               if(ll.eq.1) entrintr(k,llefct)=0.0
+               !YuP/commented: if(ll.eq.1) entrintr(k,llefct)=0.0
+               !YuP[2023-01-03] It seems the issue is resolved after 
+               !making entrintr() a pointer (was - static allocation).
                lrr=lrindx(ll)
                entrintr(k,llefct)=entrintr(k,llefct)+
      1              entr(k,llefct,ll)*dvol(lrr)

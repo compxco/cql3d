@@ -422,10 +422,10 @@ c.......................................................................
         else  ! eqmod.ne.disabled
 
 
-          if ((psimag-psilim).le.0.0) stop 'psimag.lt.psilim in tdnpa0'
-          tr(0)=0.0
+          if ((psimag-psilim).le.zero) stop 'psimag.lt.psilim in tdnpa0'
+          tr(0)=zero
           do 160  l=1,lrzmax
- 160      tr(l)=psimag-psivalm(l)
+ 160      tr(l)=psimag-psivalm(l)  !Increases from 0. to psimag-psilim at edge.
           xx=xs_(1)
           yy=xs_(2)
           rr=sqrt(xx**2+yy**2)
@@ -444,7 +444,7 @@ c.......................................................................
 
           ppsi=terp2(rr,zz,nnr,er,nnz,ez,epsi,epsirr,epsizz,
      1      epsirz,nnra,0,0)
-          apsi=psimag-ppsi     !Increases from 0. to psimag at edge.
+          apsi=psimag-ppsi     !Increases from 0. to psimag-psilim at edge.
           apsi=max(apsi,zero)  !Sometimes there might be a small
                                !error in psimag causing a problem
                                !near the magnetic axis [BH, 121115].
@@ -463,6 +463,16 @@ CMPIINSERT_ENDIF_RANK
           endif
           if(((iongrid.eq.0).or.(ppsi.le.psilim)).and.
      +                                        istart.eq.1)  go to 100
+          !Correction, similar to YuP[2021-11-05] in tdsxr0:
+          !YuP[2023-08-10] Flaw in logic: assumes that the sightline
+          !enters plasma at psi=psilim surface, 
+          !which is outside of rya(lrzmax).
+          !The procedure below is checking
+          !where the point is relative to bracket [tr(lrz-1); tr(lrz)]
+          !while it is not there yet. As a result, 
+          !the value of ibin1+1 will exceed lrzmax.
+          !Temporary fixed it by adding a limit
+          !ibin1=min(ibin1,lrzmax)  [see below, after label 170]
 
           istart=0  ! in the plasma, i.e., no longer starting.
 
@@ -480,12 +490,12 @@ c.......................................................................
           if(ibin2.eq.2.or.ibin2.eq.4)  go to 180
 
 c.......................................................................
-c     ibin2 is equal to 1 or 3. Thus at previous step the bin disignator
+c     ibin2 is equal to 1 or 3. Thus at previous step the bin designator
 c     was in a decreasing mode.
 c     Check if in the same bin as previous step.
 c.......................................................................
 
-          rs1=apsi-tr(ibin1)
+          rs1=apsi-tr(ibin1)     !  ibin1 is initialized = lrzmax
           rs2=apsi-tr(ibin1-1)
           if(rs1*rs2.le.0..and.rs1.ne.zero)  go to 190
 
@@ -493,7 +503,7 @@ c.......................................................................
 c     Have changed bins.
 c.......................................................................
 
-          if(rs1.ge.0.)  go to 170
+          if(rs1.ge.zero)  go to 170  ! Changed to increasing mode
 c.......................................................................
 c     Continuing in decreasing mode.
 c.......................................................................
@@ -508,6 +518,13 @@ c.......................................................................
  170      ibin2=ibin2+1
           ibin1=ibin1+1
           iclass12=1 !cVT
+          !Correction, similar to YuP[2021-11-05] in tdsxr0:
+          ibin1=min(ibin1,lrzmax) !YuP[2023-08-10] added
+          if(ibin1.gt.lrzmax)then
+             write(*,*)' tdnpa0/170: rs1,rs2=',rs1,rs2, ibin1,ibin2
+             stop 'stop 170/ibin1>lrz in tdnpa0'
+          endif
+
           go to 190
 
 c.......................................................................
@@ -518,19 +535,21 @@ c.......................................................................
 
  180      rs1=apsi-tr(ibin1-1)
           rs2=apsi-tr(ibin1)
-          if(rs1*rs2.le.0..and.rs2.ne.zero)  go to 190
+          if(rs1*rs2.le.zero.and.rs2.ne.zero)  go to 190
 
 c.......................................................................
 c     Have changed bins
 c.......................................................................
 
-          if(rs1.lt.0.0)  go to 185
+          if(rs1.lt.zero)  go to 185
 
 c.......................................................................
-c     Continuing on is same direction
+c     Continuing on in same direction
 c.......................................................................
           ichangebin24=1 !cVT
           ibin1=ibin1+1
+          !Correction, similar to YuP[2021-11-05] in tdsxr0:
+          ibin1=min(ibin1,lrzmax) !YuP[2023-08-10] added
           if(ibin1.gt.lrzmax)  stop 'stop 5 in tdnpa0'
           go to 190
 
@@ -900,8 +919,12 @@ cBH100418:         eflux_npa(1,nn)=1.0
 cBH100418:      enddo
 
 c     iplt3d set in tdchief
+!YuP      if (iplt3d.ne.0 .or. n.eq.0 .or. n.eq.nstop 
+!YuP     +     .and. (iplotnbi.eq.'yes' .or. iplotsxr.eq.'yes')  ) then
+!YuP[2022-03-20] Removing iplotsxr.eq.'yes' 
+!YuP Looks like it got here by mistake. No handle to iplotsxr
       if (iplt3d.ne.0 .or. n.eq.0 .or. n.eq.nstop 
-     +     .and. iplotnbi.eq.'yes') then
+     +     .and. (iplotnbi.eq.'yes')  ) then
          call tdsxrplt(en_,eflux_npa,nen_npa,nenaa,
      +        efluxt,nv_npa,inegsxr,softxry,npa_diag,lnwidth)
 

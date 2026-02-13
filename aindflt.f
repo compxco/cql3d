@@ -33,7 +33,7 @@ c      pi=3.141592653589793d0
       nmods=nmodsa ! YuP-101220: should be mrfn, but not known yet
             
       nso=0
-      lz=lza
+      lz=40 !YuP[2021-04-14] was lz=lza .  lza is not used anymore
 
       ampfmod="disabled"
       ampfadd="neo+bscd" !YuP[2019-12-26] Added ampfadd; 
@@ -53,7 +53,7 @@ c      pi=3.141592653589793d0
       brfac1=0.
       brfacgm3=1.0
       isoucof=0
-      faccof=1.e0
+      faccof=1.d0
       bth=1000.
       btor=10000.
       chang="enabled"
@@ -76,18 +76,18 @@ c      pi=3.141592653589793d0
          enddo
       enddo
       difusr=1.d4
-      difus_rshape(1)=1.0
-      difus_rshape(2)=3.0
-      difus_rshape(3)=3.0
-      difus_rshape(4)=1.0
-      difus_rshape(5)=-1.0
-      difus_rshape(6)=0.0
-      difus_rshape(7)=0.0
-      difus_rshape(8)=0.0
-      difus_vshape(1)=0.
-      difus_vshape(2)=0.
-      difus_vshape(3)=0.
-      difus_vshape(4)=0.
+      difus_rshape(1)=1.d0
+      difus_rshape(2)=3.d0
+      difus_rshape(3)=3.d0
+      difus_rshape(4)=1.d0
+      difus_rshape(5)=-1.d0
+      difus_rshape(6)=0.d0
+      difus_rshape(7)=0.d0
+      difus_rshape(8)=0.d0
+      difus_vshape(1)=0.d0
+      difus_vshape(2)=0.d0
+      difus_vshape(3)=0.d0
+      difus_vshape(4)=0.d0  !==c4, For 1/gamma^c4 dependence
       droptol=0.001d0
       dtr=5.d0
       dtr0=dtr
@@ -102,7 +102,7 @@ c      pi=3.141592653589793d0
       efrelax=0.5
       efrelax1=0.5 !0.8
       efrelax_exp=1.d0 !YuP[2020-04-03] For generalized procedure in efswtch="method4"
-      elpar0=0.
+      elpar0=0.d0
       eoved=-.01
       enorm=200.
       enorme=enorm
@@ -111,14 +111,16 @@ c      pi=3.141592653589793d0
       eqmodel="power"
       eseswtch="disabled"
       f4d_out="disabled"
-      gamaset=0.
+      f3d_out="disabled"
+      f3d_format="ascii"
+      gamaset=0.d0
       gamafac="disabled"
       !--------------------------------------------------------------
       !YuP[2019-07-31]-[2019-09] Added new namelist var:
       !Impurity type, which can be in many ionization states,
       ! depending on plasma electron temperature, etc.
       adpak='enabled' ! To use ADPAK tables (alternatively, use ADCDO)
-      imp_type=6 !for gamafac="hesslow". 1-He,2-Be,3-C,4-N,5-Ne,6-Ar,7-Xe,8-W
+      imp_type=6 !for gamafac="hesslow". 1-He,2-Be,3-C,4-N,5-Ne,6-Ar,7-Xe,8-W,9->B
       ! For ADPAK subroutines/tables, need values of neutral D0.
       model_dens_nD0=1  ! Only one model so far for neutral D0. 
       dens_nD0_b=1.0d10 ! 1/cm^3 ! Edge density of neutral D0
@@ -303,23 +305,27 @@ c      pi=3.141592653589793d0
       ! Can be extended to coupling with other codes.)
       read_data="disabled" !Other possible values: 'nimrod', for now.
       ! Set default names for data files. They are declared as
-      !character*128, dimension(101) :: read_data_filenames !list of files
-      ! Max number of files is 101, for now. 
+      !character*128, dimension(1000) :: read_data_filenames !list of files
+      ! Max number of files is 1000, for now. 
       ! For coupling with NIMROD, each file contains data at one time slice.
       ! Therefore, it is recommended to match the max number of files
       ! with value of nbctimea [set in param.h]
       do i=1,size(read_data_filenames)
          read_data_filenames(i)="notset"
-         !write(*,*) TRIM(read_data_filenames(i))
       enddo
+      read_data_filenames_prefix="notset" !YuP[2021-04-06]
+      read_data_filenames_suffix="notset" !YuP[2021-04-06]
       temp_min_data=5.d-3 ![keV] Lower limit, to adjust Te and Ti data
+      elecfld_data= "jspitzer" ![2022-07]'jspitzer' or 'readdata'
       !-----------------------------------------------------------------    
       
       gsla=270.
       ephicc=0.
       gslb=35.
       jhirsh=0
-      kfrsou=0
+      do ib=1,kb  ! kb is max number of nbeams (parameter in param.h)
+         kfrsou(ib)=0
+      enddo
       lbdry0="enabled"
       sbdry="bounded"
       scheck="enabled"
@@ -510,6 +516,9 @@ c**   while CQL3D uses [Gauss, cm]. Need to specify input values:
       advectr=1.0
       adimeth="disabled"
       nonadi= 5
+      drr_scale=1.d0 !YuP[2021-08] added (used in case of read_data='nimrod')
+      pltdrr="first" !Added/YuP[2021-08] Plots of Drr(i,j) at n=nontran
+      
       updown="symmetry"
 
       rdcmod="disabled"
@@ -668,7 +677,7 @@ CDIR$ NEXTSCALAR
             fpld(i,k)=0.
  8       continue
          fpld(7,k)=0.
-         fpld(8,k)=1.e10
+         fpld(8,k)=1.d10  !YuP[2022-12] was 1.e10
          fpld(9,k)=0.
          fpld(10,k)=pi
          do ll=1,lrza
@@ -720,10 +729,10 @@ CDIR$ NEXTSCALAR
            reden(k,ll)=1.
            temp(k,ll)=1.
         enddo
-        do ll=2,lza+1
+        do ll=2,lsa+1
           if (cqlpmod .ne. "enabled") then
-            denpar(k,ll)=1.
-            temppar(k,ll)=1.
+            denpar(k,ll)=1.  !Only used for CQLP
+            temppar(k,ll)=1. !Only used for CQLP
           endif
         enddo
  21   continue
@@ -744,8 +753,8 @@ c..................................................................
       iprocur="parabola"
       tmdmeth="method1"
       njene=0
-      njte=njene
-      njti=njene
+      njte=njene !Not used
+      njti=njene !Not used
       enescal=1.
       tescal=1.
       tiscal=1.
@@ -787,7 +796,7 @@ c..................................................................
       do k=1,npaproca
          npa_process(k)="notset"
          ennl(k)=5.0
-         ennb(k)=1.e10
+         ennb(k)=1.d10  !YuP[2022-12] was 1.e10
          do  i=1,njenea
             ennin(i,k)=0.0d0
          enddo
@@ -849,6 +858,11 @@ c..................................................................
       nv_f4d=20
       nt_f4d=20
       
+      ! For saving f3d== f(pol.angle,vpar,mu) at fixed rho==f3d_rho :
+      npol_f3d=20
+      nvpar_f3d=200 ! 
+      nmu_f3d=100 ! number of grid points in mu=0.5*m*Vperp^2/B
+      f3d_rho=0.5d0 ! f3d is saved at this rho value
       nen=nena
       nen_npa=nena
       mmsv=mx
@@ -938,7 +952,7 @@ cBH080125      enddo
                seppm2z(k,m,ll)=seppm2(k,m)
                szm2z(k,m,ll)=szm2(k,m)
             enddo
-            asorz(k,m,0)=0.
+            asorz(k,m,0)=0.d0 !YuP[2022-12-13] was 0.
             do ll=1,lrza
                asorz(k,m,ll)=asor(k,m,ll)
             enddo

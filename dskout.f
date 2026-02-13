@@ -150,16 +150,17 @@ c..................................................................
 
 
       subroutine read_data_files(filenm,jtm,ipresent,t_data,kopt)
-      !YuP[2021-01-21] read data files.
+      !YuP[2021-01-21] read data files.  Revised [2021-02-08].
       !(Initial purpose - coupling with NIMROD. 
       ! Can be extended to coupling with other codes.)
       ! For coupling with NIMROD, 
       ! each file contains data at one time slice.
-      !implicit none
       implicit integer (i-n), real*8 (a-h,o-z)
       include 'param.h'
       include 'comm.h' !contains enein_t(njenea,ntotala,nbctimea),
                !tein_t(njenea,nbctimea), etc.
+               !Also added dbb2in_t(:,:) !(njene,nbctime)
+               !Also added ryain_t(:,:)  !(njene,nbctime) Time-dep. ryain array
 CMPIINSERT_INCLUDE
 
       !INPUT: filenm, jtm, kopt;  Also nstates (from comm.h)
@@ -175,28 +176,41 @@ CMPIINSERT_INCLUDE
       real*8,INTENT(OUT) :: t_data
       integer kode,istat,iunit ! local
       integer idum !local
-      real*8 dum1,dum2,dum3 ! local
+      real*8 dum1,dum2,dum3, pi ! local
       character*8 cdum !local
       integer njene_data !local
       integer irow !local
       character*64 format_data !local, To form a format line
       ! For reading columns :
       integer ix_data
-      real*8 r_data,psi_data,b_data,e_data,curr_data,elecd_data
+      real*8 r_data,psi_data,b_data,db_data,e_data,curr_data,elecd_data
       real*8 dene_data,denD0_data,deni_data,denz_data
       real*8 ti_data,te_data
+      
+      real*8 zeff_in,rbb,eps_in,trapfrac_in
+      real*8 sptzr_out,pressau1,pressau2
+      
       real*8,dimension(:),allocatable :: denzz_data ![0:nstates]
       save denzz_data
       
       ipresent=0  !To be changed to 1 if filenm is found
       t_data=0.d0 !To be found from reading data: time slice [sec]
       iunit=14
+      
+      pi=atan2(zero,-one)
+      
+      if(.NOT.ASSOCIATED(d_rr))then !temporary; normally is done in tdtraloc
+       allocate(d_rr(0:iyp1,0:jxp1,ngen,0:lrz),STAT=istat)
+       call bcast(d_rr,zero,SIZE(d_rr))
+      endif
+      
       open(unit=iunit,file=filenm,status='old',iostat=kode)
       if (kode.ne.0) then
-CMPIINSERT_IF_RANK_EQ_0
-         WRITE(*,*)'subr.read_data_files:',filenm,' cannot be opened'
-CMPIINSERT_ENDIF_RANK         
+!CMPIINSERT_IF_RANK_EQ_0
+!         WRITE(*,*)'subr.read_data_files:',filenm,' cannot be opened'
+!CMPIINSERT_ENDIF_RANK         
          ipresent=0
+         goto 200 !-> return/exit
       else
          ipresent=1
       endif
@@ -245,19 +259,39 @@ CMPIINSERT_ENDIF_RANK
         if(.NOT. ASSOCIATED(dens_imp_t)) then
           allocate(dens_imp_t(0:nstates,1:njene,1:nbctime),STAT=istat)
         endif
+
+        !if(transp.eq."enabled")then !could add later
+        if(.NOT. ASSOCIATED(dbb2in_t)) then
+          allocate(dbb2in_t(1:njene,1:nbctime),STAT=istat)
+          allocate(dbb2(1:lrz),STAT=istat)
+        endif
+        !endif !transp
+
+        if(.NOT. ASSOCIATED(ryain_t))then !YuP[2021-08-20] added: time-dependent
+          allocate(ryain_t(1:njene,1:nbctime),STAT=istat)
+        endif
+
     
         !Form format specs.  ONLY FOR NIMROD data files: 
         write(cdum,'(i4)') (nstates+1) ! columns corr to 0:nstates
-        format_data='(1x,i4,1x,12d16.9,'//TRIM(cdum)//'(d16.9))' 
+        format_data='(1x,i4,1x,13d16.9,'//TRIM(cdum)//'(d16.9))' 
         !write(*,*) 'format_data=',format_data
         !write(*,*) 't_data[sec]=',t_data
         
-        ! Read row by row
+        ! Read row by row.
+        ! After 2021-02-29, additional column is added 
+        !   for |dB| = (B-<B>)/B where <..> flux average, or (B-B0)/B
+! ix,R,psi,|B|,|dB|,E.B/B,J.B/B,elecd,ne,nD,ni,nz,Ti,Te,Nz0,Nz1,Nz2,Nz3,Nz4,Nz5,Nz6,Nz7,Nz8,Nz9,Nz10
+! [SI units]
+! Note, from printout: E_data/J_data  matches mu0*elecd, up to 2nd-3rd digit.
+! In NIMROD, the "spitzer model" is a simple scaling eta_0*T^(-1.5)
+! with floor and ceiling (to prevent the current density being too high or too low)
         read(iunit,*) !Skip one row (with headings)
         do irow=1,njene       
            read(iunit,format_data,iostat=kode) 
      &         ix_data,
-     &         r_data,psi_data,b_data,e_data,curr_data,elecd_data,
+     &         r_data, psi_data, b_data, db_data,
+     &         e_data, curr_data, elecd_data,
      &         dene_data,denD0_data,deni_data,denz_data,
      &         ti_data,te_data,
      &         (denzz_data(idum),idum=0,nstates) 
@@ -281,18 +315,22 @@ CMPIINSERT_ENDIF_RANK
            deni_data= max(deni_data,0.d0) ! For main ion "ni"
            
            !2.TEST for quasineutrality.
-           sum_ni_Zi=deni_data !column "ni", which is for the main ion (D+)
+           sum_ni_Zi= deni_data*bnumb(kionm(1)) !from column "ni", 
+                      !which is for the main ion (D+)
+           sum_ni_Zi2=deni_data*bnumb(kionm(1))**2 !For Zeff computation.
            sum_nimp_zstate=0.d0 !To count electrons from impurity, all Zstates
            do kstate=1,nstates !These are additional ions from impur.source.
              sum_nimp_zstate= sum_nimp_zstate
      &                       +denzz_data(kstate)*bnumb_imp(kstate)
+             sum_ni_Zi2= sum_ni_Zi2
+     &                  +denzz_data(kstate)*bnumb_imp(kstate)**2 !For Zeff
            enddo ! kstate
            sum_ni_Zi= sum_ni_Zi +sum_nimp_zstate !total number of free electrons
            err1= abs(dene_data-sum_ni_Zi)/dene_data !Supposed to be ~0
-!           if(err1.gt.1.d-7)then
-!             write(*,'(a,2e16.9)')
-!     &       '  dene_data,sum_ni_Zi=',dene_data,sum_ni_Zi
-!           endif
+           if(err1.gt.1.d-2)then
+             write(*,'(a,2e16.9)')
+     &       '  dene_data,sum_ni_Zi=',dene_data,sum_ni_Zi
+           endif
            !RESULTS: At t_data>0, dene_data = sum_ni_Zi up to 7 digit,
            ! but at t_data=0 [the very 1st data file]
            ! the value of dene_data [column "ne"] is corrupted - 
@@ -300,7 +338,8 @@ CMPIINSERT_ENDIF_RANK
            ! (supposed to be the edge value only)
            !---> Resetting ne to have quasineutrality:
            dene_data= sum_ni_Zi 
-           !END TEST
+           zeff_in= sum_ni_Zi2/sum_ni_Zi !Additionally, Zeff is computed
+           !END TEST          
            
            !3. LOWER LIMIT for Te and Ti
            !Noticed that Te and Ti may go down to ~0.3 eV in data tables.
@@ -310,10 +349,32 @@ CMPIINSERT_ENDIF_RANK
            ! ti_data is in eV, while temp_min_data is in keV in cqlinput namelist
            
            !--------- Now populate CQL3D arrays
-           if(irow.eq.1) r0_data=r_data !Assuming 1st data point is at magn.axis
-           ryain(irow)= (r_data-r0_data) !Here in [m]
-           !The above definition will be normalized by (r_data_max-r_data_min)
-           ! after all rows are read.
+      
+           !YuP[2024-07-25] Added radcoord="polflx" 
+           !and "sqpolflx" (through psi_data)
+           if(radcoord.eq.'rminmax')then
+             !if(t_data.eq.0.d0)then !YuP[2021-08-13] added
+              ! with this condition, the definition of rho is based 
+              ! on the very first data file. Then ignore other files for ryain. 
+              ryain_t(irow,jtm)=r_data !Here in [m]
+              !The above definition will be normalized by (r_data_max-r_data_min)
+              ! after all rows are read.
+             !endif
+           else !((radcoord.eq.'polflx').or.(radcoord.eq.'sqpolflx'))
+              ryain_t(irow,jtm)=psi_data !Units not important - will be norm-ed
+              !This is only the first step in definition, 
+              !later - psilim will be determined,
+              !and ryain_t will be redefined to be norm-ed to [0;1]
+           endif
+           
+           !YuP[2024-07-25] Added - detection of irow_lcfs,
+           !which we find as the last irow where psi_data>0
+           !(psi_data<0 is outside of LCFS) 
+           if(psi_data.ge.0.d0)then
+             irow_lcfs=irow !YuP[2024-07-25] Detection of irow_lcfs
+             !This value is updated until psi_data >= 0, 
+             !then it will stop updating
+           endif
            
            tein_t(irow,jtm)= te_data*1.d-3 !converted to keV
            tiin_t(irow,jtm)= ti_data*1.d-3 !converted to keV
@@ -328,23 +389,163 @@ CMPIINSERT_ENDIF_RANK
            endif
            
            !Electric field [V/cm]
-           elecin_t(irow,jtm)= e_data*1.d-2 !converted V/m to V/cm
+           !Note:  checked that E_data/j_data  
+           ! matches elecd*mu0 (==elecd_data*12.6e-7),
+           ! up to 2nd-3rd digit. 
+           if(elecfld_data.eq.'readdata')then ![2022-07-13] New option
+             !Get E directly from data, from column "E.B/B"
+             elecin_t(irow,jtm)= e_data*1.d-2 !converted V/m to V/cm
+           endif !(elecfld_data.eq.'readdata')then 
+           
+           
+           !The following evaluation of eta 
+           !is only needed for elecfld_data.eq.'jspitzer'
+           !but we evaluate it in any case, for check/printout
+           r_data_cm= r_data*100.d0 ! Given major radius for this row in data
+           if(r_data_cm.lt.rpcon(1))then ! Smaller than rya(1) point
+             lr=1
+             rbb= rgeom(lr)*bmod0(lr)/bthr0(lr)
+             eps_in= eps(lr)
+             trapfrac_in= trapfrac(lr)
+             bpsi_max_in= bpsi_max(lr) ! Bmax/Bmin
+           elseif(r_data_cm.ge.rpcon(lrz))then !Larger than rya(lrz)
+             lr=lrz
+             rbb= rgeom(lr)*bmod0(lr)/bthr0(lr)
+             eps_in= eps(lr)
+             trapfrac_in= trapfrac(lr)
+             bpsi_max_in= bpsi_max(lr) ! Bmax/Bmin
+           else ! scan 1:lrz range in Rpcon, find the nearest lr-nodes
+             !Note: rpcon(lr)== Routboard[cm] corresponds to rya(lr)
+             do ll=1,lrz-1
+               if( r_data_cm.ge.rpcon(ll) .and. 
+     &             r_data_cm.lt.rpcon(ll+1)     )then
+               lr=ll
+               rbb= rgeom(lr)*bmod0(lr)/bthr0(lr)
+               eps_in= eps(lr)
+               trapfrac_in= trapfrac(lr)
+               bpsi_max_in= bpsi_max(lr) ! Bmax/Bmin
+               endif
+             enddo
+           endif
+           !YuP: From printout for DIII-D equilibrium:
+           !eps, sqrt(1.-Bmin/Bmax), trapfrac = 8.078E-03 1.266E-01 1.302E-01
+           !eps, sqrt(1.-Bmin/Bmax), trapfrac = 1.053E-01 4.351E-01 4.512E-01
+           !eps, sqrt(1.-Bmin/Bmax), trapfrac = 2.042E-01 5.785E-01 5.931E-01
+           !eps, sqrt(1.-Bmin/Bmax), trapfrac = 3.599E-01 7.239E-01 6.733E-01
+           !The 1st line is for plasma center, the last line is for plasma edge
+!             write(*,'(a,1p3e11.3)')
+!     &        'eps, sqrt(1.-1/bpsi_max), trapfrac =', 
+!     &         eps_in, sqrt(1.d0-1.d0/bpsi_max_in), trapfrac_in
+           !  Find Spitzer resistivity [IN/OUT: cgs units, and keV]
+!      write(*,*)'===========  r_data [m]=',r_data
+!      write(*,'(a,1p9e11.4)')
+!     &     ' Te,Ti[ev],ne,ni[m3],mi[g],Zeff,rbb[cm],eps,trapfrac=',
+!     &     te_data, ti_data,dene_data, deni_data, fmass(kionm(1)), 
+!     &     zeff_in,  rbb,eps_in,trapfrac_in
+           !trapfrac_in=0.d0 !TEST ONLY!
+           call sptz(te_data*1.d-3, ti_data*1.d-3,
+     &          dene_data*1.d-6, deni_data*1.d-6, fmass(kionm(1)), 
+     &          zeff_in,  rbb,eps_in,trapfrac_in,  
+     &          sptzr_out,pressau1,pressau2)
+           !Based on estimate of Spitzer resistivity 
+           ! with neoclassical trapping correction pressau1 (~ 1.2x -- 3.6x):
+           eta_sptzr= sptzr_out*9.e9   ! Resistivity [SI]
+!           e_sptzr= curr_data*(eta_sptzr*pressau1) ! V/m, A/m^2
+           !Note: the above uses eta_sptzr*pressau1, 
+           !which is collision-less limit. 
+           !----------------------------------------------------------
+           ![2022-01-06]Better use collisional limit (as in NIMROD):
+           e_sptzr= curr_data*(eta_sptzr*pressau2) ! V/m, A/m^2
+           !e_sptzr= curr_data*eta_sptzr !TEST ONLY! V/m, A/m^2
+           !In this case - in profiles.f, 
+           ! change curra(1,ll)/sig_starnue0(ll)
+           !     to curra(1,ll)/sig_starnue(ll)
+           !----------------------------------------------------------
+           !Just to save data, for printout: (xjin_t is not used during run)
+           xjin_t(irow,jtm)=curr_data*1.d-4 ! A/cm^2 
+!      write(*,'(a,1p3e11.4)')'OUT: eta_sptzr[SI],pressau1,pressau2=',
+!     &            sptzr_out,pressau1,pressau2
+!      write(*,*)' '
+
+           if(elecfld_data.eq.'jspitzer')then ![2022-07-13] Original option
+           !by default, evaluate E as j_data/resistivity.
+           elecin_t(irow,jtm)= e_sptzr*1.d-2 !converted V/m to V/cm
            !Note: in NIMROD file, e_data is labeled as "E.B/B",
            !so - is it parallel? Should we reset efflag="parallel" ?
            !Also the proper sign is of some concern.
            !Maybe need to use bsign here? 
            !write(*,'(a,e12.6)')'elecin_t()=',elecin_t(irow,jtm)
+           endif !elecfld_data.eq.'jspitzer'
+           
+CMPIINSERT_IF_RANK_EQ_0
+        !Check the difference in two methods for E, print out if too large
+        e_data_abs= abs(e_data)
+        e_sptzr_abs=abs(e_sptzr)
+        if( e_data_abs > 1d-2 )then !Only check when E > 0.01 V/m
+        if(abs(e_data_abs-e_sptzr_abs)>0.2*(e_data_abs+e_sptzr_abs))then
+             !eta_data= e_data/curr_data  ! Resistivity [SI]
+         write(*,'(a,i5,1p4e11.3)')'  ix,t_data, r_data,e_data,e_sptzr',
+     &              irow-1, t_data, r_data, e_data, e_sptzr ![sec; m; V/m]
+        endif
+        endif
+CMPIINSERT_ENDIF_RANK         
            
            !Impurity - densities of each ionization state
            do kstate=0,nstates
               dens_imp_t(kstate,irow,jtm)=denzz_data(kstate)*1.d-6 !to cm^-3
            enddo
            
-        enddo ! irow
+           !if(transp.eq."enabled")then !could add later
+             ![2021-08] Added, For NIMROD coupling 
+             !(reading deltaB/B data)
+             dbb2in_t(irow,jtm)= db_data**2 !== (dB/B)^2
+             !Drr is formed at each time step in subr.profiles, based on
+             !See Rechester, Rosenbluth, Phys.Rev.Lett.40,40(1978).
+             !A pitch-angle dependence is added as in 
+             !Harvey,McCoy,Hsu,Mirin, PRL 47, p.102 (1981)
+           !endif !transp
+           
+        enddo ! irow=1,njene 
+
+        !YuP[2024-07-25] Done above - detection of irow_lcfs,
+        !which we find as the last irow where psi_data>0
+        !(psi_data<0 is outside of LCFS).
+        !Redefine njene now, to keep data within rho<1 only:
+        njene=irow_lcfs !VERY IMPORTANT
+        !(Typical example: njene_data=144, irow_lcfs=120)
+CMPIINSERT_IF_RANK_EQ_0
+        WRITE(*,*)'Based on psi_data, njene is reset to njene=',njene
+CMPIINSERT_ENDIF_RANK         
+
+        !YuP[2024-07-25] Added radcoord="polflx" 
+        !and "sqpolflx" (through psi_data)
+        !if(t_data.eq.0.d0)then
+        if(radcoord.eq.'rminmax')then
+          ! with this condition, the definition of rho is based 
+          ! on the very first data file. Then ignore other files for ryain. 
+          !Above, in the irow=1,njene loop, this array was saved:
+          !ryain_t(irow,jtm)= r_data 
+          r0_data=     ryain_t(1,jtm)         !R at m.axis
+          r_data_lcfs= ryain_t(irow_lcfs,jtm) !R at LCFS
+          ryain_t(:,jtm)=(ryain_t(:,jtm)-r0_data)/(r_data_lcfs-r0_data)
+        else !((radcoord.eq.'polflx').or.(radcoord.eq.'sqpolflx'))
+          !Above, in the irow=1,njene loop, this array was saved:
+          !ryain_t(irow,jtm)=psi_data 
+          psi0_data=     ryain_t(1,jtm)         !psi at m.axis
+          psi_data_lcfs= ryain_t(irow_lcfs,jtm) !psi at LCFS
+          
+          if(radcoord.eq.'polflx')then
+            ryain_t(:,jtm)= (ryain_t(:,jtm)-psi0_data)/
+     &                       (psi_data_lcfs-psi0_data)
+          endif
+          if(radcoord.eq.'sqpolflx')then
+            ryain_t(:,jtm)= sqrt( (ryain_t(:,jtm)-psi0_data)/
+     &                            (psi_data_lcfs-psi0_data)   )
+          endif
+        endif !radcoord
+        !endif !(t_data.eq.0.d0)
         
-        ryain(:)= ryain(:)/(r_data-r0_data) !For radcoord='rminmax' only!
-        !assuming last data point is at rho=1 (psi=psilim)
-        !write(*,*)'ryain=',ryain(1:njene) ! checked: [0;1] range
+        !write(*,*)'ryain=',ryain_t(1:njene,jtm) ! checked: [0;1] range
         !write(*,*)kelecg,kelecm
         
       endif ! kopt.eq.1 .and. ipresent.eq.1

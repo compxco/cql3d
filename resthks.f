@@ -15,7 +15,7 @@ c
 c     preshin=Hinton and Hazeltine ratio
 c     preskim=Kim (Hirshman-Sigmar) ratio
 c     pressau1=Sauter1
-c     pressau1=Sauter2
+c     pressau2=Sauter2
 c
 ! YuP[2020-02] Notes: 
 ! 1. Value of starnue only affects the values of pressau2 and preshin.

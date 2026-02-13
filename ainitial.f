@@ -44,12 +44,17 @@ c     bounce average various geometrical quantities..
 c.....................................................................
 
       if (l_ .eq. lmdpln_) call bavgmax
+!     In CQL3D case, lmdpln_=radial_index (which is l_ in this case),
+!     so this condition is met at every l_;
+!     In CQLP, lmdpln_=1, while l_ is index along field line,
+!     so the above condition is only met at l_=1.
 
 c.......................................................................
 c     Redefine vptb=1.0 if CQLP
 c.......................................................................
 
       if (cqlpmod.eq."enabled" .and. l_.eq.lmdpln_) call wpvptb
+!     In CQLP, lmdpln_=1 
 
 c..............................................................
 c     Evaluate an additional integration coefficient.
@@ -62,6 +67,7 @@ c     call routine which initializes distribution functions.
 c...........................................................
 
       call finit
+
 c.....................................................................
 c     compute the orbit loss krook operator and the toroidal
 c     loss operator
@@ -77,12 +83,6 @@ c     call routine to calculate energies and densities.
 c...........................................................
 
       call diaggnde
-
-c.....................................................................
-c     compute the orbit loss krook operator and the toroidal
-c     loss operator
-c.....................................................................
-cyup      if (l_ .eq. lmdpln_) call losscone
 
 c.....................................................................
 c     Compute coefficients for synchrotron radiation loss
@@ -113,7 +113,14 @@ c...........................................................
 c     call driver routine which initializes analytic sources.
 c...........................................................
 
-      if (l_ .eq. lmdpln_) call sourcee
+      if (l_ .eq. lmdpln_) call sourcee !before[2022-02-11]
+!     In CQL3D case, lmdpln_=radial_index (which is l_ in this case),
+!     so the above condition is met at every l_;
+!     In CQLP, lmdpln_=1, while l_ is index along field line,
+!     so the above condition was only met at l_=1.
+      !For CQLP, now the source is set at every l_ (field line point):
+      !call sourcee !YuP[2022-02-11] For every l_, even in CQLP case
+      !The above does not work, so in case of CQLP, set source at l_=1 only.
 
 c.......................................................................
 c     Call RF module if this is a 2-D calculation and if the RF
@@ -163,8 +170,9 @@ c.....................................................................
 c     print out some parameters
 c.......................................................................
 
-      if (lrzmax .eq. 1) call tdoutput(1)
-C
+      if (lrzmax.eq.1 .and.(cqlpmod.ne."enabled")) call tdoutput(1)
+      !YuP[2021-02-26] added (cqlpmod.ne."enabled") 
+
 
       return
       end

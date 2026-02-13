@@ -18,7 +18,7 @@ CMPIINSERT_INCLUDE
 
       character*8 icall,iplotsxr
       character*128 filenm ! template for file name with data 
-      real*8 a_new(njene)  ! working array
+      !real*8 a_new(njene)  ! working array !Not used
       real*8 ZDISTR(100) ! local, for subr. ADCDO()
 
       if (n.gt.0) return
@@ -85,37 +85,13 @@ c.......................................................................
      &    (read_data.eq.'nimrod')              )then  
           !BH,YuP[2021-01-21] added option when data is obtained from files.
           !Value of imp_type should match NIMROD data files. Select from:
-          !imp_type: 1->He,2->Be,3->C,4->N,5->Ne,6->Ar,7->Xe,8->W
+          !imp_type: 1->He,2->Be,3->C,4->N,5->Ne,6->Ar,7->Xe,8->W,9->B
          call set_impurity_data !-> bnumb_imp(0:nstates),excit_enrgy(0:nstates),etc
          !Some arrays that depend on nstates 
          ! are allocated in subr.set_impurity_data.
          !Other could be allocated in ainalloc, e.g. those that depend on 
          ! combination of nmax+nstates.
       endif
-
-
-      !-----------------------------------------------------------------   
-      !BH,YuP[2021-01-21] Option to read data files.
-      !(Initial purpose - coupling with NIMROD. 
-      ! Can be extended to coupling with other codes.)
-      if(read_data.eq.'nimrod')then
-        kopt=1 ! Setup radial grid ryain() based on R-grid in data files,
-        !also fill-up spline-t arrays like enein_t(), tein_t(), etc.
-        !This part should be called AFTER set_impurity_data, because
-        !we need to know the number nstates for a given impurity type.
-        do jtm=1,nbctime !nbctime was set to number of data files in ainsetva,
-          !which is the number of time slices in case of read_data='nimrod'
-          call read_data_files(read_data_filenames(jtm),jtm,
-     &                            ipresent,t_data,kopt)
-          bctime(jtm)=t_data ![sec], from reading 1st line in data file
-CMPIINSERT_IF_RANK_EQ_0
-          WRITE(*,*)'read_data_filenames=',
-     &     TRIM(read_data_filenames(jtm)),'  bctime[sec]=',bctime(jtm)
-CMPIINSERT_ENDIF_RANK         
-        enddo ! jtm
-      endif
-      !-----------------------------------------------------------------   
-
 
 c.......................................................................
 c     Allocate arrays and radial transport arrays, if required
@@ -125,7 +101,6 @@ c.......................................................................
       if (ampfmod.eq."enabled" .and.cqlpmod.ne."enabled") call ampfalloc
       
       if (transp.eq."enabled" .and. cqlpmod.ne."enabled") call tdtraloc
-c%OS  if (transp.eq."enabled") call tdtraloc
       if (transp.eq."enabled" .and. cqlpmod.eq."enabled") call wpalloc
 
 c.......................................................................
@@ -158,7 +133,7 @@ c..................................................................
       call urfinitl ! mrfn= is set here also
       call frinitl
       open(unit=2,file='cqlinput',delim='apostrophe',status='old')
-      call frset(lrz,noplots,nmlstout)   ! Uses unit 2
+      call frset(lrz,noplots,nmlstout,ngen,kfrsou(1:nbeams))   ! Uses unit 2
       close(2)
 
       if (machine .ne. "toroidal") call tdwrng(1)
@@ -171,6 +146,7 @@ c     if the meshes on the various flux surfaces are linked.
 c.....................................................................
 
       call tdtrmuy
+      write(*,*)'aft. tdtrmuy: iymax=',iymax
 
 c.....................................................................
 c     Call routine which initializes certain arrays using input
@@ -195,10 +171,6 @@ c.....................................................................
            endif  !On nlrestrt.eq."ncdfdist"
            !YuP[2020-02-11] Moved this part from profiles to tdinitl
       endif
-
-      !if(nbctime.gt.0)then !YuP[2019-09-18] This logic is inside subr.
-         call profiles
-      !endif
 
 c.....................................................................
 c     Determine mesh normalization constant vnorm.
@@ -264,6 +236,44 @@ CMPIINSERT_IF_RANK_EQ_0
 CMPIINSERT_ENDIF_RANK
              
  
+      !-----------------------------------------------------------------   
+      !BH,YuP[2021-01-21] Option to read data files.
+      !(Initial purpose - coupling with NIMROD. 
+      ! Can be extended to coupling with other codes.)
+      if(read_data.eq.'nimrod')then
+        kopt=1 ! Setup radial grid ryain() based on R-grid in data files,
+        !also fill-up spline-t arrays like enein_t(), tein_t(), etc.
+        !This part should be called AFTER set_impurity_data, because
+        !we need to know the number nstates for a given impurity type.
+        jtmm=0 ! to be incremented
+        do jtm=1,nbctime !nbctime was set to number of data files in ainsetva,
+          !which is the number of time slices in case of read_data='nimrod'
+          call read_data_files(read_data_filenames(jtm),jtm,
+     &                            ipresent,t_data,kopt)
+          if(ipresent.eq.1)then ! File is found
+            jtmm=jtmm+1
+            bctime(jtmm)=t_data ![sec], from reading 1st line in data file
+CMPIINSERT_IF_RANK_EQ_0
+            WRITE(*,*)'Done jtm,jtmm,read_data_filenames=',
+     &      jtm,jtmm,
+     &      TRIM(read_data_filenames(jtmm)),
+     &      '  bctime[s]=',bctime(jtmm), '  E(r=0)=',elecin_t(1,jtm)
+            WRITE(*,*)'  '
+CMPIINSERT_ENDIF_RANK    
+          endif     
+        enddo ! jtm
+      endif ! read_data
+      !-----------------------------------------------------------------   
+
+      !YuP[2021-02-08] Moved calls to read_data_files and to profiles
+      !here, after call to aingeom->eqcoord related subroutines.
+      !For subr.read_data_files, need to have arrays related to geometry
+      !of flux surfaces, because it evaluates resistivities.
+      !And subr.profiles should be called after read_data_files.
+      !if(nbctime.gt.0)then !YuP[2019-09-18] This logic is inside subr.
+         call profiles
+      !endif
+
 
 c.......................................................................
 c     Determine equilibrium parameters at lower half of cross-section
@@ -274,6 +284,7 @@ c.......................................................................
         lz=2*(lz-1)
         lsmax=2*(lsmax-1)
         ls=2*(ls-1)
+        write(*,*)'tdinitl before wploweq: lz,ls,lsmax=', lz,ls,lsmax
         call wploweq
       endif
 
@@ -283,6 +294,7 @@ c.....................................................................
 
       if (cqlpmod.eq."enabled" .and. meshy.eq."fixed_mu" .and.
      .  tfac.lt.0.0) call wptrmuy
+      !write(*,*)'tdinitl aft. wptrmuy: iy,mun=', iy,mun(:)
 
 c.......................................................................
 cl    1.1.2 Initialize some plasma parameters on entire lrzmax mesh
@@ -295,7 +307,6 @@ cl    1.1.3 First Loop over spatial variable index for which the equations
 c     will be solved to compute y-mesh on all l_ indices
 c     (this takes micxinit out of ainitial subroutine)
 c.....................................................................
-
       do 113 ll=lrors,1,-1
 
 c......................................................................
@@ -314,6 +325,7 @@ c.......................................................................
 
       ieq_tot=0
       do ll=1,lrors
+         call tdnflxs(ll) !YuP[2021-03-04] Added (just in case)
          ieq_tot=ieq_tot+inewjx_(ll) ! inewjx_() is defined in micxinit
          if (ll.eq.1) then
             ieq_(ll)=1
@@ -333,29 +345,45 @@ c.......................................................................
       if (nchgdy .eq. 1) then
         do 114 ll=1,lrors
           call tdnflxs(ll)
-          call wpchgdy
+          call wpchgdy ! called for each l_
  114    continue
       endif
-
+      write(*,*)'iymax=',iymax
       ! YuP[Sept-2014] moved this part outside of ainitial: 
       ! needed for proper work of FOW-logic.
       do ll=lrors,1,-1
         call tdnflxs(ll)
         call micxinil ! integration coefficients, mostly for cfpcoefn:
         ! gamma,alphan,cog,cosz,zmaxpsi (uses bbpsi,solrz from micxiniz)
+        !if(cqlpmod.eq."enabled")then !YuP[2021-04-13] test:
+          !set tau-->1.0 and dtau-->1.0 (instead of getting them from baviorbto)
+          !call bcast(tau(1,lr_),1.d0,iymax)        !YuP[2021-04-13] ok?
+          !call bcast(dtau(1,1,lr_),1.d0,iymax*lz)  !YuP[2021-04-13] ok?
+          !For CQLP, tau and dtau should not be needed.
+          !From tests, resetting them to 1.0 does not affect the solution,
+          !but it does change some diagnostics: 
+          !- parallel distribution (see subr. fle_pol),
+          !- printout "Connor", "One2/spt(Z)", etc, probably through <1/R>
+          !  and similar BA values from subr.bavgmax. 
+          !  (Not "Hinton" resistivity)
+        !else
         if (l_ .eq. lmdpln_) then
            ! calculate tau()==v*tauB_ZOW [also dtau(), vptb()]
+           !write(*,*)' tdinitl--> baviorbto   ll,l_=',ll,l_
+           !In CQLP, baviorbto is called with l_=1 only
            if(taunew.eq."enabled") then
               call baviorbt ! must be called after micxiniz
            else
               call baviorbto
            endif
         endif
+        !endif
       enddo
 
 c....................................................................
 c     Set some more radial mesh quantities.
       call tdrmshst !must be called AFTER: aingeom,tdtoarad,micxinit,micxinil
+      write(*,*)'aft tdrmshst 1'
 c....................................................................
 
 cBH160530
@@ -462,7 +490,7 @@ c....................................................................
       if (transp.eq."enabled") then
         if (cqlpmod .ne. "enabled") then
 c     warning: these routines use lrors, not lrzmax
-          call tdtrvint
+          call tdtrvint ! CQL3D only (not CQLP)
 
 c         Obtain radial diffusion d_rr, and optionally
 c         pinch velocity d_r, from file.  In this case, the
@@ -488,12 +516,12 @@ c         The read in d_rr/d_r won't be changed.
                 enddo
              endif
           else
-             call tdtrdfus
+             call tdtrdfus ! CQL3D only (not CQLP)
           endif
 
-          call tdtrflg
-          call tdtrwtl
-        else
+          call tdtrflg ! CQL3D only (not CQLP)
+          call tdtrwtl ! Both CQL3D and CQLP (Sets all dl(,,,)=0.5)
+        else ! (cqlpmod.eq."enabled")
           call wpinitl
         endif
       endif
@@ -501,7 +529,7 @@ c         The read in d_rr/d_r won't be changed.
 
 c%OS  
 c     check some mesh values
-      call wpmshchk
+      call wpmshchk  !disabled by somebody
 c%OS  
 
 
@@ -543,18 +571,24 @@ c..................................................................
 c     Call the neutral beam source module
 c..................................................................
 
-      write(*,*)'tdinitl:call frnfreya, n=',n,'time=',timet
+cBH171014:  Enable calls for multiple beam species.
+      if (frmodp.eq."enabled") then !YuP[2025-12-12] added if
+CMPIINSERT_IF_RANK_EQ_0      
+      WRITE(*,*)'tdinitl:call frnfreya, n=',n,'time=',timet
+CMPIINSERT_ENDIF_RANK
+      ! nbeams,nbeamsp= 0,0   here
       call frnfreya(frmodp,fr_gyrop,beamplsep,beamponp,beampoffp,
-     .              hibrzp,mfm1p,noplots)
-       write(*,*) 'mfm1 (freya) = ',mfm1p
-c       write(*,*) 'hibrzp(i,1,1),hibrzp(i,2,1),hibrzp(i,3,1)'
-c       do i=1,mfm1p
-c         write(*,'(i4,2x,0p9f9.4)') i, hibrzp(i,1,1),
-c     >        hibrzp(i,2,1),hibrzp(i,3,1),
-c     >        hibrzp(i,1,2),hibrzp(i,2,2),hibrzp(i,3,2),
-c     >        hibrzp(i,1,3),hibrzp(i,2,3),hibrzp(i,3,3)
-c       enddo
-c      stop
+     &              nbeamsp,hibrzp,mfm1p,noplots,kfrsou,src_nbi_ep)
+      !nbeamsp is one of outputs: got value from nbeams (cqlinput variable)
+      !Now nbeamsp is saved into comm.h
+CMPIINSERT_IF_RANK_EQ_0      
+      WRITE(*,*)'tdinitl/aft.frnfreya: mfm1, nbeamsp,src_nbi_ep=',
+     &  mfm1p,nbeamsp,src_nbi_ep
+      WRITE(*,*)'tdinitl/aft.frnfreya: kfrsou(1:nbeamsp)=',
+     & kfrsou(1:nbeamsp)
+CMPIINSERT_ENDIF_RANK
+
+      endif !(frmodp.eq."enabled") !YuP[2025-12-12] added if
 c
 c     Initialize ibeampon/ibeamponp (present and previous time step)
       if (frmodp.eq."enabled") then

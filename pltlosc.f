@@ -15,7 +15,7 @@ c
 
       do 100 k=1,ngen
         suu=0.
-        do 92001 i=1,iy
+        do 92001 i=1,iy_(l_)  !YuP[2021-03-11] iy-->iy_(l_)
           do 92002 j=1,jx
             if(gone(i,j,k,indxlr_).lt.-.9) then
               temp1(i,j)=vnorm*x(j)*f(i,j,k,l_)/tau(i,lr_)

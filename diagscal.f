@@ -30,7 +30,7 @@ c..................................................................
       call bcast(tam4,zero,jx)
 
       ! Now integrate over d3v to find n0 and <n>
-      do 1 i=1,iy
+      do 1 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
         do 2 j=1,jx
             if(temp1(i,j).gt.zero) then
                tam1(j)=tam1(j)+temp2(i,j)*cynt2(i,l_) !for n0 (midplane)
@@ -44,6 +44,8 @@ c..................................................................
           gn=gn+tam1(j)*cint2(j) !  n0 == Midplane density
           sden=sden+tam4(j)*cint2(j)*one_  ! <n> ZOW only
  3    continue
+      sden=sden/zmaxpsi(lr_) !YuP[2021-11-05] added 
+      !This will be ised as <n_old> below.
 
 c..................................................................
 c     Determine the velocity mesh point j such that for electron
@@ -51,7 +53,6 @@ c     runaway calculations the distribution density up to x(j)
 c     is held constant. Used only for lbdry(k)="fixed" calculations.
 c     This option is currently inoperable. 
 c..................................................................
-
       j=jx
 c     esfac=1.
 c     if (k .ne. kelecg) go to 21
@@ -60,24 +61,21 @@ c     do 20 j=1,jx
 c     if (x(j)*vnorm .gt. evol) go to 21
 c20   continue
 c21   continue
-
 c..................................................................
-c     runden is the new density - will be used in denominator
-c     of scale factor.
+c     runden is the RE density. Skip it from consideration.
 c..................................................................
-
-      if ( j .gt. jx) j=jx
+      if ( j .gt. jx) j=jx !With present setup, it is always j=jx
       runden=0.
-      do 24 jj=1,j
+      do jj=1,j
         runden=runden+tam4(jj)*cint2(jj)*one_ !<n> ZOW only
- 24   continue
- 
-c      write(*,'(a,2i3,4e12.5)')'k,lr,xlndn00(k,lr),runden,sden,gn=',
-c     +                          k,lr_,xlndn00(k,lr_),runden,sden,gn
-     
+      enddo
+      runden=runden/zmaxpsi(lr_) !<n_RE> !YuP[2021-11-05] zmaxpsi added;
+      !However: Skip runden from present setup.
+      !Use sden as <n_old>, to avoid confusion with RE.
+      
 c..................................................................
 c     If time-dependent density, add Maxwellian particles (at present
-c     temperature or temp_den.ne.0.) to achieve reden(k,lr_).
+c     temperature temp(k,lr_), or temp_den.ne.0.) to achieve reden(k,lr_).
 c     Else, scale f to original density.
 c..................................................................
 
@@ -96,19 +94,19 @@ cYuP,BH180918: adding enein_t
          ! Note: temp() and reden() are updated at each time step 
          ! in subr.profiles()
          if (temp_den.ne.zero) then
-            temp_ad=temp_den ! set in namelist
+            temp_ad=temp_den ! set in namelist (default is 0.d0)
          else
             temp_ad=temp(k,lr_)
          endif
          thta=fmass(k)*clite2/(temp_ad*ergtkev)
          do j=1,jx
             swwtemp=exp(-gamm1(j)*thta)
-            do i=1,iy
-               temp1(i,j)=swwtemp
+            do i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
+               temp1(i,j)=swwtemp !cold distribution with T=temp_ad
             enddo
          enddo
          call bcast(tam1,zero,jx)
-         do i=1,iy
+         do i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
             do j=1,jx
                tam1(j)=tam1(j)+vptb(i,lr_)*temp1(i,j)*cynt2(i,l_)
             enddo
@@ -119,13 +117,14 @@ cYuP,BH180918: adding enein_t
             sden1=sden1+tam1(j)*cint2(j)
          enddo
 
-         sden1=sden1/zmaxpsi(lr_)
+         sden1=sden1/zmaxpsi(lr_)  !<n>_cold (FSA) [with T=temp_ad]
  
-         ratio1=(reden(k,lr_)-runden/zmaxpsi(lr_))/sden1
-         !reden= n0_new is the new (target) density,
-         !runden/zmaxpsi is the old n0_old (based on present f)
+         ratio1=(reden(k,lr_)-sden)/sden1
+         !reden= <n> is the new (target) density, sden= <n_old>
+         ! To impose a lower limit for f() :
+         fmin= 1.383896526737250d-87 ! log(1.383896526737250d-87)= -200.
          do j=1,jx
-            do i=1,iy
+            do i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
                f(i,j,k,l_)=f(i,j,k,l_)+ratio1*temp1(i,j)
                !Basically, this adjustment is
                ! f_new = f_old + (n_new-n_old)* f_cold/n_cold
@@ -134,12 +133,18 @@ cYuP,BH180918: adding enein_t
                ! Verify: Integrate both sides in d3v:
                ! n_new = n_old + (n_new-n_old)* n_cold/n_cold
                ! n_new = n_new
+               !Danger:  Can the new f() be pulled to negative values?
+               !Yes, if the source is too large (and then ratio1 is negative)
+               f(i,j,k,l_)= max(f(i,j,k,l_),fmin) !impose a lower limit.
+               !If this lower limit is reached, then the density cannot be 
+               !expected to be equal to target [=reden] (not enough "room" 
+               !to reduce the distribution)
             enddo
          enddo ! j
          ! Verify: integrate f_new over d3v to find n0 and <n>
          call dcopy(iyjx2,f(0,0,k,l_),1,temp2(0,0),1)
          call bcast(tam4,zero,jx)
-         do i=1,iy
+         do i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
          do j=1,jx
             if(temp2(i,j).gt.zero) then
                tam4(j)=tam4(j)+vptb(i,lr_)*temp2(i,j)*cynt2(i,l_) !<n>
@@ -149,23 +154,22 @@ cYuP,BH180918: adding enein_t
          enddo
          sden_new=0.
          do j=1,jx
-          sden_new=sden_new+tam4(j)*cint2(j)*one_  ! <n>new
+          sden_new=sden_new+tam4(j)*cint2(j)/zmaxpsi(lr_)  !<n>_new
          enddo
 CMPIINSERT_IF_RANK_EQ_0
          WRITE(*,'(a,3i4,4e17.9)')
      &   'diagscal: n,k,lr=; f is adjusted. ratio1, nold, nnew,reden=',
      &              n,k,lr_,  ratio1, 
-     &     runden/zmaxpsi(lr_), sden_new/zmaxpsi(lr_), reden(k,l_) 
+     &     sden, sden_new, reden(k,l_) 
 CMPIINSERT_ENDIF_RANK
          
       else  !---> nbctime=0 (not a time-dependent profile)
       
-         ratio(k,lr_)=xlndn00(k,lr_)/runden ! field-line-aver <n>
+         ratio(k,lr_)=xlndn00(k,lr_)/(sden*zmaxpsi(lr_)) ! field-line-aver <n>
+           !Note: xlndn(k,lr_) is the field line density, reden*zmaxpsi at t=0
          call dscal(iyjx2,ratio(k,lr_),f(0,0,k,l_),1) !rescale f
 CMPIINSERT_IF_RANK_EQ_0
          if (ioutput(1).ge.1) then !YuP[2020] Useful diagnostic printout
-         !WRITE(*,'(a,3i4,3e13.5)')'diagscal: n,k,lr,xlndn00,runden,gn',
-      !+                               n,k,lr_,xlndn00(k,lr_),runden,gn
          WRITE(*,'(a,3i4,e16.9)')
      &   'diagscal: n,k,lr=;  f is rescaled by ratio()=',
      &              n,k,lr_,  ratio(k,lr_) 
@@ -175,9 +179,9 @@ CMPIINSERT_ENDIF_RANK
          ! Example: When there is a large-power NBI source, 
          ! comparing to the initial background 
          ! set in cqlinput. The value of xlndn00 
-         ! (in ratio(k,lr_)=xlndn00(k,lr_)/runden) is based 
+         ! (in ratio(k,lr_)=xlndn00(k,lr_)/(sden*zmaxpsi(lr_)) is based 
          ! on the initial density, so it does not include particles from NBI.
-         ! And the value of runden (or sden) does include all sources.
+         ! And the value of sden does include all sources.
          ! In such a case, it is better to use lbdry(k)="conserv"
       endif
 

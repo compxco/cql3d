@@ -9,7 +9,7 @@ c..................................................................
 c     Subroutine to calculate bounce-averaged Fokker-Planck collision
 c     coefficients (relativistic corrections added by MARK FRANZ--
 c     U.S.A.F.)
-c     If (cqlpmod .eq. "enabled") then compute only the coefficients
+c     If (cqlpmod.eq."enabled") then compute only the coefficients
 c     at the orbit position l=l_ and do not perform the bounce-averages.
 c..................................................................
       include 'param.h'
@@ -29,14 +29,16 @@ c
       endif
       impcoef=1
       nccoef=nccoef+1
-      call bcast(cal(1,1,1,l_),zero,iyjx*ngen)
-      call bcast(cbl(1,1,1,l_),zero,iyjx*ngen)
-      call bcast(ccl(1,1,1,l_),zero,iyjx*ngen)
-      call bcast(cdl(1,1,1,l_),zero,iyjx*ngen)
-      call bcast(cel(1,1,1,l_),zero,iyjx*ngen)
-      call bcast(cfl(1,1,1,l_),zero,iyjx*ngen)
-      call bcast(eal(1,1,1,1,l_),zero,iyjx*ngen*2)
-      call bcast(ebl(1,1,1,1,l_),zero,iyjx*ngen*2)
+      call bcast(cal(1,1,1,l_),zero,iymax*jx*ngen)
+      call bcast(cbl(1,1,1,l_),zero,iymax*jx*ngen)
+      call bcast(ccl(1,1,1,l_),zero,iymax*jx*ngen)
+      call bcast(cdl(1,1,1,l_),zero,iymax*jx*ngen)
+      call bcast(cel(1,1,1,l_),zero,iymax*jx*ngen)
+      call bcast(cfl(1,1,1,l_),zero,iymax*jx*ngen)
+      call bcast(eal(1,1,1,1,l_),zero,iymax*jx*ngen*2)
+      call bcast(ebl(1,1,1,1,l_),zero,iymax*jx*ngen*2)
+            !YuP[2021-03-11] Changed iy-->iymax 
+            !(just in case if iy is changed by iy=iy_(l_) somewhere)
 
 c..................................................................
 c     if only gen. species contributions are desired execute jump..
@@ -64,7 +66,7 @@ c     for relativistic calculations.
 c..................................................................
 
         temp_loc=temp(kbm,lr_)
-        if (cqlpmod .eq. "enabled") temp_loc=temppar(kbm,ls_)
+        if (cqlpmod.eq."enabled") temp_loc=temppar(kbm,ls_)
 
 !! YuP[08-2017] alternative to the following section: Use table cfpm() instead:
 !! See if(cfp_integrals.eq.'enabled')  section
@@ -199,11 +201,18 @@ c     the contribution to all general species coeff.
 c.......................................................................
 
         if (cqlpmod .ne. "enabled") then
-          call bavdens(kbm)
-        else
-          do 59 i=1,iy
-            bavdn(i,lr_)=denpar(kbm,ls_)
-            bavpd(i,lr_)=denpar(kbm,ls_)*sinn(i,l_)
+          call bavdens(kbm) !CQL3D only
+        else ! (cqlpmod.eq."enabled")
+          do 59 i=1,iy_(l_) !iymax !YuP[2021-03-11] iy-->iy_(l_)
+            bavdn(i,lr_)=denpar(kbm,ls_) !CQLP
+            bavpd(i,lr_)=denpar(kbm,ls_)*sinn(i,l_) !CQLP
+            !YuP[2021-03] Logically, it would be better to use 
+            ! bavdn(i,ls_) and bavpd(i,ls_) here, in CQLP part,
+            !i.e., index ls_ instead of lr_.
+            !However, it does not matter. bavdn(:,lr_) is only used
+            !locally here, so the index lr_ or ls_ does not matter.
+            !Just be sure that below, at cfl() = line, 
+            !they are used with the same index. 
  59       continue
         endif
 
@@ -218,17 +227,17 @@ c     general  to the Max. species.
         do 80 ka=1,ngen  !Loop over gen species, adding bkgrnd coeffs
           anr1=gama(ka,kbm)*satioz2(kbm,ka)*one_  !ln(Lambda)*(Z_k/Z_kk)**2
           anr2=anr1*satiom(ka,kbm)              !*mass_kk/mass_k
-          call bcast(tem1,zero,iyjx)
-          call bcast(tem2,zero,iyjx)
+          call bcast(tem1,zero,iymax*jx)
+          call bcast(tem2,zero,iymax*jx)
           
           do 70 j=2,jx
             ttta=anr2*tam10(j)*gamefac(j,kbm) !if gamafac="enabled" or "hesslow", then
             tttb=anr1*tam11(j)*gamefac(j,kbm) !use gamefac for en dep gama
             tttf=anr1*tam12(j)*gamefac(j,kbm) !YuP[2019-07-26] kbm index added
-            do 60 i=1,iy
-              jj=i+(j-1)*iy 
-              tem1(jj)=ttta*vptb(i,lr_)*bavdn(i,lr_)
-              tem2(jj)=tttb*vptb(i,lr_)*bavdn(i,lr_)
+            do 60 i=1,iymax !!YuP[2021-03-11] Changed iy-->iymax
+              jj=i+(j-1)*iymax
+              tem1(jj)=ttta*vptb(i,lr_)*bavdn(i,lr_) !saved for eal()
+              tem2(jj)=tttb*vptb(i,lr_)*bavdn(i,lr_) !saved for ebl()
               cal(i,j,ka,l_)=cal(i,j,ka,l_)+tem1(jj)
               cbl(i,j,ka,l_)=cbl(i,j,ka,l_)+tem2(jj)
              cfl(i,j,ka,l_)=cfl(i,j,ka,l_)+tttf*vptb(i,lr_)*bavpd(i,lr_)
@@ -241,13 +250,15 @@ ccc             prnt5(i)=bavpd(i,lr_)
 ccc          enddo
 
           if(kbm.eq.kelecm) then
-            call daxpy(iyjx,one,tem1,1,eal(1,1,ka,1,l_),1)
-            call daxpy(iyjx,one,tem2,1,ebl(1,1,ka,1,l_),1)
+            call daxpy(iymax*jx,one,tem1,1,eal(1,1,ka,1,l_),1)
+            call daxpy(iymax*jx,one,tem2,1,ebl(1,1,ka,1,l_),1)
+            !YuP[2021-03-11] Changed iy-->iymax 
+            !(just in case if iy is changed by iy=iy_(l_) somewhere)
           else
             do 101 i=1,nionm
               if(kbm.eq.kionm(i)) then
-                call daxpy(iyjx,one,tem1,1,eal(1,1,ka,2,l_),1)
-                call daxpy(iyjx,one,tem2,1,ebl(1,1,ka,2,l_),1)
+                call daxpy(iymax*jx,one,tem1,1,eal(1,1,ka,2,l_),1)
+                call daxpy(iymax*jx,one,tem2,1,ebl(1,1,ka,2,l_),1)
 
 cBH180807:  Saving individual Maxwl ion components of coll operator
 cBH180807:                call daxpy(iyjx,one,tem1,1,eal(1,1,ka,kbm+1,l_),1)
@@ -389,8 +400,7 @@ cBH180807:  use with radial transport moment codes.
            !so that gscreen(nstates,j)=0 for all j.
            !But the first term still works, as for a fully-ionized ion:
            ! Zion2*coulomb_log_ei
-           do i=1,iy
-             jj=i+(j-1)*iy 
+           do i=1,iy_(l_) !YuP[2021-03-11] Changed iy-->iy_(l_) 
              !Find bounce-av. density of this ionization state;
              !similar to subr.bavdens, only replace reden(k,lr_)-->dens_imp(kstate,lr_)
              bavpd_imp=batot(i,lr_)*sinn(i,lmdpln_)*dens_imp(kstate,lr_)
@@ -523,7 +533,7 @@ cBH180807:  use with radial transport moment codes.
           !Also here: satiom(ka,k)==mass_kk/mass_k =1.
           !Use bounce-av. density of this ionization state;
           !similar to subr.bavdens, only replace reden(k,lr_)-->dens_imp(kstate,lr_)
-          call bcast(tem1,zero,iyjx)
+          call bcast(tem1,zero,iymax*jx)
           do j=2,jx
            ! We only need to add contribution for the "A" term -  
            ! drag of (free)electron on (bound)electrons.
@@ -532,8 +542,8 @@ cBH180807:  use with radial transport moment codes.
            !Note that density is included here.
            !It is multiplied by hbethe(kstate,j), which contains 
            !z_bound= z_imp-z_state ! Nej in paper (number of bound electrons)
-           do i=1,iy
-             jj=i+(j-1)*iy 
+           do i=1,iymax !YuP[2021-03-11] Changed iy-->iymax 
+             jj=i+(j-1)*iymax
              tem1(jj)= ttta*vptb(i,lr_) !for contributing to eal() below
              cal(i,j,kelecg,l_)= cal(i,j,kelecg,l_)+tem1(jj) !free_e on bound_e
              ! ka=kelecg here (electron_general)
@@ -584,7 +594,7 @@ c..................................................................
         do 250 k=1,ngen
           if (k.ne.ngen) then
             do 220 j=1,jx
-              do 210 i=1,iy
+              do 210 i=1,iymax
                 if(2.*f(i,j,k,l_)-f_(i,j,k,l_).gt.0.) then
                   fxsp(i,j,k,l_)= 2.*f(i,j,k,l_)-f_(i,j,k,l_)
                 else
@@ -613,7 +623,7 @@ c.......................................................................
       if (cqlpmod .ne. "enabled") then
         iorbstr=1
         iorbend=lz  ! Whole flux surface, eqsym="none", else half FS.
-      else
+      else ! (cqlpmod.eq."enabled")
         iorbstr=l_
         iorbend=l_
       endif
@@ -631,7 +641,7 @@ cBH180906   The coding also needs adding to cfpcoefr.f.
 
       do 600 l=iorbstr,iorbend
         ileff=l
-        if (cqlpmod .eq. "enabled") ileff=ls_
+        if (cqlpmod.eq."enabled") ileff=ls_
 
         do 500 k=1,ngen
 c.................................................................
@@ -644,12 +654,12 @@ c..................................................................
 
 c     zero ca, cb,.., cf  : 
 CPTR>>>REPLACE PTR-BCASTCACD
-          call bcast(ca,zero,iyjx)
-          call bcast(cb,zero,iyjx)
-          call bcast(cc,zero,iyjx)
-          call bcast(cd,zero,iyjx)
-          call bcast(ce,zero,iyjx)
-          call bcast(cf,zero,iyjx)
+          ca=zero !call bcast(ca,zero,iyjx)
+          cb=zero !call bcast(cb,zero,iyjx)
+          cc=zero !call bcast(cc,zero,iyjx)
+          cd=zero !call bcast(cd,zero,iyjx)
+          ce=zero !call bcast(ce,zero,iyjx)
+          cf=zero !call bcast(cf,zero,iyjx)
 CPTR<<<END PTR-BCASTCACD
 
           mu1=0
@@ -670,7 +680,13 @@ CPTR<<<END PTR-BCASTCACD
 c     compute V_m_b in tam1(j), for given l, m and gen. species b
 c     coeff. of Legendre decomposition of f (using temp3)
             call cfpleg(m,ileff,1) !-> tam1
+!            do j=1,jx
+!              if((j/15)*15.eq.j)then
+!              write(*,*)' after cfpleg: m, V_m=tam1(j)=',m,tam1(j)
+!              endif
+!            enddo
 
+            ! tam2(1)=0.d0 !YuP: should be added ?
             tam2(jx)=0.
             tam3(1)=0.
             tam4(jx)=0.
@@ -720,7 +736,7 @@ c     not linear. (not used)
 c..................................................................
             do 302 j=2,jx
               xs=sqrt(temp(k,lr_)*ergtkev*0.5/fmass(k))
-              if (cqlpmod .eq. "enabled")
+              if (cqlpmod.eq."enabled")
      +          xs=sqrt(temppar(k,ls_)*ergtkev*0.5/fmass(k))
               if (x(j)*vnorm.gt.xs) goto 303
  302        continue
@@ -736,7 +752,7 @@ c990131              tam21(j)=alog(tam1(j)/tam1(j+1))/(gamm1(j+1)-gamm1(j))
  304        continue
             rstmss=fmass(k)*clite2/ergtkev
             reltmp=rstmss/temp(k,lr_)
-            if (cqlpmod .eq. "enabled") reltmp=rstmss/temppar(k,ls_)
+            if (cqlpmod.eq."enabled") reltmp=rstmss/temppar(k,ls_)
             call bcast(tam23,zero,jx*8)
             nintg=max0(21,min0(51,int(x(2)/sqrt(.2*cnorm2/reltmp))))
             nintg=2*(nintg/2)+1
@@ -851,7 +867,28 @@ c.......................................................................
               shxxx(j)=cog(m,9)*tam6(j)-cog(m,10)*tam9(j)-
      *          cog(m,11)*tam8(j)+cog(m,12)*tam7(j)
               shxxx(j)=gamcub(j)*x3i(j)*shxxx(j)
+!              if((j/15)*15.eq.j)then
+!                write(*,'(a,2i4,1p5e10.3)')
+!     +          'm,j, urel[cm/s], enerkev, f, A_m, B_m[cgs]=',
+!     +           m,j, x(j)*vnorm, enerkev(j,k), 
+!     +           temp3(1,j)/vnorm**3, sh(j)*vnorm, sg(j)*vnorm ![cgs]
+!!     +      1e6*temp3(1,j)/(vnorm/1e2)**3, 1e6*sh(j)*(vnorm/1e2), 1e6*sg(j)*(vnorm/1e2) ![SI]
+!              endif
  340        continue
+ 
+!            gn=0.d0 !Test
+!            do j=1,jx
+!            do i=1,iy
+!            !Test/check: compute density n[m^-3]
+!            !1e6*  to convert cm^-3 to m^-3,
+!            ! vnorm/1e2 gives m/s;  temp3 contains f_code
+!            gn= gn+ (1e6*temp3(i,j)/(vnorm/1e2)**3)
+!     +              *(cint2(j)*cynt2(i,l_)*(vnorm/1e2)**3)
+!            enddo
+!            enddo
+!            write(*,*)'n[m^-3]=',gn 
+!            !Test: Yes, verified.
+!            pause
 
 c.......................................................................
 c     compute A_a, B_a, ..., F_a as in GA report GA-A20978 p.11, 
@@ -894,9 +931,15 @@ c$$$ 370          continue
 c$$$ 380        continue
 c$$$c     end of loop over m
 c     sum over m: Add contribution from each m
-
+              !Note: for CQLP, ileff= l= l_=ls_, index along s
               do 380 iii=1,imax(ileff,lr_)
-                if(iii.ge.itl+1 .and. mod(m,2).eq.1) goto 380 !YuP
+                if(symtrap.eq."enabled")then !YuP[2021-04-02] added symtrap condition
+                  !Note that this skipping (goto 380)
+                  !is only valid for bounce-averaging process.
+                  !It should not be applied for CQLP (which runs with 
+                  !symtrap='disabled' only)
+                  if(iii.ge.itl+1 .and. mod(m,2).eq.1) goto 380 !YuP-111202
+                endif
                 !YuP-111202: This removes a bug in the calculation of
                 !YuP-111202: collisional contribution to C,D, and F.
                 !YuP-111202: Check YuP Email to BH, 111201
@@ -906,8 +949,14 @@ c     sum over m: Add contribution from each m
                 !parity in theta0-(pi/2): even parity for ca,cb,cf; 
                 !odd parity for cc,cd,ce (they are ~ dPm/dtheta). 
                 !No further symmetrization needed.
+                ! [but only valid for CQL3D]
                 do 370 ii=0,1
-                i=iii*ii-(iy+1-iii)*(ii-1) ! i=iy+1-iii or i=iii
+                i=iii*ii-(iy_(l_)+1-iii)*(ii-1) ! i=iy+1-iii or i=iii
+                !YuP[2021-03-11] iy-->iy_(l_)
+                !CQLP: l=index along field line, 
+                !      and here l takes the single value of l_
+                !CQL3D: l=index along pol.angle, scanning 1:lz range,
+                !      while l_ is fixed (given radial index)
                 do 360 j=2,jx
                  ca(i,j)=ca(i,j)+ss(i,ileff,m,lr_)*tam2(j)*gamefac(j,k) !YuP[2019-07-26] k index added
                  cb(i,j)=cb(i,j)+ss(i,ileff,m,lr_)*tam3(j)*gamefac(j,k) !YuP[2019-07-26] k index added
@@ -927,9 +976,13 @@ c     sum over m: Add contribution from each m
 
           if (madd.eq.2 .or. symtrap.ne."enabled") goto 430
 
-c     symmetrize in trap region
+c     symmetrize in trap region (if symtrap.eq."enabled")
           do 420 i=itl+1,iyh
-            iu=iy+1-i
+            iu=iy_(l_)+1-i !YuP[2021-03-11] iy-->iy_(l_)
+            !CQLP: l=index along field line, 
+            !      and here l takes the single value of l_
+            !CQL3D: l=index along pol.angle, scanning 1:lz range,
+            !      while l_ is fixed (given radial index)
             do 410 j=2,jx
               ca(i,j)=.5*(ca(i,j)+ca(iu,j))
               cb(i,j)=.5*(cb(i,j)+cb(iu,j))
@@ -963,14 +1016,16 @@ c.......................................................................
             anr1=gama(kk,k)*satioz2(k,kk)*one_
             if (anr1.lt.em90) goto 490
 CPTR>>>REPLACE PTR-DSCALCACD
-            call dscal(iyjx,anr1,ca(1,1),1) !-YuP: size of ca..cf: iy*jx
-            call dscal(iyjx,anr1,cb(1,1),1)
-            call dscal(iyjx,anr1,cc(1,1),1)
-            call dscal(iyjx,anr1,cd(1,1),1)
-            call dscal(iyjx,anr1,ce(1,1),1)
-            call dscal(iyjx,anr1,cf(1,1),1)
-            call dscal(iyjx,satiom(kk,k),ca(1,1),1)
-            call dscal(iyjx,satiom(kk,k),cd(1,1),1)
+            call dscal(iymax*jx,anr1,ca(1,1),1) !-YuP: size of ca..cf: iy*jx
+            call dscal(iymax*jx,anr1,cb(1,1),1)
+            call dscal(iymax*jx,anr1,cc(1,1),1)
+            call dscal(iymax*jx,anr1,cd(1,1),1)
+            call dscal(iymax*jx,anr1,ce(1,1),1)
+            call dscal(iymax*jx,anr1,cf(1,1),1)
+            call dscal(iymax*jx,satiom(kk,k),ca(1,1),1)
+            call dscal(iymax*jx,satiom(kk,k),cd(1,1),1)
+            !YuP[2021-03-11] Changed iy-->iymax 
+            !(just in case if iy is changed by iy=iy_(l_) somewhere)
 CPTR<<<END PTR-DSCALCACD
 
             
@@ -983,7 +1038,11 @@ c.......................................................................
 
 c     Perform the bounce averaging
               do 480 i=1,imax(l,lr_)
-                ii=iy+1-i
+                !CQLP: l=index along field line, 
+                !      and here l takes the single value of l_
+                !CQL3D: l=index along pol.angle, here scanning 1:lz range,
+                !      while l_ is fixed (given radial index)
+                ii=iy_(l_)+1-i !YuP[2021-03-11] iy-->iy_(l_) Here: CQL3D
                 ax=abs(coss(i,l_))*dtau(i,l,lr_)
                 ay=tot(i,l,lr_)/sqrt(bbpsi(l,lr_))
                 az=ay*tot(i,l,lr_)
@@ -1045,10 +1104,14 @@ cBH180906: species from itself and other species.
  470            continue
  480          continue ! i=1,imax(l,lr_)
 
-            else ! cqlpmod = "enabled"
-              do 485 i=1,iy
+            else ! (cqlpmod.eq."enabled")
+              do 485 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_) Here: CQLP
+                !CQLP: l=index along field line, 
+                !      and here l takes the single value of l_
+                !CQL3D: l=index along pol.angle, scanning 1:lz range,
+                !      while l_ is fixed (given radial index)
                 do 486 j=2,jx
-                  cal(i,j,kk,l_)=cal(i,j,kk,l_)+ca(i,j)
+                  cal(i,j,kk,l_)=cal(i,j,kk,l_)+ca(i,j) 
                   cbl(i,j,kk,l_)=cbl(i,j,kk,l_)+cb(i,j)
                   ccl(i,j,kk,l_)=ccl(i,j,kk,l_)+cc(i,j)
                   cdl(i,j,kk,l_)=cdl(i,j,kk,l_)+cd(i,j)
@@ -1060,14 +1123,16 @@ cBH180906: species from itself and other species.
 
 CPTR>>>REPLACE PTR-DSCAL2
             fscal= one/anr1
-            call dscal(iyjx,fscal,ca(1,1),1)
-            call dscal(iyjx,fscal,cb(1,1),1)
-            call dscal(iyjx,fscal,cc(1,1),1)
-            call dscal(iyjx,fscal,cd(1,1),1)
-            call dscal(iyjx,fscal,ce(1,1),1)
-            call dscal(iyjx,fscal,cf(1,1),1)
-            call dscal(iyjx,one/satiom(kk,k),ca(1,1),1)
-            call dscal(iyjx,one/satiom(kk,k),cd(1,1),1)
+            call dscal(iymax*jx,fscal,ca(1,1),1)
+            call dscal(iymax*jx,fscal,cb(1,1),1)
+            call dscal(iymax*jx,fscal,cc(1,1),1)
+            call dscal(iymax*jx,fscal,cd(1,1),1)
+            call dscal(iymax*jx,fscal,ce(1,1),1)
+            call dscal(iymax*jx,fscal,cf(1,1),1)
+            call dscal(iymax*jx,one/satiom(kk,k),ca(1,1),1)
+            call dscal(iymax*jx,one/satiom(kk,k),cd(1,1),1)
+            !YuP[2021-03-11] Changed iy-->iymax 
+            !(just in case if iy is changed by iy=iy_(l_) somewhere)
 CPTR<<<END PTR-DSCAL2
 
  490      continue ! kk=1,ngen
@@ -1124,16 +1189,18 @@ c..................................................................
 
       do 2000 k=1,ngen
         fscal= one/tnorm(k)  !tnorm=vnorm**3/(GAM1*one_), see ainvnorm.f
-        call dscal(iyjx,fscal,cal(1,1,k,l_),1)
-        call dscal(iyjx,fscal,cbl(1,1,k,l_),1)
-        call dscal(iyjx,fscal,ccl(1,1,k,l_),1)
-        call dscal(iyjx,fscal,cdl(1,1,k,l_),1)
-        call dscal(iyjx,fscal,cel(1,1,k,l_),1)
-        call dscal(iyjx,fscal,cfl(1,1,k,l_),1)
-        call dscal(iyjx,fscal,eal(1,1,k,1,l_),1)
-        call dscal(iyjx,fscal,ebl(1,1,k,1,l_),1)
-        call dscal(iyjx,fscal,eal(1,1,k,2,l_),1)
-        call dscal(iyjx,fscal,ebl(1,1,k,2,l_),1)
+        call dscal(iymax*jx,fscal,cal(1,1,k,l_),1)
+        call dscal(iymax*jx,fscal,cbl(1,1,k,l_),1)
+        call dscal(iymax*jx,fscal,ccl(1,1,k,l_),1)
+        call dscal(iymax*jx,fscal,cdl(1,1,k,l_),1)
+        call dscal(iymax*jx,fscal,cel(1,1,k,l_),1)
+        call dscal(iymax*jx,fscal,cfl(1,1,k,l_),1)
+        call dscal(iymax*jx,fscal,eal(1,1,k,1,l_),1)
+        call dscal(iymax*jx,fscal,ebl(1,1,k,1,l_),1)
+        call dscal(iymax*jx,fscal,eal(1,1,k,2,l_),1)
+        call dscal(iymax*jx,fscal,ebl(1,1,k,2,l_),1)
+        !YuP[2021-03-11] Changed iy-->iymax 
+        !(just in case if iy is changed by iy=iy_(l_) somewhere)
 
 c..................................................................
 c     For the case that colmodl=3, a positive definite operator
@@ -1143,9 +1210,12 @@ c     user manual) and should be used with care. Caveat emptor!
 c     In any case if we get negative diffusion from the model,
 c     it is set to zero to keep the code from blowing up.
 c..................................................................
+
         if (colmodl.eq.3) then
           do 2004 j=1,jx
-            do 2005 i=1,iy
+            do 2005 i=1,iymax
+            !YuP[2021-03-11] Changed iy-->iymax 
+            !(just in case if iy is changed by iy=iy_(l_) somewhere)
               if(cbl(i,j,k,l_).lt.0.) then
                  cbl(i,j,k,l_)=em100
               endif
@@ -1156,6 +1226,26 @@ c..................................................................
  2004     continue
         endif
  2000 continue
+ 
+!           k=1
+!           write(*,*)'   n,k,l_=',n,k,l_
+!           gam1=4.*pi*(charge*bnumb(k))**4/fmass(k)**2
+!           do j=1,jx
+!             if((j/15)*15.eq.j)then
+!                write(*,'(a,i4,1pe12.4,1p7e11.3)')
+!     +          'j, urel[cm/s], enerkev, A,B,C,D,E,F[cgs]=',
+!     +           j, x(j)*vnorm, enerkev(j,k), 
+!     +           cal(2,j,1,1)*tnorm(k),
+!     +           cbl(2,j,1,1)*vnorm*tnorm(k),
+!     +           ccl(2,j,1,1)*tnorm(k),
+!     +           cdl(2,j,1,1)*tnorm(k),
+!     +           cel(2,j,1,1)*vnorm*tnorm(k),
+!     +           cfl(iyh,j,1,1)*tnorm(k)/vnorm
+!             endif
+!             ! *tnorm is to remove fscal factor applied above.
+!           enddo
+           !pause
+
 
 c Bug (from Gary Kerbel, Oct 31, 2005) needs checking:
 c Take difference of eal (linear part for electron + 2nd part from ions)

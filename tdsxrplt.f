@@ -166,7 +166,9 @@ CMPIINSERT_INCLUDE
       character*8  pltsxrvw
 
       REAL*4 ZTOP
-      REAL*4 RTAB1(LFIELDA),RTAB2(LFIELDA)
+      REAL*4 RTAB1(LFIELD),RTAB2(LFIELD) !local
+      !YuP[2021-04] Changed to lfield
+
       REAL*4 PGER1,PGERNNR,PGEZNNZ
       REAL*4 :: R4P15=.15,R4P85=.85,R4P9=.9,R40=0.
 
@@ -222,7 +224,7 @@ c      write(*,*)'tdsxrvw: PGER1,PGERNNR=',PGER1,PGERNNR
       endif
 
       do 10 l=1,lrzmax
-         IF (LORBIT(L).GT.LFIELDA) STOP 'tdsxrvw: CHECK DIM OF RTAB1/2'
+         IF (LORBIT(L).GT.LFIELD) STOP 'tdsxrvw: CHECK DIM OF RTAB1/2'
 
         if(eqsym.ne."none") then 
 c     Up-Down symmetric flux surfaces are plotted:
@@ -239,6 +241,7 @@ c     Up-Down symmetric flux surfaces are plotted:
            
         else
 c     Full flux surface contours are plotted:
+           ioutput(1)=0 !not accessible from comm.h in this subr.
            if (ioutput(1).ge.2) then !YuP[2020] diagnostic printout
            write(*,*)
            write(*,*)'tdsxrplt: l,lorbit(l)=',l,lorbit(l)
@@ -255,18 +258,21 @@ c     Full flux surface contours are plotted:
         endif
  10   continue
 
-      if(eqsym.eq.'none' .and. ncontr.gt.1) then
+      if(eqsym.eq.'none' .and. ncontr.gt.3) then
         ! YuP[2015/05/03] Add LCFS, if available
-        ncontr_= min(ncontr,LFIELDA)
+        ncontr_= min(ncontr,LFIELD)
         do ilim=1,ncontr_
            RTAB1(ilim)=rcontr(ilim)
            RTAB2(ilim)=zcontr(ilim)
         enddo
+        CALL PGSCI(3) !green color
         CALL PGLINE(ncontr_,RTAB1,RTAB2)
+        CALL PGSCI(1) !restore black color
       endif
 
       iistep=0
-      do 30 nn=1,nv
+      CALL PGSCI(2) !red color
+      do 30 nn=1,nv !View chords (sightlines)
 
         do 40 j=1,lensxr(nn)
            if(j.le.iyjx)  then
@@ -285,6 +291,7 @@ c        write(*,*) 'tdsxrvw: RRTAB2',(RRTAB2(jj),jj=1,lensxr(nn))
         iistep=iistep+lensxr(nn)
 
  30   continue
+      CALL PGSCI(1) !restore black color
  
       deallocate(rrtab1,STAT=istat) 
       deallocate(rrtab2,STAT=istat) 

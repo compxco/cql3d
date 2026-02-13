@@ -14,13 +14,17 @@ CMPIINSERT_INCLUDE
       REAL*4 RLRZAP(0:LRZA)
       !YuP[2019-09] REAL*4 LNWIDTH ! It is integer, in name_decl.h
 
-      REAL*4 :: R40=0.,R41P44=1.44,R42P5=2.5,R4P5=.5
+      REAL*4 :: R40=0.,R41P44=1.44,R42P5=2.5,R4P5=.5,R41P5=1.5,R41P2=1.2
       REAL*4 :: R41=1.,R42=2.,R43=3.,R44=4.,R45=5.,R46=6.,R41P8=1.8
-      REAL*4 :: R47=7.,R48=8.
+      REAL*4 :: R47=7.,R48=8.,R45P5=5.5
       REAL*4 :: R4P2=.2,R4P8=.8,R4P6=.6,R4P9=.9
-      REAL*4 :: R4P05=.05,R4P95=.95,R41P3=1.3
+      REAL*4 :: R4P05=.05,R4P95=.95,R41P3=1.3 
+      REAL*4 :: R4MP2=-0.2 
 
       character*16 t_horiz
+      
+      real*8 wk_lrz(lrza),
+     +       sorpw_nbi_all(lrza), sorpw_nbii_all(lrza) ! local
 
 c..................................................................
 c     This routine plots a number of current drive diagnostics
@@ -322,17 +326,39 @@ C-----------------------------------------------------------------------
 C     IF NO POWER NO PLOT
 C-----------------------------------------------------------------------
 C%OS  
-c     Adjust for kfrsou=0 (can occur when no NBI):
-      if (kfrsou.ne.0) then
-         kfrsou1=kfrsou
-      else
-         kfrsou1=1
-      endif
 
-      IF (sorpwtza .le. 1.0e-25) go to 809
+cBH171014:  Need to check whether more than kfrsou(1) needed for
+cBH171014:  more than 1 beamline species.
+c     Adjust for kfrsou=0 (can occur when no NBI):
+cyup      if (kfrsou(1).ne.0) then
+cyup         kfrsou1=kfrsou(1)
+cyup      else
+cyup         kfrsou1=1
+cyup      endif
+cyup: kfrsou1 is not used anymore [2018-06-27],
+cyup: Instead, plot/print values for each k_gen species
+cyup: or print/plot values of the sum over k_gen, see below.
+      
+      !YuP[2018-06-27] Added, for plots: sum of sorpw_nbi over all k_gen
+      sorpw_nbi_all= 0.d0 ! initialize
+      sorpw_nbii_all=0.d0 ! initialize
+      do l=1,lrzmax
+      do k=1,ngen
+         sorpw_nbi_all(l)= sorpw_nbi_all(l) +sorpw_nbi(k,l)
+         sorpw_nbii_all(l)=sorpw_nbii_all(l)+sorpw_nbii(k,l)
+         !YuP: might include KO source pwr, if e_general is present
+      enddo
+      enddo
+
+      !write(*,*)'tdpltjop: sorpwtza=', sorpwtza, maxval(sorpwt)
+      IF (abs(sorpwtza)+maxval(powurf).le.1.e-25) goto 809 !IF NO POWER NO PLOT
+      !YuP[2022-05-10] Sometimes sorpwtza is negative 
+      !(from instability in distr func)
+      ! although powurf is positive. Added abs(), and also
+      ! added maxval(powurf) for the if() check above.
 C%OS  
       ! PRINT OUT OF SOURCE POWER (WATTS/CC): 
-      ! sorpwt(l),sorpw_nbi(kfrsou,l),sorpw_rf(1,l),sorpw_rf(2,l),sorpw_rf(3,l)
+      ! sorpwt(l),sorpw_nbi(k,l),sorpw_rf(1,l),sorpw_rf(2,l),sorpw_rf(3,l)
       CALL PGPAGE  
       CALL PGSVP(R4P05,R4P95,R4P05,R4P95)
       RILIN=0.
@@ -357,13 +383,15 @@ C%OS
 c     Start printing results on first page
       do 10  l=1,min(40,lrzmax)
         if (ngen.eq.1) then
-          write(t_,6015) tr(l),sorpwt(l),sorpw_nbi(kfrsou1,l),
-     1      sorpw_rf(1,l)
-        elseif (ngen.eq.2) then
-          write(t_,6016) tr(l),sorpwt(l),sorpw_nbi(kfrsou1,l),
+          !YuP[2018-06-27] print the sum of sorpw_nbi over all k_gen
+          write(t_,6015) tr(l),sorpwt(l), sorpw_nbi_all(l),sorpw_rf(1,l)
+        elseif (ngen.eq.2) then 
+          !YuP[2018-06-27] print the sum of sorpw_nbi over all k_gen
+          write(t_,6016) tr(l),sorpwt(l), sorpw_nbi_all(l),
      1      sorpw_rf(1,l),sorpw_rf(2,l)
-        else
-          write(t_,6017) tr(l),sorpwt(l),sorpw_nbi(kfrsou1,l),
+        else ! ngen=3
+          !YuP[2018-06-27] print the sum of sorpw_nbi over all k_gen
+          write(t_,6017) tr(l),sorpwt(l), sorpw_nbi_all(l),
      1      sorpw_rf(1,l),sorpw_rf(2,l),sorpw_rf(3,l)
         endif
         CALL PGMTXT('T',-RILIN,R40,R40,t_)
@@ -376,14 +404,15 @@ c     Continue printing results on second page, if lrzmax.gt.40
          CALL PGSVP(R4P05,R4P95,R4P05,R4P95)
          RILIN=0.+3.
          do l=41,lrzmax
+           !YuP[2018-06-27] print the sum of sorpw_nbi over all k_gen
             if (ngen.eq.1) then
-               write(t_,6015) tr(l),sorpwt(l),sorpw_nbi(kfrsou1,l),
+               write(t_,6015) tr(l),sorpwt(l),sorpw_nbi_all(l),
      1              sorpw_rf(1,l)
             elseif (ngen.eq.2) then
-               write(t_,6016) tr(l),sorpwt(l),sorpw_nbi(kfrsou1,l),
+               write(t_,6016) tr(l),sorpwt(l),sorpw_nbi_all(l),
      1              sorpw_rf(1,l),sorpw_rf(2,l)
             else
-               write(t_,6017) tr(l),sorpwt(l),sorpw_nbi(kfrsou1,l),
+               write(t_,6017) tr(l),sorpwt(l),sorpw_nbi_all(l),
      1              sorpw_rf(1,l),sorpw_rf(2,l),sorpw_rf(3,l)
             endif
             CALL PGMTXT('T',-RILIN,R40,R40,t_)
@@ -400,7 +429,7 @@ c     Continue printing results on second page, if lrzmax.gt.40
       write(t_,6022) sorpwtza !sorpwtza=sorpwti(lrzmax) !NBI+RF, all gen.species
       CALL PGMTXT('T',-RILIN,R40,R40,t_)
       RILIN=RILIN+1.
-      write(t_,6023) sorpw_nbii(kfrsou1,lrzmax)     ! NBI only
+      write(t_,6023) sorpw_nbii_all(lrzmax) ! NBI only (sum over k_gen)
       CALL PGMTXT('T',-RILIN,R40,R40,t_)
       RILIN=RILIN+1.
       if (ngen.ge.1) then
@@ -499,11 +528,11 @@ c     Continue printing results on second page, if lrzmax.gt.40
          enddo
       endif
 
- 6115 format(f5.3, 2(1x,e9.2) )
- 6116 format(f5.3, 3(1x,e9.2) )
- 6117 format(f5.3, 4(1x,e9.2) )
- 6118 format(f5.3, 5(1x,e9.2) )
- 6119 format(f5.3, 6(1x,e9.2) )
+ 6115 format(f5.3, 2(1x,1pe9.2) )
+ 6116 format(f5.3, 3(1x,1pe9.2) )
+ 6117 format(f5.3, 4(1x,1pe9.2) )
+ 6118 format(f5.3, 5(1x,1pe9.2) )
+ 6119 format(f5.3, 6(1x,1pe9.2) )
       
       RILIN=RILIN+2.
       write(t_,6122) sorpwtza
@@ -597,10 +626,13 @@ c..................................................................
       CALL PGSLW(LNWIDTH) ! line thickness/width
       CALL PGMTXT('T',R46,R4P5,R4P5,
      +              'FSA SOURCE POWER DEN: (WATTS/CM\u3\d)')
+      CALL PGSCI(1) !black color
       CALL PGMTXT('T',R45,R40,R40,
      ~   "Solid: NBI(or KO)+RF for all gen.sp.[sorpwt]")
+      CALL PGSCI(2) !red color
       CALL PGMTXT('T',R44,R40,R40,
      ~   "Dashed: NBI (or KO) [sorpw_nbi]")
+      CALL PGSCI(1) !black color
       CALL PGMTXT('T',R43,R40,R40,
      ~   "Solid-bold: total absorbed RF power [powrft]")
       CALL PGMTXT('T',R42,R40,R40,
@@ -628,11 +660,14 @@ c..................................................................
         CALL PGLINE(lrzmax,RLRZAP1(1),RLRZAP11(1))
         CALL PGSLS(2) ! 2-> dashed
         CALL PGSCI(2) ! red color
-        DO I=1,LRZMAX
-           RLRZAP12(I)=sorpw_nbi(kfrsou1,I) ! dashed: NBI(or KO) only
-        ENDDO
-        CALL PGLINE(lrzmax,RLRZAP1(1),RLRZAP12(1))
-      do k=1,ngen ! rf sources for general species
+	
+      do k=1,ngen ! NBI and rf sources for general species
+           DO I=1,LRZMAX
+             RLRZAP12(I)=sorpw_nbi(k,I) ! dashed: NBI only
+             !YuP[2018-06-27] For each k_gen now
+           ENDDO
+           CALL PGSLS(2) !NBI:  dashed, for each k=k_gen 
+           CALL PGLINE(lrzmax,RLRZAP1(1),RLRZAP12(1)) ! NBI, each k
          DO I=1,LRZMAX
             RLRZAP12(I)=sorpw_rf(k,I) 
          ENDDO
@@ -656,6 +691,10 @@ c..................................................................
       CALL PGLAB(' ','power density (W/cm\u3\d)',' ')
       CALL PGMTXT('B',R41P8,R4P5,R4P5,t_horiz)
       CALL PGUNSA
+      RILIN=6.
+      write(t_,10150) n,timet 
+      CALL PGMTXT('B',RILIN,R4MP2,R40,t_) ! n,time
+10150 format("time step (n) is",i5,5x,"time=",1pe12.4," secs")      
       ! DONE FSA SOURCE POWER 
 
       
@@ -681,8 +720,16 @@ c..................................................................
       ! Vertical axis limits:
       call aminmx(powrft(1),1,lrzmax,1,gmin,gmax,kmin,kmax)
       RPG1=gmin ! could be negative because of numerical errors
-      RPG2=gmax*1.2 ! give 20% extra
-      RPG1=min(gmin,0.) !Make lower limit 0 when gmin>0 
+      RPG2=gmax
+      !YuP[2018-06-27] Added min/max estimate from sorpw_rf
+      do k=1,ngen ! rf sources for general species
+        wk_lrz(1:lrzmax)=sorpw_rf(k,1:lrzmax)
+        call aminmx(wk_lrz,1,lrzmax,1,gmin,gmax,kmin,kmax)
+        RPG1=min(RPG1,gmin) 
+        RPG2=max(RPG2,gmax)
+      enddo
+      RPG1=min(RPG1,0.) !Make lower limit 0 when gmin>0 
+      RPG2=RPG2*1.2 ! give 20% extra
       IF ( RPG2-RPG1 .le. 1.e-16 ) THEN ! YuP [02-23-2016]
          RPG2= RPG1+1.e-16
       ENDIF
@@ -738,12 +785,15 @@ c..................................................................
         CALL PGSVP(R4P2,R4P8,R4P2,R4P6)
         CALL PGSAVE
         CALL PGSCH(R41P44)
+        CALL PGSCI(1) !black color
         CALL PGMTXT('T',R46,R4P5,R4P5,
      +              'SOURCE POWER (integr. up to rho or psi) (WATTS)')
         CALL PGMTXT('T',R45,R40,R40,
      ~   "Solid: NBI(or KO)+RF for all gen.sp.[sorpwti]")
+        CALL PGSCI(2) !red color
         CALL PGMTXT('T',R44,R40,R40,
      ~   "Dashed: NBI(or KO) [sorpw_nbii]")
+        CALL PGSCI(1) !black color
         CALL PGMTXT('T',R43,R40,R40,
      ~   "Solid-bold: total absorbed RF [powurfi(*,0)]")
         CALL PGMTXT('T',R42,R40,R40,
@@ -766,23 +816,27 @@ c..................................................................
         CALL PGSWIN(RPGmin,RPGmax,RPG1,RPG2)
         CALL PGBOX('BCNST',R40,0,'BCNST',R40,0)
         CALL PGSLS(1) ! 1-> Solid line
+        CALL PGSCI(1) !black color
         DO I=1,LRZMAX
            RLRZAP11(I)=sorpwti(i) !solid: NBI(or KO)+RF(all gen.species)
         ENDDO
         CALL PGLINE(lrzmax,RLRZAP1(1),RLRZAP11(1))
-        CALL PGSLS(2) ! 2-> dashed
-        DO I=1,LRZMAX
-           RLRZAP12(I)=sorpw_nbii(kfrsou1,I) ! dashed: NBI only
-        ENDDO
-        CALL PGLINE(lrzmax,RLRZAP1(1),RLRZAP12(1))
       do k=1,ngen ! rf sources for general species
+           CALL PGSLS(2) ! 2-> dashed
+           CALL PGSCI(2) !red color
+           DO I=1,LRZMAX
+           RLRZAP12(I)=sorpw_nbii(k,I) !dashed: NBI, each k_gen
+           ENDDO
+           CALL PGLINE(lrzmax,RLRZAP1(1),RLRZAP12(1)) ! NBI
          DO I=1,LRZMAX
             RLRZAP12(I)=sorpw_rfi(k,I) 
          ENDDO
+         CALL PGSCI(1) !black color
          CALL PGSLS(k+2) ! 3-> -.-.- ;   4-> .....
          CALL PGLINE(lrzmax,RLRZAP1(1),RLRZAP12(1))
       enddo ! k=1,ngen
       CALL PGSLS(1) ! solid
+      CALL PGSCI(1) !black color
       CALL PGSLW(LNWIDTH+1) ! bold
       DO I=1,LRZMAX
          RLRZAP13(I)=powurfi(i,0) ! = SUM_harmonics{powurfi(l,harmonics)}
@@ -794,6 +848,9 @@ c..................................................................
       CALL PGSCH(R41P44)
       CALL PGLAB(' ','Int power: 0 to psi (or rho)',' ')
       CALL PGMTXT('B',R41P8,R4P5,R4P5,t_horiz)
+      RILIN=6.
+      write(t_,10150) n,timet 
+      CALL PGMTXT('B',RILIN,R4MP2,R40,t_) ! n,time
       CALL PGUNSA ! restore
 
 
@@ -857,74 +914,11 @@ c..................................................................
       CALL PGUNSA ! restore
 
 c..................................................................
-c     J/P print out
-c..................................................................
-
-c$$$      call gxglfr(0)
-c$$$      call gscpvs(.5,.99)
-c$$$      call gstxjf("center","top")
-c$$$      call gstxno(40.)
-c$$$      call gitxft(ift)
-c$$$      if (ift .ne. ift07a) call gstxft(ift07a)
-c$$$      call gptx2d("J/P-(AMPS/WATT);$")
-c$$$      call gitxft(ift)
-c$$$      if (ift.ne.ift21a) call gstxft(ift21a)
-c$$$      call gstxno(100.)
-c$$$      call gstxjf("center","top")
-c$$$      call gscpvs(.5,.93)
-c$$$      write(t_,8010) pltvs
-c$$$      call gptx2d(t_)
-c$$$ 8010 format(4x,a8,2x," J/P (fi)   J/P (fi+e)","$")
-c$$$      do 801 l=1,lrzmax
-c$$$        write(t_,8011) tr(l),bdre(l),bdrep(l)
-c$$$        call gptx2d(t_)
-c$$$ 801  continue
-c$$$ 8011 format((1x,1pe10.3,2x,e10.3,2x,e10.3),"$")
-C%OS  call gxglfr(0)
-C%OS  call gscpvs(.5,.95)
-C%OS  call gstxjf("center","top")
-C%OS  call gstxno(40.)
-C%OS  call gitxft(ift)
-C%OS  if (ift .ne. ift07a) call gstxft(ift07a)
-C%OS  call gptx2d("J/P - (AMPS/WATT);$")
-C%OS  call gitxft(ift)
-C%OS  if (ift.ne.ift21a) call gstxft(ift21a)
-C%OS  call gstxno(100.)
-C%OS  call gscvlb(1)
-c$$$      fmin=0.
-c$$$      fmax=0.
-c$$$      call aminmx(bdrep(1),1,lrzmax,1,fmin,fmax,kmin,kmax)
-c$$$      call aminmx(bdre(1),1,lrzmax,1,fminn,fmaxx,kmin,kmax)
-c$$$      if (fminn.lt.fmin) fmin=fminn
-c$$$      if (fmaxx.gt.fmax) fmax=fmaxx
-c$$$      if (fmax-fmin.lt.1.e-8) fmin=fmax-.1*abs(fmax)-1.e-5
-c$$$      call gswd2d("linlin$",tr(1),tr(lrzmax),fmin,fmax)
-c$$$      call gsvp2d(.2,.9,.15,.6)
-c$$$      call gscvft(0.)
-c$$$      text(1)="fi+e$"
-c$$$      call gscvtx(loc(text))
-c$$$      call gpgr80("linlin$")
-c$$$      call gpcv2d(tr(1),bdrep(1),lrzmax)
-c$$$      call gscvft(.3)
-c$$$      text(1)="fi$"
-c$$$      call gscvtx(loc(text))
-c$$$      call gpcv2d(tr(1),bdre,lrzmax)
-c$$$      call gstxan(90.)
-c$$$      call gscpvs(.01,.375)
-c$$$      call gscvlb(0)
-c$$$      write(t_,8080)
-c$$$      call gptx2d(t_)
-c$$$ 8080 format("fi - J/P for fast ions - NBI",";",
-c$$$     1  "fi+e - J/P (fast ions+electrons - NBI+RF)","$")
-c$$$      call gstxan(0.)
-c$$$      call gscpvs(.57,.1)
-c$$$      call gptx2d(t_)
-
-c..................................................................
 c     Print out figures af merit and other average quantities.
 c..................................................................
 
  809  CONTINUE
 
+      CALL PGSCH(R41) ! restore to default font size      
       return
       end

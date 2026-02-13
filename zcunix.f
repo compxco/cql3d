@@ -677,12 +677,7 @@ cdir$ nobounds
 c
 c     arithmetic statement function used to locate entries in f and w arrays
 c
-      ii(index)=(index-1)*int+1
-c
-c
-c
-c
-c
+!YuP[2022-12] was statement func: ii(index)=(index-1)*int+1
 c
 c     the following call is for gathering statistics on library use at ncar
       if (q8q4) then
@@ -767,7 +762,7 @@ c     compute tridiagonal arrays
 c
 c     apply boundary conditions at boundary 2.
 c
-      in = ii(n)
+      in =(n-1)*int+1 !YuP[2022-12] was statement func: ii(n)=(n-1)*int+1
       go to (108,109,110,111),ml
 c
 c     second derivative given at boundary 2.
@@ -816,7 +811,7 @@ c
      2  a12*a13/(a14*a24*a34)*f(j4)
       go to 109
  112  continue
-      iw1 = ii(i1)
+      iw1 =(i1-1)*int+1 !YuP[2022-12] was statement func: ii(i1)=(i1-1)*int+1
       call trip (nn,wk(i1,3),wk(i1,1),wk(i1+1,3),wk(i1,2),w(iw1),int)
       go to (114,114,113,114),mk
  113  continue
@@ -824,7 +819,9 @@ c
  114  continue
 cdir$ bounds
       return
-      end
+      end subroutine coeff1
+      
+      
       subroutine coeff2 (nx,x,ny,y,f,fxx,fyy,fxxyy,idm,ibd,wk)
       implicit integer (i-n), real*8 (a-h,o-z)
 c
@@ -896,22 +893,27 @@ c
  107  continue
  108  continue
       return
-      end
+      end subroutine coeff2
+      
       subroutine intrp (n,x,f,w,y,i,int,tab,itab)
-      implicit integer (i-n), real*8 (a-h,o-z)
-      dimension       x(i+1)    ,f(i*int+1)    ,w(i*int+1)  ,tab(3)
-     -  ,itab(3)
+      implicit none !integer (i-n), real*8 (a-h,o-z)
+      integer n,i,int !IN
+      real*8 y
+      integer i0,ip !local
+      real*8 flk,flp,fl0,a,b,c
+      real*8       x(i+1)    ,f(i*int+1)    ,w(i*int+1)  ,tab(3) !IN
+      integer itab(3) !IN
 c
 c     arithmetic statement function used to locate entries in f and w arrays
 c
-      ii(index)=(index-1)*int+1
+!YuP[2022-12] was statement func:  ii(index)=(index-1)*int+1
 c
 c     perform interpolation or extrapolation
 c
       flk = x(i+1)-x(i)
       flp = x(i+1)-y
       fl0 = y-x(i)
-      i0 = ii(i)
+      i0 = (i-1)*int+1 !YuP[2022-12] was statement func [used once] ii(i)
       ip = i0+int
       if (itab(1) .ne. 0) go to 101
       go to 102
@@ -947,10 +949,16 @@ c
       tab(3) = (w(i0)*flp+w(ip)*fl0)/flk
  106  continue
       return
-      end
+      end subroutine intrp
+      
+      
       subroutine search (xbar,x,n,i)
-      implicit integer (i-n), real*8 (a-h,o-z)
-      dimension       x(n)
+      implicit none !integer (i-n), real*8 (a-h,o-z)
+      real*8 xbar !IN
+      real*8 x(n) !IN
+      integer n,i !IN, OUT
+      integer k,m,nm1 !local
+      real*8 b !local
       save b
       data b/.69314718/
 c
@@ -967,7 +975,7 @@ c
 c
 c     find maximum power of two less than n
 c
-      m = int((alog(float(n)))/b)
+      m = int((log(dfloat(n)))/b) !YuP[2022-12-19] was FLOAT, alog()
       i = 2**m
       if (i .ge. n) i = i/2
       k = i
@@ -984,12 +992,14 @@ c
       if (xbar .le. x(i+1)) return
       i = min0(i+k,nm1)
       go to 103
-      end
+      end subroutine search
+      
+      
       subroutine terp1 (n,x,f,w,y,int,tab,itab)
       implicit integer (i-n), real*8 (a-h,o-z)
 c
-      dimension       x(n)       ,f(n*int)       ,w(n*int)    ,tab(3),
-     1  itab(3)
+      real*8  x(n)       ,f(n*int)       ,w(n*int)    ,tab(3) !IN
+      integer itab(3) !IN
 c     the following call is for gathering statistics on library use at ncar
       logical q8q4
       save q8q4
@@ -1006,7 +1016,7 @@ c     carry out interpolation (or extrapolation)
 c
       call intrp (n,x,f,w,y,i,int,tab,itab)
       return
-      end
+      end subroutine terp1
 
 
       real*8 function terp2 
@@ -1070,6 +1080,7 @@ c     subroutine intrp and corrected problem with
 c     version numbers in one statistics call
 c-----------------------------------------------------------------------
       end
+      
       subroutine searche (xbar,x,n,i,dx)
       implicit integer (i-n), real*8 (a-h,o-z)
       dimension       x(n)
@@ -1182,6 +1193,8 @@ c     subroutine intrp and corrected problem with
 c     version numbers in one statistics call
 c-----------------------------------------------------------------------
       end
+      
+      
       subroutine trip (n,a,b,c,y,z,int)
       implicit integer (i-n), real*8 (a-h,o-z)
       dimension       a(n)       ,b(n)       ,c(n)       ,y(n)       ,
@@ -1189,7 +1202,7 @@ c-----------------------------------------------------------------------
 c
 c     arithmetic statement function used to locate entries in array z.
 c
-      ii(index)=(index-1)*int+1
+!YuP[2022-12] was statement func: ii(index)=(index-1)*int+1
 c
 c     gaussian elimination
 c
@@ -1216,15 +1229,15 @@ c
       yn = yn-v*y(n-2)
       v = a(n)-v*b(n-2)
 c     back substitution
-      iin = ii(n)
+      iin = (n-1)*int+1 !YuP[2022-12] was statement func: ii(n)=(n-1)*int+1
       z(iin) = (yn-v*y(n-1))/(bn-v*b(n-1))
-      iin2 = ii(n-1)
+      iin2 =(n-2)*int+1 !YuP[2022-12] was statement func: ii(n-1)=(n-2)*int+1
       z(iin2) = y(n-1)-b(n-1)*z(iin)
       nm1 = n-1
-      in = ii(n)
+      in = (n-1)*int+1 !YuP[2022-12] was statement func: ii(n)=(n-1)*int+1
       do 102 j=2,nm1
         k = n-j
-        ik = ii(k)
+        ik = (k-1)*int+1 !YuP[2022-12] was statement func: ii(k)=(k-1)*int+1
         ikt = ik+int
       z(ik) = y(k)-b(k)*z(ikt)-a(k)*z(in)
       if(j.eq.(-n)) write(*,140) b(k), y(k), a(k), z(ikt),z(ik)

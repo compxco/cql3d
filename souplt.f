@@ -1,6 +1,7 @@
 c
 c
       subroutine souplt
+      !called pltmain-->souplt, for each ll=1:lrors
       implicit integer (i-n), real*8 (a-h,o-z)
 
 c..................................................................
@@ -15,7 +16,7 @@ c..................................................................
       REAL*4 RILIN
       REAL*4 RTAM1(jx),RTAM2(jx)
       REAL*4 REMAX,REMIN
-      REAL*4 :: R4MP2=-.2,R40=0.
+      REAL*4 :: R4MP2=-.2,R40=0.,R41=1.
 
       if (pltso.eq."disabled") return
       
@@ -24,9 +25,10 @@ c..................................................................
       
          temp1=0.d0 ! initialize for each k species
 
-         if (xlncur(k,lr_).lt.1.e-10) goto 10
+         if (xlncur(k,l_).lt.1.e-10) goto 10 !YuP[2022-02-11] now l_ (was lr_)
 cBH171231         if(frmodp.eq.'enabled')then ! NBI source
-           call dcopy(iyjx2,source(0,0,k,indxlr_),1,temp1(0,0),1)
+           !call dcopy(iyjx2,source(0,0,k,indxlr_),1,temp1(0,0),1) !before[2022-02-11]
+           call dcopy(iyjx2,source(0,0,k,l_),1,temp1(0,0),1) ![2022-02-11]
 cBH171231         endif
          write(t_,550) k
  550     format(1x,"Species ",i2,
@@ -34,8 +36,9 @@ cBH171231         endif
          CALL PGPAGE
          itype=3 ! means: plots are made for source
          call pltcont(k,1,t_,itype) ! for source
-cBH171231         crnt_nbi=xlncur(k,lr_)*zmaxpsii(lr_) ! [ptcl/sec/cm^3]
-         crnt=xlncur(k,lr_)*zmaxpsii(lr_) ! [ptcl/sec/cm^3]
+cBH171231         crnt_nbi=xlncur(k,l_)*zmaxpsii(lr_) ! [ptcl/sec/cm^3]
+         crnt=xlncur(k,l_)*zmaxpsii(lr_) ! [ptcl/sec/cm^3]
+             !YuP[2022-02-11] now l_ (was lr_)
 
 cBH171231         write(t_,540) crnt_nbi
 cBH171231 540     format("NBI source rate=",1pe11.4," ptcls/cc/sec")
@@ -75,6 +78,7 @@ c     Plot the speed-integrated source,
 c     as a function of pitch angle theta0 at the midplane    
 cyup      call pltso_theta  !YuP[06-2016]
    
+      CALL PGSCH(R41) ! restore to default font size      
       return
       end
 c
@@ -92,7 +96,7 @@ c
       REAL*4 RTAM1(jx),RTAM2(jx), wk_tam(jx)
       REAL*4 REMAX,REMIN
       REAL*4 :: R4MP2=-.2,R40=0.,R4P2=.2,R4P8=.8,R4P45=.45,R4P9=.9
-      REAL*4 :: R41P44=1.44
+      REAL*4 :: R41P44=1.44,R41=1.
       real*8 wkd(jx) 
 
       character*8 target
@@ -102,9 +106,10 @@ c
       do 20 k=1,ngen
       
         temp3=0.d0 ! initialize for each k species
-        if (xlncur(k,lr_).lt.1.e-10) goto 20
+        if (xlncur(k,l_).lt.1.e-10) goto 20 !YuP[2022-02-11] now l_ (was lr_)
 cBH171231        if(frmodp.eq.'enabled')then ! NBI source
-          call dcopy(iyjx2,source(0,0,k,indxlr_),1,temp3(0,0),1) ! temp3
+          !call dcopy(iyjx2,source(0,0,k,indxlr_),1,temp3(0,0),1) !!before[2022-02-11]
+          call dcopy(iyjx2,source(0,0,k,l_),1,temp3(0,0),1) ![2022-02-11]
 cBH171231        endif
 
 c-----YuP[2018-01-08] revised to match cqlinput_help:
@@ -131,7 +136,7 @@ c**                    from 0. to pltlimm (kev).
             target="ionmesh"
             jxq=jlwr 
             xmaxq=xlwr ! xlwr is set in cqlinput
-            !iyjxq=iy*jlwr
+            !iyjxq=iy_(l_)*jlwr
             tx_='u/vnorm'
             do j=1,jxq
                !tam1(j)=x(j)
@@ -258,6 +263,7 @@ c       Obtain integrated distribution in tam1
  20   continue ! k species
 
 
+      CALL PGSCH(R41) ! restore to default font size      
       return
       end
 
@@ -277,31 +283,35 @@ c
 CMPIINSERT_INCLUDE
 
       REAL*4 RILIN
-      REAL*4 RTAM1(iy),RTAM2(iy)
+      REAL*4 RTAM1(iymax),RTAM2(iymax)
+      !YuP[2021-03-11] Changed iy-->iymax in declarations
+      !(just in case if iy is changed by iy=iy_(l_) somewhere)
+
       REAL*4 REMAX,REMIN
       REAL*4 :: R4MP2=-.2,R40=0.,R4P2=.2,R4P8=.8,R4P45=.45,R4P9=.9
       REAL*4 :: R41P44=1.44
 
-      real*8 wk_so(iy)
+      real*8 wk_so(iymax)
       character*8 vert_scale ! 'log10' or 'lin'
       
       vert_scale='log10' !'lin'
-      do i=1,iy
-        RTAM1(i)=y(i,lr_)*180.0/pi  ! horizontal.axis: theta0 (degree)
+      do i=1,iy_(l_)
+        RTAM1(i)=y(i,l_)*180.0/pi  ! horizontal.axis: theta0 (degree)
       enddo
       
       do 20 k=1,ngen ! sources for each general sp. are plotted
       
         temp3=0.d0 ! initialize for each k species (i,j)
-        if (xlncur(k,lr_).lt.1.e-10) goto 20
+        if (xlncur(k,l_).lt.1.e-10) goto 20 !YuP[2022-02-11] now l_ (was lr_)
         
         if(frmodp.eq.'enabled')then ! NBI source
-          call dcopy(iyjx2,source(0,0,k,indxlr_),1,temp3(0,0),1) ! temp3
+          !call dcopy(iyjx2,source(0,0,k,indxlr_),1,temp3(0,0),1) !before[2022-02-11]
+          call dcopy(iyjx2,source(0,0,k,l_),1,temp3(0,0),1) ![2022-02-11]
         endif
          
 
-c       Obtain integrated distribution into wk_so(1:iy)
-        do i=1,iy
+c       Obtain integrated distribution into wk_so(1:iy_(l_))
+        do i=1,iy_(l_)
            wk_so(i)=0. ! initialize
         do j=1,jx
            wk_so(i)= wk_so(i)+ temp3(i,j)*cint2(j)
@@ -309,18 +319,18 @@ c       Obtain integrated distribution into wk_so(1:iy)
            !cynt2= 2pi*sin(theta0)*dtheta0
         enddo
         WRITE(*,'(a,2i5,2e13.5)')
-     +   'pltso_theta: lr_,i,y(i,lr_)*180.0/pi,wk_so(i)=',
-     +        lr_,i, y(i,lr_)*180.0/pi, wk_so(i)
+     +   'pltso_theta: lr_,i,y(i,l_)*180.0/pi,wk_so(i)=',
+     +        lr_,i, y(i,l_)*180.0/pi, wk_so(i)
         enddo 
         !In case of isotropized distribution: 
         !  Int(wk_so(i)*cynt2(i)) is density (per sec.)
 
-        call aminmx(wk_so,1,iy,1,fmin,fmax,kmin,kmax)
+        call aminmx(wk_so,1,iy_(l_),1,fmin,fmax,kmin,kmax)
         if(fmax.lt.em90) goto 20 !-> Almost no source , next k species
         
         if(vert_scale.eq.'log10')then
           fmin=1.e-03*fmax ! limit the lower range (for log scale)
-          do i=1,iy
+          do i=1,iy_(l_)
             if (wk_so(i) .lt. fmin ) wk_so(i)=fmin
             RTAM2(i)=LOG10(wk_so(i))
           enddo
@@ -332,7 +342,7 @@ c       Obtain integrated distribution into wk_so(1:iy)
            fmax= fmax+1.e-16
            fmin= fmin-1.e-16
           ENDIF
-          RTAM2(1:iy)=wk_so(1:iy) ! Units: vnorm^3 *(reactions/sec)/cm^3 
+          RTAM2(1:iy_(l_))=wk_so(1:iy_(l_)) ! Units: vnorm^3 *(reactions/sec)/cm^3 
           ! Should be divided by vnorm^3 to obtain physical units 
           ! (reactions/sec)/cm^3 /(cm/sec)^3
           REMIN=fmin*0.99
@@ -341,7 +351,7 @@ c       Obtain integrated distribution into wk_so(1:iy)
 
         CALL PGPAGE
         CALL PGSVP(R4P2,R4P8,R4P45,R4P9)
-        CALL PGSWIN(Rtam1(1),Rtam1(iy),Remin,Remax)
+        CALL PGSWIN(Rtam1(1),Rtam1(iy_(l_)),Remin,Remax)
         if(vert_scale.eq.'log10')then
         CALL PGBOX('BCNST',R40,0,'BCNSTL',R40,0)
         else
@@ -351,7 +361,7 @@ c       Obtain integrated distribution into wk_so(1:iy)
         CALL PGSCH(R41P44)
         CALL PGLAB('theta0 (degree)','S0(theta0)','v-integrated Source')
         CALL PGUNSA
-        CALL PGLINE(iy,RTAM1,RTAM2)
+        CALL PGLINE(iy_(l_),RTAM1,RTAM2)
 
         write(t_,10040) k
 10040   format("Particle source integrated over v for species",i2)

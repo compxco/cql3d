@@ -9,7 +9,7 @@ c
       include 'param.h'
       include 'comm.h'
 
-      REAL*4 RTAM1(LZA),RTAM2(LZA)
+      REAL*4 RTAM1(lz),RTAM2(lz) !YuP[2021-04] lza-->lz
       REAL*4 RPGMIN,RPGMAX
       REAL*4 RILIN,PGCOORD
 

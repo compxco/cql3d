@@ -6,7 +6,7 @@ c
 
 c..................................................................
 c     Routine computes density gain due to particle sources and losses
-c     during the during theta sweep in exsweep.
+c     during the theta sweep in exsweep.
 c     gains are positive - losses are negative.
 c     2- density gained due to setting negative values of
 c     distribution function to 0 during theta sweep.
@@ -21,7 +21,7 @@ c..................................................................
 c     Add in the source contribution.
 c..................................................................
 
-      sgain(3,k)=xlncur(k,lr_)*.5*dtr+sgain(3,k)
+      sgain(3,k)=xlncur(k,l_)*.5*dtr+sgain(3,k) !YuP[2022-02-11] now l_ (was lr_)
       call dcopy(iyjx2,temp2(0,0),1,temp1(0,0),1)
       s=0.
       if (ineg .eq. "disabled") go to 350
@@ -31,7 +31,7 @@ c     if desired set negative values of distribution function = 0.
 c..................................................................
 
       do 300 j=1,jx
-        do 301 i=1,iy
+        do 301 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
           if(temp2(i,j) .lt. 0.) then
             temp1(i,j)=zero
             temp4(i,j)=-temp2(i,j)

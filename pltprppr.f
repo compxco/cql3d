@@ -44,18 +44,22 @@ c     (which may conflict with call fle_fsa or fle_pol, below).
         endif
 c       Obtain equatorial plane pitch-avg'd distribution for ko model
 c       case.  (Else setup interfere's with subroutine sourceko).
-        if ((knockon.ne."disabled").and.(n.ge.nonko).and.(n.le.noffko)
-     &                                                          ) then
+!        if ((knockon.ne."disabled").and.(n.ge.nonko).and.(n.le.noffko)
+!     &                                                          ) then
             !YuP[2020-12-22] Added (n.ge.nonko).and.(n.le.noffko)
             !In cqlinput, knockon could be set to 'enabled' (or other),
             !but effectively it is disabled because of large 
             !value of nonko=10000 (example).
 c           call fle("setup",0)
 c           call fle("calc",1)
-            write(*,*)'pltprppr: Not ready for knockon=enabled'
-        elseif (lrz.eq.1) then
-           call fle_pol("setup",0)
-           call fle_pol("calc",1)
+!            write(*,*)'pltprppr: Not ready for knockon=enabled'
+        if (lrz.eq.1) then
+           call fle_pol("setup",0) ! lp=0 is of no importance during setup
+           if(cqlpmod.ne."enabled")then !YuP[2021-03-08] added if()
+             call fle_pol("calc",1) ! lp=1 means midplane position
+           else !(cqlpmod.eq."enabled")  !YuP[2021-03-08] added for CQLP
+             call fle_pol("calc",l_) ! lp=l_ means position along B line (CQLP)
+           endif
         else
            call fle_fsa("setup")
            call fle_fsa("calc")
@@ -67,7 +71,8 @@ c     plot (fll(+xpar)-fll(-xpar)), and xpar*(fll(+xpar)-fll(-xpar))
         tem1(1)=0.0
         tem2(1)=0.0
         do 30  jp=1,jpxyhm
-          tem1(jp)=fl(jpxyh+jp-1)-fl(jpxyh-jp)    ! fll(+xpar)-fll(-xpar)
+          ![2022-03-19] Now fl() is computed&saved for each l_ 
+          tem1(jp)=fl(jpxyh+jp-1,l_)-fl(jpxyh-jp,l_) ! fll(+xpar)-fll(-xpar)
           tem2(jp)=xlm(jpxyh+jp-1)*tem1(jp) ! xpar*(fll(+xpar)-fll(-xpar))
 !           write(*,'(a,i4,2e11.3)')'lr_, xpar, fll(+xpar)-fll(-xpar)=', 
 !     &          lr_,xlm(jpxyh+jp-1),tem1(jp)
@@ -77,7 +82,7 @@ c     plot (fll(+xpar)-fll(-xpar)), and xpar*(fll(+xpar)-fll(-xpar))
         fmin=min(fmin1,fmin2)
         fmax=max(fmax1,fmax2)
         
-        CALL PGPAGE ! new page(s)
+        CALL PGPAGE !--------------------------------------- new page(s)
         CALL PGSVP(R4P2,R4P8,R4P25,R4P95) !(.2,.8,.25,.95)!YuP[2019-10-28]
         ! (XLEFT, XRIGHT, YBOT, YTOP)
         CALL PGSCH(R41) ! set character size; default is 1.
@@ -96,17 +101,28 @@ c     plot (fll(+xpar)-fll(-xpar)), and xpar*(fll(+xpar)-fll(-xpar))
 10012 format("(f_par normed so int(-1,+1)=equatorial ne)")
         RILIN=RILIN+1.
         CALL PGMTXT('B',RILIN,R40,R40,t_)
+        
+        if(cqlpmod.eq."enabled")then !YuP[2021-03-03] added for CQLP:
+        write(t_,10032) l_,sz(l_)
+        RILIN=RILIN+1.
+        CALL PGMTXT('B',RILIN,R40,R40,t_)
+        endif
        
-        CALL PGPAGE ! new page(s)
-        call aminmx(fl(1),1,2*jpxyhm,1,fmin,fmax,kmin,kmax)
+        CALL PGPAGE !--------------------------------------- new page(s)
+        ![2022-03-19] Now fl() is computed&saved for each l_ :
+        call aminmx(fl(1,l_),1,2*jpxyhm,1,fmin,fmax,kmin,kmax)
         fmin=1.d-08*fmax
         CALL PGSVP(R4P2,R4P8,R4P25,R4P95) !(.2,.8,.25,.95)!YuP[2019-10-28]
         CALL PGSCH(R41) ! set character size; default is 1.
         call GSWD2D("linlog$",xll,xlu,fmin,fmax)
         do 10 jj=1,2*jpxyhm
-          if (fl(jj) .lt. fmin ) fl(jj)=fmin
+          ![2022-03-19] Now fl() is computed&saved for each l_ :
+          if (fl(jj,l_) .lt. fmin ) fl(jj,l_)=fmin
  10     continue
-        call GPCV2D(xlm,fl,2*jpxyhm)
+        call GPCV2D(xlm(1:2*jpxyhm),fl(1:2*jpxyhm,l_),2*jpxyhm)
+        !YuP[2022-03-19] added explicit range for xlm();
+        !Note that xlm array is allocated as xlm(0:jfl),
+        !and fl is allocated as fl(0:jfl,1:lrors)
         
         write(t_,10013) k
 10013 format("parallel distribution function for species:",1x,i5)
@@ -134,6 +150,14 @@ c     plot (fll(+xpar)-fll(-xpar)), and xpar*(fll(+xpar)-fll(-xpar))
 10031 format("r/a=",e14.6,5x,"radial position (R) =",e14.6," cm")
         RILIN=RILIN+1.
         CALL PGMTXT('B',RILIN,R40,R40,t_)
+        
+        if(cqlpmod.eq."enabled")then !YuP[2021-03-03] added for CQLP:
+        write(t_,10032) l_,sz(l_)
+10032 format("Index along B, l=",i4, 4x,  
+     &       "Parallel position s=",1pe14.6," cm")
+        RILIN=RILIN+1.
+        CALL PGMTXT('B',RILIN,R40,R40,t_)
+        endif
         
         CALL PGSCH(R41) ! recover default 1.0 fontsize
         

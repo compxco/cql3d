@@ -21,6 +21,9 @@ c      save
       include 'param.h'
       include 'comm.h'
 CMPIINSERT_INCLUDE     
+
+      real*8,dimension(:,:,:),allocatable :: i0tran
+      
       save 
 !YuP[2020-02-06] Now sourcee-->sourceko is called from each mpirank>0 (at n>0)
 
@@ -40,6 +43,20 @@ c     Should probably replace jfl with jx, etc (bh, 980501).
       
       if (n.lt.nonko .or. n.gt.noffko .or. 
      +       knockon.eq."disabled") return
+     
+      if(kelecg.eq.0)then
+       if(ifirst.eq."first")then
+       WRITE(*,*)' subr.sourceko is only for electrons_general'
+       endif
+       return 
+      endif
+      if(cqlpmod.eq."enabled")then
+       if(ifirst.eq."first")then
+       WRITE(*,*)' subr.sourceko is not ready for CQLP'
+       endif
+       return 
+      endif
+     
       if (ampfmod.eq."enabled" .and. it_ampf.gt.1) return
      
       k=kelecg
@@ -53,6 +70,12 @@ c       Similarly, momenta area is in units of (mc)**2.
 
       if (ifirst.eq."first") then
          ifirst="notfirst"
+         
+         if (.NOT.ALLOCATED(i0tran)) then !
+            !YuP[2021-04] moved from comm.h to here [used locally only]
+            allocate(i0tran(i0param+1,lz,lrz),STAT=istat)
+         endif
+         
          call bcast(ppars,zero,jx*jfl)
          call bcast(pprps,zero,jx*jfl)
 c  pparea storage can be removed:   call bcast(pparea,zero,jx*jfl)
@@ -291,14 +314,15 @@ c..................................................................
       else ! isoucof=1
          if (soffvte.gt.0.) then
             if (faccof.lt.0.7) faccof=0.7
-cSC_did_not_like:        xvte3=amin1(soffvte,ucrit(kelec,lr_)*faccof)
-c990131            xvte3=amin1(soffvte*vthe(lr_)/vnorm,ucrit(kelec,lr_)*faccof)
-            xvte3=min(soffvte*vthe(lr_)/vnorm,ucrit(kelec,lr_)*faccof)
+cSC_did_not_like:        xvte3=amin1(soffvte,ucrit(kelec,l_)*faccof)
+c990131            xvte3=amin1(soffvte*vthe(lr_)/vnorm,ucrit(kelec,l_)*faccof)
+            !YuP[2021-04] (k,lr_) --> (k,l_)
+            xvte3=min(soffvte*vthe(lr_)/vnorm,ucrit(kelec,l_)*faccof)
             ! YuP: Why min() of the two? If vthe~0, then min() gives ~0.
             ! Maybe max() of the two?
          else ! soffvte.le.0.
             if (faccof.lt.0.5) faccof=0.5
-            xvte3=ucrit(kelec,lr_)*faccof
+            xvte3=ucrit(kelec,l_)*faccof
          endif
          !YuP[2020-01] Added: calculate  elecr() for mnemonic.nc,
          !similar to the isoucof.eq.0 section (few lines above):
@@ -312,6 +336,9 @@ c990131            xvte3=amin1(soffvte*vthe(lr_)/vnorm,ucrit(kelec,lr_)*faccof)
       endif
       call lookup(xvte3,x,jx,wtu,wtl,lement)
       jvte3=lement
+      if(jvte3.le.2)then
+        write(*,*)'sourceko/warn: jvte3(too small)=',jvte3
+      endif
 
 c  Distribution of primary knockon particles zeroed out (effectively)
 c    below velocity soffpr*(above source cutoff velocity):
@@ -320,6 +347,9 @@ c    (default soffpr=0.0)
       xsoffpr=soffpr*xvte3
       call lookup(xsoffpr,xl(jflh),jfl,wtu,wtl,lement)
       jsoffpr=min(lement,jfl)
+      if(jsoffpr.le.2)then
+        write(*,*)'sourceko/warn: jsoffpr(too small)=',jsoffpr
+      endif
 
 
       dens_bound_e=0.d0 ! for each given lr_, to be found below.
@@ -392,7 +422,7 @@ c     do jf=jflh-jsoffpr,jflh+jsoffpr
 
 
       do jf=jflh+1,jfl-1
-c     Skip calc if fl(jf) near minimum value:
+c     Skip calc if fl1(jf)+fl2(jf) near minimum value:
             if ((fl1(jf)+fl2(jf)).lt.em100*flmax) go to 99
      
             xpar1p=xl(jf)
@@ -474,7 +504,7 @@ cBH091031         endif
 c     Symmetrize trapped particles
       do  j=jvte3,jx
          do  i=itl,iyh
-            ii=iy+1-i
+            ii=iy_(l_)+1-i !  !YuP[2021-03-11] iy-->iy_(l_)
             source(i,j,k,indxlr_)=0.5*(source(i,j,k,indxlr_)
      +  	+source(ii,j,k,indxlr_)) ! for k=kelecg
             source(ii,j,k,indxlr_)=source(i,j,k,indxlr_)
@@ -509,8 +539,8 @@ c..................................................................
           s1=0.
           do j=jvte3,jx
           do i=1,iy
-             s1=s1+
-     +          source(i,j,k,indxlr_)*cynt2(i,l_)*cint2(j)*vptb(i,lr_)
+          !s1=s1+source(i,j,k,indxlr_)*cynt2(i,l_)*cint2(j)*vptb(i,lr_) !before[2022-02-11]
+          s1=s1+source(i,j,k,l_)*cynt2(i,l_)*cint2(j)*vptb(i,lr_) !after[2022-02-11]
           enddo
           enddo
           s1=s1/zmaxpsi(lr_)
@@ -594,7 +624,7 @@ CMPIINSERT_ENDIF_RANK
 c..................................................................
 c     As passed to subroutine souplt:
 c..................................................................
-      xlncur(1,lr_)=s1*zmaxpsi(lr_)
+      xlncur(1,l_)=s1*zmaxpsi(lr_) !YuP[2022-02-11] now l_ (was lr_)
 
  999  return
       end subroutine sourceko

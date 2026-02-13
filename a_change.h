@@ -8,8 +8,220 @@ c     This file documents changes in the code
 c
 c***********************************************************************
 
+
+------------------------------
+version="git_cql3d_251215.0"
+------------------------------
+
+c[360] Few adjustments, most important is related to cases 
+  when impurity species is added (to get the specified Zeff).
+  Maxwellian electrons are moved by one index;
+  it was done for central/edge values but not for powers 
+  in parabolic profiles. Added: 
+     !YuP[2025-12-12] Also need to move up powers npwr and mpwr:
+     mpwr(kelecm)=mpwr(kelecm-1) !For T_e_maxw
+     npwr(kelecm)=npwr(kelecm-1) !For T_e_maxw
+  Track changes by "[2025-12-12]"
+
+------------------------------
+version="git_cql3d_230113.4"
+------------------------------
+
+c[359] Corrected plot for E(rho) field at selected time steps -
+ the integration step and the time frame for this step are
+ properly identified and printed. The E field is set at the beginning
+ of each step. See notes in tdpltmne.f, around "YuP[2024-08-08]"
+
+c[358] Revised appearance of some plots in tdpltmne,
+ to have radial profiles as a func of rho and func of R in one page,
+ to have both the midplane and FSA profiles, etc.
+ YuP[2024-08-01]
+ 
+c[357] For NIMROD coupling, added radcoord="polflx" 
+ and "sqpolflx" (through psi_data). 
+ In subroutine read_data_files -
+ added detection of irow_lcfs,
+ which is found as the last irow where psi_data>0
+ (psi_data<0 is outside of LCFS) 
+ See YuP[2024-07-25] 
+ 
+c[356] The crash reported by S.G. Baek (MIT) -
+ when using soln_method='it3drv' and transp='enabled'.
+ The code hangs in MPI run at the last time step. 
+ Tracked the issue to "do 30" loop in tdchief,
+ particularly because of these two calls 
+ (they occur at n=nstop only):
+ call tdtrfcop(1) !copy frn-->f, and then call diaggnde
+ If soln_method='it3drv", frn (and fvn) is not used,
+ and then gn becomes 0.0 in diaggnde.
+ Once gn=0.0, the "stop" is triggered at this mpi core,
+ or the code may hang in diaggnde.
+ Added if(soln_method.ne.'it3drv')
+ condition around calls to tdtrfcop(*)
+ and diaggnde in the "do 30" loop.
+ See YuP[2024-07-25] 
+
+
+------------------------------
+version="cql3d_git_230113.2"
+------------------------------
+
+c[355] Enabled 'f4d_out' functionality, added 'f3d_out',
+ both adapted from CQL3D-FOW version. 
+ [2023-09-27]
+
+c[354] Correction in tdnpa0, similar to YuP[2021-11-05] in tdsxr0,
+ related to stepping along sightlines outside of plasma.
+ YuP[2023-08-10]
+
+c[353] Adjusted subroutine getsgxn which is used for NBI deposition
+ in rotating plasma. See comments around [2023-07-11].
+
+c[352] Bug in subr.synchrad - should NOT set arrays synca and syncd to 0
+ [as in call_bcast(synca,zero,iyjx*lrz)]
+ This subroutine is called for each lr, and bcast(...zero...)
+ was wiping data for all other lr !
+ YuP[2023-06-30]
+ 
+c[351] Added an option to read elecfld() array from previous run,
+  in case of a restart run. See tdreadf.f.
+  This option was already present for ampfmod='enabled',
+  but it is needed for efswtch.eq."method6", too.
+  YuP[2023-02-02]
+
+c[350] Changes/bug fixes in netcdfrw2.f, subr.netcdfvec,   
+  related to saving of flux_vectors in velocity space.
+  Made by Seung-Gyou Baek [2023-02-02],
+  see comments marked with "sgbaek".
+
+------------------------------
+version="cql3d_git_230113.0"
+------------------------------
+
+c[349] Another transfer of changes made in CQL3D-m version 
+  to this mainstream version.
+  Revised how certain arrays for FREYA are populated -
+  zti(), zni(), zzi(). Previously, the primary ion species kk=1:nprim 
+  for FREYA were selected among Maxwellian_ion list in cqlinput,
+  if available (in case of colmodl=3, these species are also present in 
+  general_ion list); if not available - they are taken 
+  from the general_ion list.
+  Now they are selected from general_ion list,
+  among first nprim ions. See cqlinput_help around 'nprim' and 'nimp',
+  also see subr.frstup for details.  
+  This change can make a difference for runs with colmodl=3,
+  where general ions are repeated in the Maxwellian_ion list.
+  If the density of general ions is allowed to grow (as a result of 
+  NBI source), and the NBI deposition is updated at each time step, 
+  it is important that the density of primary ions zni(kk=1:nprim)
+  is also updated. If those ions are referred to the Maxwellian_ion
+  list (as was done previously), their density is not updated. 
+  YuP[2023-01-10]
+
+c[348] YuP[2023-01-03] Made entrintr(:,:) array a pointer. 
+  Previously - static array, it was causing floating-point exception
+  and other issues (as in subr. diagentr_vol, see comments cBH120807,
+  cBH050616).
+
+c[347] Transfer of changes made in CQL3D-m version 
+  to this mainstream version. Mostly related to FREYA modules.
+  Enabling multiple beams capability (now kfrsou(1:nbeams) 
+  should be set for each beam), enabling capability to update 
+  NBI deposition at every time step.
+  YuP[2022-12-13..30] As a result of debugging - 
+  Many changes in Freya-related subroutines 
+  (reason: runs in gfortran fail with NaNs, when NBI deposition
+  is updated at every time step).
+  See frinitl.f, freya.f, frnfreya.f and zfreya.f.
+  It is found that the problem is mostly from
+  missing initializations (or wrong index range 
+  during initialization - search "BUG?" for details);
+  also, because of not-saved arrays that are defined during
+  initial call to freya/zfreya and then reused.
+  Most important changes are in subr. adasqh6.
+  Also see [2022-11-28] for resetting dummy=RANDOM_my(ranseed)
+  at each new call (each time step).  
+
+c[346] For the read_data coupling functionality, added an option
+  for setting the value of E field:
+  When elecfld_data='readdata', get E field directly from data file.
+  When elecfld_data='jspitzer', get E as j_data/resistivity
+  (the latter version was the only option until this change).
+  !YuP[2022-07-13]
+
+c[345] Adjusted subr. tdpltjop - 
+  The printout of table with powers and plots of p_RF profiles
+  were skipped in some cases,
+  because of if(sorpwtza.le.1d-25) check, 
+  and because sometimes sorpwtza is negative 
+  (from instability in distr func).
+  However, powurf is positive, at least for most of krf modes.
+  Changed to checking abs(sorpwtza)
+  instead of sorpwtza itself, and also
+  added maxval(powurf) for the if() condition.
+  YuP[2022-05-10] 
+
+
+c[344] version="cql3d_git_210125.3"
+   [Includes all changes related to CQLP 
+    and also changes related to NIMROD coupling] 
+
+
+c[344] Added 'fl' into netcdfrw2.f, which saves
+c[344] the value of reduced parallel distr. function F_par(v_par),
+c[344] and saves 'xl' = the normalized parallel momentum.
+c[344] It can be saved at each time step (use netcdfshort="long_jp"),
+c[344] otherwise it is saved at last time step only.
+c[344] The logic for saving is same as for 'currv' array,
+c[344] and the size of 'fl' is (1:jfl,1:lrors),
+c[344] so it would not take much space in mnemonic.nc file.
+c[344] See [2022-03-19] 
+
+
+c[343] version="cql3d_git_210125.2"
+       Moved rescaling of time-dependent density
+       from profiles.f to tdxinitl.f, where it is done like this:
+         redenc(1:nbctimea,1:ntotala)= enescal*redenc(:,:)
+         redenb(1:nbctimea,1:ntotala)= enescal*redenb(:,:)
+         enein_t(1:njenea,1:ntotala,1:nbctimea)=enescal*enein_t(:,:,:)
+       Now the above namelist variables are rescaled at once,
+       for all nbctime steps,
+       and there is no need to rescale "renden" in profiles.f
+       ![2022-03-10] 
+
+
+c[342] Small corrections in tdsxr*, tdnpa* diagnostics,
+   related to sightlines. Search "YuP[2021-11"
+
+c[341] Extensive changes related to CQLP branch 
+   of the code (cqlpmod="enabled"). It works now,
+   and passes conductivity tests quite well.
+   Not tested for MPI runs, needs checking.
+   Some of changes may affect CQL3D, e.g., related to conversion of 
+   many fixed-size arrays to pointers, 
+   changing iy to iy_(l_) in many places, etc.
+   In param.h, the parameter lza is not needed anymore
+   (just set lz in cqlinput; default is set to lz=40).
+   Also, lsa can be smaller than lrza now.  
+   Track changes by "YuP[2021-03", "YuP[2021-04", "YuP[2022-02", "YuP[2022-03" 
+
+c[340] Added automatic search of data files (from NIMROD).
+    In cqlinput, it is only necessary to specify:
+      read_data_filenames_prefix= 'rycq0'  (example; default is "notset")
+      read_data_filenames_suffix= '00.dat' (example; default is "notset")
+    These two variables are used by the code to form
+    a template for file names. 
+    Example: Consider data file 'rycq019800.dat', 
+    it is made of prefix 'rycq0',
+    followed by 3-digit number and suffix '00.dat'
+    The code will try to find all files from  rycq000000.dat 
+    to rycq099900.dat (max 1000 files, for now); 
+    (the sequence may have gaps in numbering range 000:999).   
+    YuP[2021-04-06]  also search "YuP[2021-08", related to Drr definition.
+    Also YuP[2022-01-06]
+
 c[339] version="cql3d_git_210125.1"
-c[339] New option for reading data files with plasma profiles
+    New option for reading data files with plasma profiles
     computed with other codes;
     presently setup for coupling with NIMROD only.
     See the new namelist var. read_data (presently can be 
@@ -72,7 +284,14 @@ c[333] Modified iprozeff="curr_fit" procedure, which changes Zeff
     and zrelax_exp (default is 1.d0). The procedure is similar to 
     that used in efswtch.eq."method4". See cqlinput_help for description.
     BH,YuP[2020-11-01]
-    
+
+c[333.1] Changed the default impurity ion species from charge/mass=50./50.*m_D
+c[333.1] to 100./100*m_D in ainsetva.f on 201030.
+c[333.1] This is a non-backwards compatible change in the code
+c[333.1] and creates somewhat modified results in cases
+c[333.1] where an ion species is added to attain a target Zeff.
+c[333.1] That is, with iprozeff.ne."disabled" and only 
+c[333.1] one ion species bnumb() is given.  See cqlinput_help. [BH: 210609]
 
 c[332] version="cql3d_git_200101.3"
 
@@ -2219,11 +2438,13 @@ c[-1] by Harvey and McCoy, as a 3D 2v-1r (v0,theta0,rho) FP
 c[-1] code based on (1) the cql 2D-in-v Kerbel and McCoy 
 c[-1] FP collision code at each flux surface, plus (2)
 c[-1] an added radial variable enabling accounting for rf
-c[-1] quasilinear of electrons and ions using ray tracing
+c[-1] quasilinear diffusion of electrons and ions using ray tracing
 c[-1] input data, determination of self-consistent distributions
 c[-1] and ray energy damping, developed by Harvey and McCoy 
 c[-1] [First reported for LH heating and current drive in a
-c[-1] combined IAEA paper by Soeldner et al., Washington, D.C., 1990.
+c[-1] combined IAEA paper by Soeldner et al., Washington, D.C., 1990.]
+c[-1] Kerbel moved on from the cql effort in ~1988, and McCoy from
+c[-1] cql/cql3d in 1990-91.
 c[-1] Radial dependent synthetic diagnostics have been added, such
 c[-1] as Bremsstrahlung xray emission.  ECE emission is calculated
 c[-1] from CQL3D distributions, in the HORACE code.

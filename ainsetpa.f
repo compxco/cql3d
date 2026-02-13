@@ -39,11 +39,12 @@ c000720      if (lrzmax .gt. lrza) lrzmax=lrza
       if (lrzmax .gt. lrza) stop 'ainsetpa: lrzmax.gt.lrza'
       if (ls.eq.0) ls=lsa
 c000720      if (lsa.lt.ls) ls=lsa
-      if (lsa.lt.ls) stop 'ainsetpa: lsa.lt.ls'
+      if(lsa.lt.ls)stop 'ainsetpa: ls>lsa; Increase lsa in param.h'
 c000720      if (lsmax .gt. lsa) lsmax=lsa
-      if (lsmax .gt. lsa) stop  'ainsetpa: lsmax .gt. lsa'
+      if(lsmax.gt.lsa) stop 'ainsetpa: lsmax>lsa; Increase lsa'
 
       if (lrzdiff .ne. "enabled") lrzmax=lrz
+      
       if (lrzmax .le. lrz) then
         lrzdiff="disabled"
         lrzmax=lrz
@@ -60,6 +61,7 @@ c000720      if (lsmax .gt. lsa) lsmax=lsa
           lsindx(l)=l
  101    continue
       endif
+
 
       if (lrzdiff .eq. "enabled") then
 
@@ -81,19 +83,20 @@ cdir$ novector
         indxlr(lrindx(l))=l
  110  continue
 
+
       if (cqlpmod .ne. "enabled") then
 
 c.......................................................................
 cl    2. CQL3D: CQL or CQL3D (radial coordinate as variable)
 c.......................................................................
 
-        lrors=lrz
+        lrors=lrz ! CQL3D (FPE radial grid)
         ls=1
         lsmax=1
         lsdiff="disabled"
         lsindx(1)=1
 
-      else
+      else ! (cqlpmod.eq."enabled")
 
 c.......................................................................
 c     3. CQLP (parallel): coordinate s along B is variable 
@@ -101,7 +104,7 @@ c        instead of radius
 c.......................................................................
  300    continue
 
-        lrors=ls
+        lrors=ls ! CQLP (FPE grid along field line)
         if (lsdiff .ne. "enabled") then
           do 310 ll=1,ls
             lsindx(ll)=ll
@@ -125,6 +128,29 @@ c     (need 4D storage arrays)
 
       endif
 
+      !YuP[2021-03-18] Added more pointers over lrors FPE grid.
+      !(Previously, these were statically dimensioned in comm.h). 
+      !Note: aclear,aindflt1 are called before ainalloc, so - 
+      !need to do some allocation here.
+      !(just after lrors is defined, see above)
+      if(.NOT.ASSOCIATED(itl_))then
+      allocate(itl_(lrors),STAT=istat)
+      allocate(itu_(lrors),STAT=istat)
+      allocate(iy_(lrors),STAT=istat)
+      allocate(iyh_(lrors),STAT=istat)
+      allocate(iyjx_(lrors),STAT=istat)
+      allocate(n_(lrors),STAT=istat)
+      allocate(nch(lrors),STAT=istat)
+      allocate(time_(lrors),STAT=istat)
+      endif
+      itl_(:)=0
+      itu_(:)=0
+      iy_(:)=0
+      iyh_(:)=0
+      iyjx_(:)=0
+      n_(:)=0
+      nch(:)=0
+      time_(:)=0.d0
 
 c.......................................................................
 cl    Set some physical, numerical and normalization constants.
@@ -175,7 +201,7 @@ c     Additional variable initialization
 c.......................................................................
 
       do 111 ll=0,lrza
-        lmdpln(ll)=ll
+        lmdpln(ll)=ll !radial index in CQL3D; For CQLP, it is reset to 1
  111  continue
 
       nonch=nstop+1 !!! Before 101220: nonch=noncha (==2000)

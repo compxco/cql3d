@@ -1,6 +1,6 @@
 c
 c
-      subroutine tdtrdfus
+      subroutine tdtrdfus ! CQL3D only (not CQLP)
       implicit integer (i-n), real*8 (a-h,o-z)
 
 c..............................................................
@@ -23,6 +23,7 @@ c..............................................................
 
       include 'param.h'
       include 'comm.h'
+CMPIINSERT_INCLUDE
 c%OS
       dimension drshape(0:lrz), rhotr(0:lrz)
 
@@ -31,6 +32,13 @@ c%OS
       call bcast(d_rr,zero,iyjx2*ngen*(lrz+1))
       call bcast(drshape(0),zero,lrz+1)
 
+      if (read_data.eq.'nimrod') then !YuP[2021-08] added.
+        !In this case the values of d_rr() are set in
+        !subr.profiles, at every time step, using time-dependent data on dB/B
+        !from NIMROD (in future, other codes for coupling could be added)
+        return ! Nothing else to do here?
+      endif
+      
 c      write(*,*)'tdtrdfus: difus_type(),',(difus_type(k),k=1,ngen)
 
       if (difus_io(1).ne."drrin") then
@@ -144,7 +152,10 @@ c   mesh to compute drshape on from difin(ryain)
                rshape1=0.
             endif
          endif
-c         write(*,*)'tdtrdfus, rshape,rshape1:',rshape,rshape1
+CMPIINSERT_IF_RANK_EQ_0
+         WRITE(*,'(a,1p3e12.3)')'tdtrdfus, rshape,rshape1,difusr1:',
+     &                                     rshape,rshape1,difusr1
+CMPIINSERT_ENDIF_RANK
          if (l.ne.0) call tdtrvshape(k,l) !Returns shape in temp1
          do j=1,jx
             if (l.eq.0 .or. icnst.eq.0) then
@@ -163,8 +174,14 @@ cBH050921 Substantial bug fix, adding  *rshape     d_rr(i,j,k,l)=difusr1
             endif
          enddo  !On j
 
-c        write(*,*)'tdtrdfus:l,(temp1(1,j),j=1,jx)',l,(temp1(1,j),j=1,jx)
-c        write(*,*)'tdtrdfus: l, d_rr',l,(d_rr(1,j,k,l),j=1,jx)
+CMPIINSERT_IF_RANK_EQ_0
+        !WRITE(*,*)'tdtrdfus:l,(temp1(1,j),j=1,jx)',l,(temp1(1,j),j=1,jx)
+        do j=1,jx,60
+        do i=1,iyh,8
+        WRITE(*,*)'tdtrdfus: l,j,i, d_rr(i,j,l)', l,j,i, d_rr(i,j,k,l)
+        enddo
+        enddo
+CMPIINSERT_ENDIF_RANK
 
        enddo  ! on l
 
@@ -193,7 +210,7 @@ c$$$         call diffus_io(4) !Reads d_rr and d_r for k=1 from .nc file
       endif  !On difus_io(1).ne."drrin"
 
       return
-      end
+      end subroutine tdtrdfus
 c
 c
       real*8 function tdtrrshape(lr)
@@ -245,7 +262,7 @@ c        Simply use last (lrzmax) value of density....
       endif
 
       return
-      end
+      end function tdtrrshape
 c
 c
       real*8 function tdtrrshape1(lr)
@@ -294,7 +311,7 @@ c
       endif
 
       return
-      end
+      end function tdtrrshape1
 c
 c
       subroutine tdtrvshape(k,l)
@@ -346,7 +363,7 @@ c     +                     idx(i,l),i,j,l,temp1(idx(i,l),j),coll_cutoff
       enddo
 
       return
-      end
+      end subroutine tdtrvshape
 
 
 
@@ -381,6 +398,10 @@ c     perp. deflection time
 
 
       lnlambda=24.-log(reden(kelec,lr)**0.5/temp(kelec,lr))
+      !YuP[2022-02-18] There is a bug in the above line -
+      !It almost matches the expression for lambda_ei in NRL
+      ! (at Te > 10*Z**2) except the temperature should be in eV.
+      !But in CQL3D, temp() array is in keV.
 
       if (k.eq.kelecg) then
 
@@ -412,7 +433,7 @@ c     perp. deflection time
       endif
       
       return
-      end
+      end function coll_freq
         
       subroutine ryaintorz(npts_in,oldx,oldf,npts,ynewx,ynewf)
       implicit integer (i-n), real*8 (a-h,o-z)
@@ -443,7 +464,7 @@ c.......................................................................
       enddo
       
       return
-      end
+      end subroutine ryaintorz
 
 
       subroutine diffus_io(kopt)
@@ -482,11 +503,11 @@ c --- some stuff for netCDF file ---
       WRITE(*,*) 'In diffus_io, kopt=',kopt
 
 c     Maximum iy as function of radius:
-      iyy=0
+      iymx=0
       do l=1,lrz
-         iyy=max(iyy,iy_(l))
+         iymx=max(iymx,iy_(l))
       enddo
-      if(iyy.gt.iy) stop 'difus_io: iy_(l) should not exceed iy' 
+      if(iymx.gt.iy) stop 'difus_io: iy_(l) should not exceed iy' 
 
       if (.NOT.ALLOCATED(wkpack)) then ! allocate working array for pack21
          nwkpack=iyjx2 +10 ! +10 just in case
@@ -969,7 +990,7 @@ c     Read d_rr and (kopt.eq.4) d_r
       endif  !On kopt.eq.3 .or. kopt.eq.4
 
       return
-      end
+      end subroutine diffus_io
 c
 c
       real*8 function difus_io_scale(k,iopt)

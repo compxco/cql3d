@@ -11,6 +11,9 @@ c......................................................................
       include 'param.h'
       include 'comm.h'
 
+            !This subr. is only called when if l_=lmdpln_
+            !For CQLP, l_=lmdpln_=1
+
       do 10 i=1,iy_(l_)
         vpint(i,lr_)=cynt2(i,l_)*abs(coss(i,l_))*tau(i,lr_)
  10   continue

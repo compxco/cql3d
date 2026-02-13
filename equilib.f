@@ -370,13 +370,13 @@ c          Interpolate psi onto new expanded grid.
            zaxis=0.d0
            ymideqd=0.d0
            if(ncontr.gt.1) then ! YuP[04-2017] Added: adjust LCFS, if available
-             ncontr_= min(ncontr,lfielda)
+             ncontr_= min(ncontr,lfield)
              do ilim=1,ncontr_
                 zcontr(ilim)=zcontr(ilim)-zshift
              enddo
            endif
            if(nlimiter.gt.1) then ! YuP[04-2017] Added: adjust plasma border
-             nline= min(nlimiter,lfielda)
+             nline= min(nlimiter,lfield)
              do ilim=1,nline
                 zlimiter(ilim)=zlimiter(ilim)-zshift
              enddo

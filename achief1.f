@@ -85,7 +85,7 @@ c.....................................................................
       call frinitl
       
       open(unit=2,file="cqlinput",delim='apostrophe',status="old") 
-      call frset(lrz,noplots,nmlstout)   ! Uses unit 2
+      call frset(lrz,noplots,nmlstout,ngen,kfrsou(1:nbeams))   ! Uses unit 2
       close(2)
 
 c..................................................................

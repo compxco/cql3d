@@ -15,7 +15,7 @@ c..................................................................
 
       if(k.gt.ngen)  return
       do 10  j=1,jx
-        do 11  i=1,iy
+        do 11  i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
           da(i,j)=da(i,j)+egylosa(i,j,k,indxlr_)
  11     continue
  10   continue

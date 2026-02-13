@@ -10,13 +10,22 @@ c     the magnetic field line z and sz, as well as related quantities.
 c     This was part of micxinit in CQL3D.
 c     These meshes are tailored to suit requirements specified by
 c     the user in the namelist input.
+c     Note: ls= FPE grid size; lsmax= profiles' grid size (along 's')
 c..................................................................
 
       include 'param.h'
       include 'comm.h'
-      dimension zd2bpol(lfielda),zd2solr(lfielda),zd2solz(lfielda),
-     +  znormsh(0:lza)
-      dimension wk_z(lza),wk_r(lza),wk_b(lza) ! local work.arrays
+      
+      !For CQLP only:
+      dimension zd2bpol(lfield),zd2solr(lfield),zd2solz(lfield) !local
+      !YuP[2021-04] Changed to lfield
+      
+      real*8 znormsh(0:lz) !YuP[2021-03] local working array
+                           !(could use 0:lsmax) 
+     
+      !For CQL3D only:
+      dimension wk_z(lz),wk_r(lz),wk_b(lz) ! local work.arrays
+      !Meaning of lz: Grid size along poloidal field line
 
 c%OS  compute psi_prime as df/ds
 c%OS  fpsismi(l)=psis(l)*dls(2,2,1,l)+psis(l+1)*(1-dls(2,2,1,l))
@@ -97,7 +106,8 @@ c..................................................................
 
       if (psimodel.eq."spline") then
         if (eqmod.eq."disabled") then
-          lfield=lfielda
+          !lfield=lfielda !YuP[2021-04] lfielda is not used anymore
+          !Now all relevant arrays are pointers of size lfield
           lorbit(lr_)=lfield
           delz=zmax(lr_)/(lfield-1)
           do 24 lu=1,lorbit(lr_)
@@ -316,7 +326,7 @@ cBH000416        endif
 c.......................................................................
 cl    3. Construct mesh and profiles in CQLP mode on given flux surface
 c     Note: If cqlpmod=enabled, lz=lsmax, full mesh along B
-c     ls gives mesh on which equations are solved
+c     ls gives mesh on which FP equations are solved
 c     (if periodic: sz(1)=sz(ls))
 c     psis=B(s)/B(midplane), psisp=d(psis)/ds
 c.......................................................................
@@ -327,13 +337,17 @@ c     Note: only one flux surface in CQLP so far (lrz=1)
 c.......................................................................
 
       if (cqlpmod.ne."enabled" .or. lr_.ne.lrindx(1)) go to 999  !To END
+      
+      !-------- The rest is for CQLP only -------------------------------
 
 c     Following, not checked for eqsym.eq."none". Possibly OK. BH090923.
 
 c     Assumes midplane at l=1. If not, bmidplne, z mesh, bpsi etc should be
 c     redefine
-      do 310 l=1,ls
-        sz(l)=z(lsindx(l),lr_)
+      do 310 l=1,ls ! over FPE grid. 
+        !lsindx(l) selects points from profiles' grid,
+        ! example: lsindx(1)=3, lsindx(2)=5, lsindx(3)=10
+        sz(l)=z(lsindx(l),lr_) !So, sz() is over FPE grid
         psis(l)=bbpsi(lsindx(l),lr_)/bbpsi(lmdpln(indxlr(lr_)),lr_)
         psisp(l)=psifp(z(lsindx(l),lr_))/bbpsi(lmdpln(indxlr(lr_)),lr_)
  310  continue
@@ -355,12 +369,13 @@ c     psipols, solrs, solzs
       i1p(2)=4
       call coeff1(lorbit(lr_),es(1,lr_),solz(1,lr_),zd2solz(1),
      1  i1p,1,work)
+      !YuP: Then, zd2bpol,zd2solr,zd2solz are over full (profiles) grid
 
       itab(1)=1
       itab(2)=0
       itab(3)=0
 
-      do 311 l=1,ls
+      do 311 l=1,ls ! over FPE grid
         call terp1(lorbit(lr_),es(1,lr_),eqbpol(1,lr_),zd2bpol(1)
      1    ,sz(l),1,tab,itab)
         psipols(l)=tab(1)/bmidplne(lr_)
@@ -371,7 +386,7 @@ c     psipols, solrs, solzs
      1    ,sz(l),1,tab,itab)
         solzs(l)=tab(1)
  311  continue
-      do 312 l=2,ls-1
+      do 312 l=2,ls-1  ! over FPE grid
         dsz(l)=0.5*(sz(l+1)-sz(l-1))
         dszp5(l)=sz(l+1)-sz(l)
         eszp5(l)=1./dszp5(l)
@@ -395,7 +410,7 @@ c.......................................................................
 
 c     tdxin13d assumes a normalized mesh
       znormsh(0)=0.0
-      do 320 l=1,lz
+      do 320 l=1,lz ! This is the profiles' grid (better use lsmax here)
         znormsh(l)=z(l,lr_)/z(lz,lr_)
  320  continue
 c     only parabola option for n(s), T(s) so far
@@ -409,17 +424,21 @@ c.......................................................................
 cl    4. Define end points accordingly whether mesh is periodic or not
 c.......................................................................
 
-      if (transp .ne. "enabled") go to 999
+      if (transp.ne."enabled") go to 999
 
-c     Note: if transp=enabled then ls=lsmax
-      if (sbdry.ne."periodic" .and. numclas.ne.1) then
+      ! Here: we are still dealing with CQLP, to the end of subroutine.
+      !Note: if transp=enabled then ls=lsmax
+      if (sbdry.ne."periodic" .and. numclas.ne.1) then !CQLP here
         do 400 ik=1,ntotal
           do 401 il=0,lsmax+1,lsmax+1
             denpar(ik,il)=0.0
             temppar(ik,il)=0.0
  401      continue
  400    continue
-        do 410 il=0,lsmax+1,lsmax+1
+        !do 410 il=0,lsmax+1,lsmax+1 !YuP[2021-03] Changed to:
+        do 410 il=0,ls+1,ls+1
+          !YuP: Error? These arrays below are over FPE grid (ls)
+          ![2021-02]Suggest to change lsmax-->ls here
           sz(il)=0.0
           psisp(il)=0.0
           psipols(il)=0.0
@@ -440,8 +459,12 @@ c     0 <=> lsmax and lsmax+1 <=> 1
             temppar(ik,il)=temppar(ik,iequiv)
  421      continue
  420    continue
-        do 430 il=0,lsmax+1,lsmax+1
-          iequiv=il/(lsmax+1)+lsmax*((lsmax+1-il)/(lsmax+1))
+        !do 430 il=0,lsmax+1,lsmax+1 !YuP[2021-03] Changed to
+        do 430 il=0,ls+1,ls+1
+          !YuP: Error? These arrays below are over FPE grid (ls)
+          ![2021-02]Suggest to change lsmax-->ls here
+          !iequiv=il/(lsmax+1)+lsmax*((lsmax+1-il)/(lsmax+1)) !YuP[2021-03] Changed to
+          iequiv=il/(ls+1)+ls*((ls+1-il)/(ls+1))
           sz(il)=sz(iequiv)
           psisp(il)=psisp(iequiv)
           psipols(il)=psipols(iequiv)

@@ -140,13 +140,15 @@ c...................................................................
 
         if (kkk.eq.1) then
         do 200 j=1,jx
-           do 199 i=1,iy
+           do 199 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
+              !Note that for meshy="fixed_mu" iy_(l_) can be less than iy
               temp1(i,j)=gfi(i,j,k)
  199       continue
  200    continue
         else
          do 202 j=1,jx
-           do 201 i=1,iy
+           do 201 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
+              !Note that for meshy="fixed_mu" iy_(l_) can be less than iy
               temp1(i,j)=hfi(i,j)
  201       continue
  202    continue
@@ -169,7 +171,8 @@ c...
       imsh(2)=itl
       imsh(3)=midtrp
       imsh(4)=iyh
-      imsh(5)=iy
+      imsh(5)=iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
+      !Note that for meshy="fixed_mu" iy_(l_) can be less than iy
 
 c        if (tandem.eq."enabled" .and. fmass(k).gt.1.e-27) then
 c          jxq=jlwr
@@ -184,7 +187,7 @@ c        endif
         if (pltlim.eq."disabled") then
            jxq=jx
            xmaxq=x(jxq)
-           iyjxq=iyjx
+           !iyjxq=iyjx !YuP: Not used?
            tx_='u/vnorm'        
            do j=1,jxq
               tam1(j)=x(j)
@@ -194,7 +197,7 @@ c        endif
         if (tandem.eq."enabled" .and. fmass(k).gt.1.e-27) then
            jxq=jlwr
            xmaxq=xlwr
-           iyjxq=iy*jlwr
+           !iyjxq=iy*jlwr !YuP: note used?
            pltlim='x' ! YuP: reset?
            pltlimm=xmaxq
            tx_='u/vnorm'        
@@ -206,7 +209,7 @@ c       'x', 'u/c', or 'energy', up to maximum pltlimm.
         elseif (pltlim.eq.'x') then
            jxq=min(luf(pltlimm,x,jx),jx)
            xmaxq=x(jxq)
-           iyjxq=iy*jxq
+           !iyjxq=iy*jxq !YuP: not used?
            tx_='u/vnorm'        
            do j=1,jxq
               tam1(j)=x(j)
@@ -214,7 +217,7 @@ c       'x', 'u/c', or 'energy', up to maximum pltlimm.
         elseif (pltlim.eq.'u/c') then
            jxq=min(luf(pltlimm,uoc,jx),jx)
            xmaxq=uoc(jxq)
-           iyjxq=iy*jxq
+           !iyjxq=iy*jxq !YuP: not used?
            tx_='u/c'        
            do j=1,jxq
               tam1(j)=uoc(j)
@@ -224,7 +227,7 @@ c       'x', 'u/c', or 'energy', up to maximum pltlimm.
            wkd(1:jx)=enerkev(1:jx,k)
            jxq=min(luf(pltlimmm,wkd,jx),jx)
            xmaxq=enerkev(jxq,k) !YuP[2018-01-08] added 2nd index (k)
-           iyjxq=iy*jxq
+           !iyjxq=iy*jxq !YuP: not used?
            tx_='Energy (keV)'        
            do j=1,jxq
               tam1(j)=enerkev(j,k) !YuP[2018-01-08] added 2nd index (k)
@@ -233,7 +236,8 @@ c       'x', 'u/c', or 'energy', up to maximum pltlimm.
 
 
         call bcast(tam4,zero,jxq)
-        do 240 i=1,iy
+        do 240 i=1,iy_(l_) !YuP[2021-03-11] iy-->iy_(l_)
+          !Note that for meshy="fixed_mu" iy_(l_) can be less than iy
           do 230 j=1,jxq
             tam4(j)=tam4(j)+temp1(i,j)*cynt2(i,l_)/twoint(l_)
  230       continue

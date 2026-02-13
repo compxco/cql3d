@@ -13,7 +13,7 @@ c..............................................................
 
       include 'param.h'
       include 'comm.h'
-      dimension zdns(lrorsa),zdns1(lrorsa)
+      dimension zdns(lrorsa),zdns1(lrorsa) !local (not really needed)
 
       include 'advnce.h'
       fpithta(i,j)=f(i+1,j,k,l_)*(1.-dithta(i,j,l_)) + 
@@ -30,7 +30,11 @@ c.......................................................................
 cl    1. Compute velsou for main mesh points
 c.......................................................................
 
-      do 100 i=1,iy
+      do 100 i=1,iy_(l_) !YuP[2021-03-08] was iy
+        !Note that for meshy="fixed_mu" iy_(l_) can be less than iy
+        !But don't use iy=iy_(l_) here! It will overwrite iy,
+        !which is the namelist value, and iy is used to set dimensions
+        !of many arrays.
         if ((i.eq.itl.or.i.eq.itu) .and. cqlpmod.ne."enabled") go to 100
 c%OS  should be j=2,jx-1? may depend on lbdry
 c%OS  do 110 j=1,jx
@@ -73,7 +77,7 @@ c..................................................................
         do 200 j=1,jx
           velsou(itl,j,k,l_)=qz(j)*(gfi(itl,j,k)-gfi(itl,j-1,k))+
      +      r2y(j)*(-hfi(itl-1,j)+2.*hfi(itl,j)+hfi(itu,j))+
-     +      vptb(itl,lr_)*(cah(itl,j)*f(itl,j,k,l_)+so(itl,j))
+     +      vptb(itl,lr_)*(cah(itl,j)*f(itl,j,k,l_)+so(itl,j)) !CQL3D only
  200    continue
       endif
 
@@ -82,8 +86,8 @@ cl    2.1 Symmetry about pi/2. in trapped region.
 c..................................................................
 
       if (symtrap .eq. "enabled") then
-        do 210 i=iyh+1,itu
-          ii=iy+1-i
+        do 210 i= iyh_(l_)+1,itu
+          ii= iy_(l_)+1-i !YuP[2021-03-08]  iy-->iy_(l_), iyh-->iyh_(l_)
           do 215 j=1,jx
             velsou(i,j,k,l_)=velsou(ii,j,k,l_)
  215      continue

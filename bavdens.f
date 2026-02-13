@@ -1,5 +1,5 @@
 c
-      subroutine bavdens(k)
+      subroutine bavdens(k) !CQL3D only
       implicit integer (i-n), real*8 (a-h,o-z)
       save
 
@@ -11,7 +11,7 @@ c.............................................................
       include 'param.h'
       include 'comm.h'
 
-      do 1 i=1,iy
+      do 1 i=1,iymax !!YuP[2021-03-11] iy-->iymax
         bavdn(i,lr_)=reden(k,lr_)
         bavpd(i,lr_)=batot(i,lr_)*sinn(i,lmdpln_)*reden(k,lr_)
  1    continue
@@ -21,12 +21,14 @@ c     Exit if locquas.ne. "enabled"
 c..................................................................
 
       if (kelecg.gt.0.or.locquas.eq."disabled".or.kelecm.ne.k) return
-      call bcast(temc3,zero,iy)
-      call bcast(temc4,zero,iy)
+      call bcast(temc3,zero,iymax)
+      call bcast(temc4,zero,iymax)
 
       
       lrange=lz
-      if (numclas .eq. 1) lrange=lz/2+1
+      !This line should not be important - for CQLP only:
+      if (cqlpmod.eq."enabled" .and. numclas .eq. 1) lrange=lz/2+1
+      !YuP[2025-12-12] added cqlpmod.eq."enabled" in the above line     
 
       
       do 30 l=1,lrange
@@ -66,27 +68,27 @@ c..................................................................
           endif
           
  31     continue
- 30   continue
+ 30   continue ! l
  
  
       ! Symmetrize around pitch=pi/2  
       do 40 i=1,iyh
-        iii=iy+1-i
+        iii=iy_(l_)+1-i  !YuP[2021-03-11] iy-->iy_(l_)
         temc3(iii)=temc3(i)
         temc4(iii)=temc4(i)
  40   continue
-      call dcopy(iy,temc3,1,bavdn,1)
+      call dcopy(iymax,temc3,1,bavdn,1)  !YuP[2021-03-12] iy-->iymax
       
       
       ! Symmetrize around pitch=pi/2  
       do 50 i=2,iyh
-        iii=iy+1-i
+        iii=iy_(l_)+1-i  !YuP[2021-03-11] iy-->iy_(l_)
         bavpd(i,lr_)=(temc4(i)/sinn(i,lmdpln_)**2
      1    -temc3(i))*tann(i,lmdpln_)**2*sinn(i,lmdpln_)
         bavpd(iii,lr_)=+bavpd(i,lr_)
  50   continue
       bavpd(1,lr_)=0.
-      bavpd(iy,lr_)=0.
+      bavpd(iy_(l_),lr_)=0. !YuP[2021-03-11] iy-->iy_(l_)
             
       
       return
