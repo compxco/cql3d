@@ -1,6 +1,8 @@
 
 cqlinput_help_local
 
+ADC/  #Files have been moved to cql3d dir (and some corrected)
+
 #Compiled objects
 *.o
 *.mod

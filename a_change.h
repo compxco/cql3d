@@ -8,6 +8,10 @@ c     This file documents changes in the code
 c
 c***********************************************************************
 
+
+------------------------------
+version="git_cql3d_251215.2"
+------------------------------
 c[364] Changed dimensions of arrays ilowp,iupp,ifct1_,ifct2_
   to be ilowp(ipack16_,nrayn,mrfn), etc.
   where ipack16_=(jjx/ibytes16)*nrayelts +1,
