@@ -69,6 +69,13 @@
 #  "-fast" option.
 #-----------------------------------------------------------------------------------
 
+#------
+# Per John Wright [2026] - Avoid using -O2 flag when debugging.
+# -O2 gives a problem with -g , so only when debugging.
+# It may  point to something not quite robust in string parsing of setup0
+# Some of namelist variables get scrambled.
+#------
+
 SHELL     = /bin/sh
 NAME      = xcql3d_mpi_gnu.perl
 COMPILER=   ftn

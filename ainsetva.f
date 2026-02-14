@@ -1,6 +1,15 @@
 c
-      subroutine ainsetva
+      subroutine ainsetva(kopt)
       implicit integer (i-n), real*8 (a-h,o-z)
+      integer kopt !IN
+      !YuP[2024-02-27] added kopt, so that ainsetva is called twice:
+      !kopt=1 - verify all vars NOT related to FREYA,
+      !kopt=2 - verify vars ONLY related to FREYA.
+      !Reason: originally, ainsetva was called once, 
+      !BEFORE frset and frnfreya
+      !where the values of frmodp, etc., are defined.
+      !This could result in wrong outcome.
+      !Now it is called again, after frnfreya, with kopt=2.
       character*8 eqmirror
 
       save
@@ -21,17 +30,20 @@ c
       !real*8:: tmpt(njene)  !Temporary array, local. YuP[2019-10-29]
       character*6 cdum !local
       real*8:: nbeams1p(kb),kblspecp(kb)
-      
-CMPIINSERT_IF_RANK_EQ_0
-      WRITE(*,*)''
-      WRITE(*,*)'In ainsetva'
-CMPIINSERT_ENDIF_RANK
-c
+
 c.......................................................................
 c     0. Check for consistency of some parameter settings
 c        (in param.h).
 c......................................................................
+CMPIINSERT_IF_RANK_EQ_0
+      WRITE(*,*)''
+      WRITE(*,*)'In ainsetva.  kopt=',kopt
+CMPIINSERT_ENDIF_RANK
 
+      
+      if(kopt.eq.2) goto 222 ![2024-02-27] added kopt=1/2 logic
+      
+      
       if (lrorsa.ne.max(lrza,lsa)) 
      +     stop 'check consistency of lrorsa in param.h'
 
@@ -116,17 +128,6 @@ CMPIINSERT_ENDIF_RANK
          nt_delta=nt_delta+1
       endif
 
-c     fr_gyrop='disabled' is default, for backwards compatability.
-c     Warn on use of fr_gyro for ZOW particles.
-      if (frmodp.eq.'enabled') then
-         if (fr_gyrop.ne.'disabled') then
-CMPIINSERT_IF_RANK_EQ_0
-            WRITE(*,*)
-            WRITE(*,*)'WARNING: ZOW NB ions, but using fr_gyro=enabled'
-            WRITE(*,*)
-CMPIINSERT_ENDIF_RANK
-         endif
-      endif
 
       if (ndeltarho.ne."disabled") then
 CMPIINSERT_IF_RANK_EQ_0
@@ -1729,50 +1730,6 @@ c     Checking consistency of netcdfvecXX settings:
      +                     stop 'STOP:check netcdfvecXX for consistency'
       endif
 
-         
-      if (frmodp.ne."disabled") then
-         if (nso.ne.1) stop 'STOP: frmodp.ne.disabled, NEED nso=1'
-         if (nbeamsp.gt.kb) stop 'STOP:frmod case, NEED nbeamsp.le.kb' 
-         do ib=1,nbeamsp
-            if (kfrsou(ib).eq.0 .or. kfrsou(ib).gt.ngen) 
-     +          stop 'STOP: frmod case, NEED to reset kfrsou(1:nbeamsp)'
-         enddo
-c        Check kfrsou() for the beam lines properly grouped
-         kbsp=1   !Number of different beamline species
-         nbeams1p(1)=1 !Number of beamlines for each species
-         kblspecp(1)=kfrsou(1) !spec index for each nbeams1p beamline set
-         do ib=2,nbeamsp
-            if (kfrsou(ib).eq.kfrsou(ib-1)) then
-               nbeams1p(kbsp)=nbeams1p(kbsp)+1
-            elseif(kfrsou(ib).ne.0) then
-               kbsp=kbsp+1      !increment number of beamline species
-               kblspecp(kbsp)=kfrsou(ib)
-               nbeams1p(kbsp)=nbeams1p(kbsp)+1
-            else                !kfrsou(ib).eq.0
-               go to 1
-            endif
-         enddo
- 1       continue
-         
-         if (kbsp.gt.1) then
-            do ks=1,kbsp
-               do kss=ks+1,kbsp
-                  if(kblspecp(kss).eq.kblspecp(ks)) then
-                     STOP 'kfrsou is improperly ordered'
-                  endif
-               enddo
-            enddo
-         endif
-
-      endif  !On frmodp
-
-c     In view of checking settings in sub frset, this condition
-c     should not (cannot) occur.
-      if (beamplsep.ne."disabled") then
-         if (frmodp.eq."disabled")
-     +        stop 'STOP:frmod.eq.disabled but beamplse.ne.disabled'
-      endif
-         
 c     Checking consistency of rdcmod and lrzdiff
       if (rdcmod.ne."disabled" .and. lrzdiff.ne."disabled") then
 CMPIINSERT_IF_RANK_EQ_0
@@ -2021,6 +1978,73 @@ CMPIINSERT_ENDIF_RANK
            STOP
         endif
       enddo
+      if(kopt.eq.1) return ! the rest is for kopt=2  ===================
+      
+      
+  222 continue !kopt=2 handle
+!--------------------------------- kopt=2 ------------------------------
+      
+c     Normally should use fr_gyro='enabled' -- 
+c     to find the guiding center position from a known birth point.
+c     But, fr_gyro='disabled' is default, for backwards compatability.
+      if (frmodp.eq.'enabled') then 
+         !NBI using FREYA 
+         !(or maybe a NUBEAM/FIDASIM list? - Check; Could be already shifted to g.c.)
+CMPIINSERT_IF_RANK_EQ_0
+            WRITE(*,*)
+            WRITE(*,*)'WARNING: NBI using fr_gyro=',fr_gyrop
+            WRITE(*,*)
+CMPIINSERT_ENDIF_RANK
+      endif
+         
+      if (frmodp.ne."disabled") then
+         if (nso.ne.1) stop 'STOP: frmodp.ne.disabled, NEED nso=1'
+        if(nsou.lt.nstop)then !YuP[2023-02-16] added
+CMPIINSERT_IF_RANK_EQ_0
+        WRITE(*,*)'WARNING: nsou<nstop, NBI will reset to 0 at n=nsou+1'
+CMPIINSERT_ENDIF_RANK
+        endif
+         if (nbeamsp.gt.kb) stop 'STOP:frmod case, NEED nbeamsp.le.kb' 
+         do ib=1,nbeamsp
+            if (kfrsou(ib).eq.0 .or. kfrsou(ib).gt.ngen) 
+     +          stop 'STOP: frmod case, NEED to reset kfrsou(1:nbeamsp)'
+         enddo
+c        Check kfrsou() for the beam lines properly grouped
+         kbsp=1   !Number of different beamline species
+         nbeams1p(1)=1 !Number of beamlines for each species
+         kblspecp(1)=kfrsou(1) !spec index for each nbeams1p beamline set
+         do ib=2,nbeamsp
+            if (kfrsou(ib).eq.kfrsou(ib-1)) then
+               nbeams1p(kbsp)=nbeams1p(kbsp)+1
+            elseif(kfrsou(ib).ne.0) then
+               kbsp=kbsp+1      !increment number of beamline species
+               kblspecp(kbsp)=kfrsou(ib)
+               nbeams1p(kbsp)=nbeams1p(kbsp)+1
+            else                !kfrsou(ib).eq.0
+               go to 1
+            endif
+         enddo
+ 1       continue
+         
+         if (kbsp.gt.1) then
+            do ks=1,kbsp
+               do kss=ks+1,kbsp
+                  if(kblspecp(kss).eq.kblspecp(ks)) then
+                     STOP 'kfrsou is improperly ordered'
+                  endif
+               enddo
+            enddo
+         endif
+
+      endif  !On frmodp
+
+c     In view of checking settings in sub frset, this condition
+c     should not (cannot) occur.
+      if (beamplsep.ne."disabled") then
+         if (frmodp.eq."disabled")
+     +        stop 'STOP:frmod.eq.disabled but beamplse.ne.disabled'
+      endif
+         
 
 c Part of printed output re viz problem
 c      write(*,*)'ainsetva after nrskip: nirzplt= ',nirzplt

@@ -184,19 +184,22 @@ c..................................................................
 c     Unpack stored data - see subroutine urfpack
 c..................................................................
 
-          !locatn=(jjx*(is-1)+jjx*nrayelts*(iray-1))/ibytes+1
-              ! BH,YuP[2020-12-18] locatn is no longer needed: 
-              ! switched to pack16/unpack16, which uses unteger*2
-          locatn16=(jjx*(is-1)+jjx*nrayelts*(iray-1))/ibytes16+1
-          ! locatn16 specifies the storage location 
-          ! in the compressed arrays
-          !if(urfb_version.eq.1)then ! 2 is the new version developed by YuP
+            ![2026-01-24] waslocatn16=(jjx*(is-1)+jjx*nrayelts*(iray-1))/ibytes16+1
+            !Per Grant Rutherford and John Wright, this version 
+            !helps to avoid overflow when number of rays 
+            !and ray elements is very large:
+            !locatn16=(jjx/ibytes16)*((is-1)+nrayelts*(iray-1)) +1
+            ! locatn16 specifies the storage location 
+            ! in the compressed arrays.
+            locatn= (jjx/ibytes16)*(is-1) +1 ![2026-01-24]
+            !if(urfb_version.eq.1)then ! 2 is the new version developed by YuP
             ! if 1, it will use the original version
-            call unpack16(ilowp(locatn16,krf),8,ilim1(1:jjx),jjx)
-            call unpack16( iupp(locatn16,krf),8,ilim2(1:jjx),jjx)
+            !call unpack16(ilowp(locatn16,krf),8,ilim1(1:jjx),jjx)
+            call unpack16(ilowp(locatn,iray,krf),8,ilim1(1:jjx),jjx) ![2026-01-24]
+            call unpack16( iupp(locatn,iray,krf),8,ilim2(1:jjx),jjx) ![2026-01-24]
             !BH,YuP[2020-12-18] Changed unpack-->unpack16(which uses integer*2)
-            call unpack16(ifct1_(locatn16,krf),8,ifct1(1:jjx),jjx)
-            call unpack16(ifct2_(locatn16,krf),8,ifct2(1:jjx),jjx)
+            call unpack16(ifct1_(locatn,iray,krf),8,ifct1(1:jjx),jjx) ![2026-01-24]
+            call unpack16(ifct2_(locatn,iray,krf),8,ifct2(1:jjx),jjx) ![2026-01-24]
                 !YuP[2020-12-18] Do not use a range in the above arrays
                 !in the first arguments of unpack16 subroutines!
                 !The 1st argument in subr.unpack is integer*1,

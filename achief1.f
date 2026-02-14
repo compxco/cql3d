@@ -42,7 +42,7 @@ c.......................................................................
 c     set variables dependent on input variables
 c.......................................................................
 
-      call ainsetva
+      call ainsetva(1)
 
 c..................................................................
 c     Allocate arrays , if required
@@ -85,7 +85,7 @@ c.....................................................................
       call frinitl
       
       open(unit=2,file="cqlinput",delim='apostrophe',status="old") 
-      call frset(lrz,noplots,nmlstout,ngen,kfrsou(1:nbeams))   ! Uses unit 2
+      call frset(lrz,noplots,nmlstout,ngen,kfrsou(1:kb))   ! Uses unit 2
       close(2)
 
 c..................................................................

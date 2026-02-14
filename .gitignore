@@ -9,7 +9,6 @@ cqlinput_help_local
 xcql3d*
 
 #Results of test runs
-00_Cql3d_Regression_Tests/test1/
 00_Cql3d_Regression_Tests/test2/
 00_Cql3d_Regression_Tests/test3/
 00_Cql3d_Regression_Tests/test4/

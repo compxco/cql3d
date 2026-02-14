@@ -113,10 +113,12 @@ c     subroutines pack/unpack are for 8-bit words, pack16/unpack16
 c     are for 16-bit words.
 c.......................................................................
 
-              !locatn=  (jjx*(is-1)+jjx*nrayelts*(iray-1))/ibytes +1
-              ! BH,YuP[2020-12-18] locatn is no longer needed: 
-              ! switched to pack16/unpack16, which uses unteger*2
-              locatn16=(jjx*(is-1)+jjx*nrayelts*(iray-1))/ibytes16 +1
+            ![2026-01-24] was locatn16=(jjx*(is-1)+jjx*nrayelts*(iray-1))/ibytes16 +1
+            !Per Grant Rutherford and John Wright, this version 
+            !helps to avoid overflow when number of rays 
+            !and ray elements is very large:
+            !locatn16=(jjx/ibytes16)*((is-1)+nrayelts*(iray-1)) +1
+            locatn= (jjx/ibytes16)*(is-1) +1 ![2026-01-24]
 
 c.......................................................................
 c     Determine the poloidal angle on the flux surface where the ray
@@ -649,11 +651,12 @@ c..................................................................
               
               !if(urfb_version.eq.1)then ! 2 is the new version developed by YuP
                 ! if 1, it will use the original version
-                call pack16(ilowp(locatn16,krf),8,ilim1,jjx)
-                call pack16( iupp(locatn16,krf),8,ilim2,jjx)
+                !call pack16(ilowp(locatn16,krf),8,ilim1,jjx)
+                call pack16(ilowp(locatn,iray,krf),8,ilim1,jjx) ![2026-01-24]
+                call pack16( iupp(locatn,iray,krf),8,ilim2,jjx) ![2026-01-24]
                 !BH,YuP[2020-12-18] Changed pack-->pack16(which uses integer*2)
-                call pack16(ifct1_(locatn16,krf),8,ifct1,jjx)
-                call pack16(ifct2_(locatn16,krf),8,ifct2,jjx)
+                call pack16(ifct1_(locatn,iray,krf),8,ifct1,jjx) ![2026-01-24]
+                call pack16(ifct2_(locatn,iray,krf),8,ifct2,jjx) ![2026-01-24]
               !endif
               
 c     Temporary printout, checking elements fall on vel grid:

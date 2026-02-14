@@ -55,7 +55,7 @@ c..................................................................
 c     PARAMETERS CHOSEN BY USER FOLLOW
 
       character version*64
-      parameter(version='git_cql3d_251215.0') 
+      parameter(version="git_cql3d_251215.2") 
       character precursr*64
       parameter(precursr="cql3d_git_230113.4") !cql3d_git_201207.0, cql3d_git_200101.3
       integer machinea

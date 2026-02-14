@@ -8,6 +8,50 @@ c     This file documents changes in the code
 c
 c***********************************************************************
 
+c[364] Changed dimensions of arrays ilowp,iupp,ifct1_,ifct2_
+  to be ilowp(ipack16_,nrayn,mrfn), etc.
+  where ipack16_=(jjx/ibytes16)*nrayelts +1,
+  a much smaller size than ipack16=(jjx/ibytes16)*nrayelts*nrayn +1
+  previously used. This change is important for runs where 
+  many rays and many ray elements are used, and then ipack16 may overflow.
+  (This issue was partially addressed in [363], but was not sufficient)
+  See [2026-01-24]
+
+c[363] Modification of locatn16 (related to pack16/unpack16)
+  which originally was set as 
+  locatn16=(jjx*(is-1)+jjx*nrayelts*(iray-1))/ibytes16 +1
+  Per Grant Rutherford and John Wright, this version 
+  helps to avoid overflow when number of rays 
+  and ray elements is very large:
+  locatn16=(jjx/ibytes16)*((is-1)+nrayelts*(iray-1)) +1
+  (i.e., perform (jjx/ibytes16) division first to reduce the factor)
+  See [2026-01-24]
+
+c[362] A fix of issue in ainsetva related to NFREYA setup.
+  Added kopt, so that ainsetva(kopt) is called twice:
+  kopt=1 - verify all vars NOT related to FREYA,
+  kopt=2 - verify vars ONLY related to FREYA.
+  Reason: originally, ainsetva was called once, 
+  BEFORE frset and frnfreya
+  where the values of frmodp, etc., are defined.
+  This could result in wrong outcome.
+  Now it is called again, after frnfreya, with kopt=2.
+  See YuP[2024-02-27]
+
+c[361] Fixed an issue related to kfrsou.
+  For each beam 'ib' there should be an associated species 'k',
+  set with values of kfrsou(ib) in cqlinput.
+  In old version of CQL3D the namelist variable kfrsou was a scalar,
+  and its value was applied for all beams.
+  Now kfrsou() is a vector, 
+  and default values are set to kfrsou(:)=0.
+  Therefore, old cqlinput where several beams are used 
+  and kfrsou (as a scalar) is set to 2 
+  (which means - 1st and 2nd beams are pointing to species k=2)
+  would fail now.
+  The issue is fixed by resetting kfrsou(ib)=0
+  to kfrsou(ib)=kfrsou(ib-1) [value of 'k' from previous beam].
+  See frinitz.f, around "[2025-12-16]" 
 
 ------------------------------
 version="git_cql3d_251215.0"

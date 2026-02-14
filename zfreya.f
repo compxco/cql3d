@@ -388,6 +388,7 @@ c
 c      include 'params.inc'   BH: The file is in Kinsey's cql3d update.
 c                                 Not needed except in standalone freya.
       include 'param.h'
+CMPIINSERT_INCLUDE
 c
       integer mb, nion, ibion
       real*8 atw(kion), ebkev(kb), vbeam(ke,kb), zne(kz), zni(kz,kion),
@@ -405,8 +406,10 @@ c---:----1----:----2----:----3----:----4----:----5----:----6----:----7-c
 c
 c... initializations
 c     
+CMPIINSERT_IF_RANK_EQ_0
       WRITE(*,*)'crsecs might have a bug... Use iexcit=5' !YuP[2022-12]
       !It could be ok if only one beam is used. See "BUG?" below.
+CMPIINSERT_ENDIF_RANK
 
       if (ibstart.eq.1) then
       do ib=1,kb

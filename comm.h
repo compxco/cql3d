@@ -1779,18 +1779,20 @@ c..................................................................
       pointer wphi
       dimension wphi(:,:,:)
       common /dptr95/ wphi
+      
       pointer ilowp
-      dimension ilowp(:,:)
+      dimension ilowp(:,:,:)
       common /dptr95/ ilowp
       pointer iupp
-      dimension iupp(:,:)
+      dimension iupp(:,:,:)
       common /dptr95/ iupp
       pointer ifct1_
-      dimension ifct1_(:,:)
+      dimension ifct1_(:,:,:)
       common /dptr95/ ifct1_
       pointer ifct2_
-      dimension ifct2_(:,:)
+      dimension ifct2_(:,:,:)
       common /dptr95/ ifct2_
+      
       pointer nrayelt
       dimension nrayelt(:,:)
       common /dptr95/ nrayelt

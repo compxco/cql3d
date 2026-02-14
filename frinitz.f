@@ -101,6 +101,32 @@ CMPIINSERT_IF_RANK_EQ_0
       WRITE(*,*) 'frinitz: nprim,nimp = ',nprim,nimp
 CMPIINSERT_ENDIF_RANK
 
+      do ib=1,nbeams  ![2025-12-16] fixing an issue related to kfrsou
+       if( kfrsou(ib).eq.0 )then
+         !For each beam 'ib' there should be an associated species 'k'.
+         !In old version of CQL3D the namelist variable kfrsou was a scalar,
+         !and its value was applied for all beams.
+         !Now kfrsou() is a vector, 
+         !and default values are set to kfrsou(:)=0.
+         !Therefore, old cqlinput where several beams are used, 
+         !and kfrsou (as a scalar) is set to 2 
+         !(which means - 1st and 2nd beams are pointing to species k=2)
+         !would fail now.
+         !Check and adjust kfrsou(ib) for such cases.
+         if(ib>1)then
+         if(kfrsou(ib-1)>0)then
+            !copy the species value from the previous beam "ib-1"
+            !to the present:
+            kfrsou(ib)=kfrsou(ib-1) ![2025-12-16]
+CMPIINSERT_IF_RANK_EQ_0
+            WRITE(*,*) 'frinitz/WARNING: for beam ib=',ib,
+     &        ' resetting kfrsou(ib)=',kfrsou(ib)
+CMPIINSERT_ENDIF_RANK
+         endif
+         endif
+       endif !kfrsou(ib).eq.0
+      enddo !ib ![2025-12-16]
+
       do ib=1,kb
          ibion(ib)=0 !initialize; find in the scan below
       enddo

@@ -72,7 +72,7 @@ c     (May add an impurity ion, increasing species indices, if
 c      iprozeff.ne.'disabled').
 c.......................................................................
 
-      call ainsetva
+      call ainsetva(1) ![2024]check everything except those related to FREYA
       
       !------- General data on impurity ions; All ionization states ----
       !YuP[2020-07-02] Earlier, this subr. was part of set_gscreen_hesslow.
@@ -125,6 +125,7 @@ c.......................................................................
          write(6,*) 'mnemonic = ',mnemonic
          write(6,*)
       endif
+CMPIINSERT_BARRIER
 
 c..................................................................
 c     Call the initialization routines for the appended modules..
@@ -133,12 +134,16 @@ c..................................................................
       call urfinitl ! mrfn= is set here also
       call frinitl
       open(unit=2,file='cqlinput',delim='apostrophe',status='old')
-      call frset(lrz,noplots,nmlstout,ngen,kfrsou(1:nbeams))   ! Uses unit 2
+      call frset(lrz,noplots,nmlstout,ngen,kfrsou(1:kb))   ! Uses unit 2
+      !It reads &frsetup, saves frmod,etc., into frname_decl.h
       close(2)
+CMPIINSERT_BARRIER
 
       if (machine .ne. "toroidal") call tdwrng(1)
-      if (lrzdiff.eq."enabled" .and. frmodp.eq."enabled") 
-     +  call diagwrng(18)
+      !YuP[2024-02-27] Here, frmodp is not set yet, 
+      !commenting this check (could move it to ainsetva?):
+!      if (lrzdiff.eq."enabled" .and. frmodp.eq."enabled") 
+!     +  call diagwrng(18)
 
 c.....................................................................
 c     This routine initializes the normalized theta mesh that is used
@@ -155,6 +160,7 @@ c     parameters arrays.
 c.....................................................................
 
       if(lrzmax.gt.1) call tdxinitl
+CMPIINSERT_BARRIER
 
 c.....................................................................
 c     Call routines to initialize any time-dependent (parabolic,...)   
@@ -171,12 +177,14 @@ c.....................................................................
            endif  !On nlrestrt.eq."ncdfdist"
            !YuP[2020-02-11] Moved this part from profiles to tdinitl
       endif
+CMPIINSERT_BARRIER
 
 c.....................................................................
 c     Determine mesh normalization constant vnorm.
 c.....................................................................
 
       call ainvnorm
+CMPIINSERT_BARRIER
 
 c.......................................................................
 cl    1.1 Loop over all radial mesh points lr=1,..,lrzmax to determine
@@ -185,7 +193,7 @@ c     Also determine the mesh parallel to the magnetic field line
 c.......................................................................
 
       if (cqlpmod.eq."enabled" .and. numclas.eq.1 .and. ls.eq.lsmax)then
-        lz=lz/2+1
+        lz=lz/2+1 !CQLP
         lsmax=lsmax/2+1
         ls=ls/2+1
       endif
@@ -456,8 +464,10 @@ c     Copy some diagnostic quantities
 c..................................................................
 
         call tdtoaray
-
- 120  continue
+        
+ 120  continue !ll
+CMPIINSERT_BARRIER
+ 
 c----------------------------------------------------------------------
 
 c..................................................................
@@ -572,22 +582,23 @@ c     Call the neutral beam source module
 c..................................................................
 
 cBH171014:  Enable calls for multiple beam species.
-      if (frmodp.eq."enabled") then !YuP[2025-12-12] added if
-CMPIINSERT_IF_RANK_EQ_0      
-      WRITE(*,*)'tdinitl:call frnfreya, n=',n,'time=',timet
-CMPIINSERT_ENDIF_RANK
       ! nbeams,nbeamsp= 0,0   here
       call frnfreya(frmodp,fr_gyrop,beamplsep,beamponp,beampoffp,
      &              nbeamsp,hibrzp,mfm1p,noplots,kfrsou,src_nbi_ep)
+      !YuP[2024-02-27] Now frmodp is set,
+      !(passed from frcomm.h to comm.h, as frmodp=frmod, etc).
       !nbeamsp is one of outputs: got value from nbeams (cqlinput variable)
       !Now nbeamsp is saved into comm.h
+      
+      call ainsetva(2) ![2024-02-27] To verify FREYA-related vars.
+      if (frmodp.eq."enabled") then !YuP[2025-12-12] added if
+      !Note: frmodp is set in frnfreya(frmodp,....)
 CMPIINSERT_IF_RANK_EQ_0      
       WRITE(*,*)'tdinitl/aft.frnfreya: mfm1, nbeamsp,src_nbi_ep=',
      &  mfm1p,nbeamsp,src_nbi_ep
       WRITE(*,*)'tdinitl/aft.frnfreya: kfrsou(1:nbeamsp)=',
      & kfrsou(1:nbeamsp)
 CMPIINSERT_ENDIF_RANK
-
       endif !(frmodp.eq."enabled") !YuP[2025-12-12] added if
 c
 c     Initialize ibeampon/ibeamponp (present and previous time step)
@@ -611,6 +622,7 @@ c..................................................................
 
       if (rdcmod.eq."format1" .or. rdcmod.eq."aorsa" 
      +                        .or. rdcmod.eq."format2") then
+        !YuP[2025-05-12] Only for 1st general species. NEEDS fixing
         call rdc_multi
       endif
 

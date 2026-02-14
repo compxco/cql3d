@@ -34,19 +34,20 @@ c.......................................................................
       nrnr2=nrayelts*nrayn*2
 
 c     ibytes16 is number of 16-bit words per integer word.
-c     ipack16 is number of integer words required to store 1 set
+c     ipack16_ is number of integer words required to store 1 set
 c     of ray data (*jjx) in the ifct1_,ifct2_ 16-bit-word arrays.
-      ipack16= jjx/ibytes16*nrayelts*nrayn +1 
+      !ipack16= (jjx/ibytes16)*nrayelts*nrayn +1 
       !YuP-101207: no need to multiply by mrfn, 
-      !  because ifct1,2_(ipack16,mrfn) includes mrfn
-      
+      !  because ifct1,2_(*,*,mrfn) includes mrfn
+      ipack16_=(jjx/ibytes16)*nrayelts +1 ![2026-01-24]
+
       nrm=nrayn*mrfn
       
       !if(urfb_version.eq.1)then ! 2 is the new version developed by YuP
         !subr. pack16() is not used by urfb_version.eq.2
         !so - no need to define pack16 and to print this out.
 CMPIINSERT_IF_RANK_EQ_0
-         WRITE(*,*)'urfalloc: ipack16,mrfn=',ipack16,mrfn
+         WRITE(*,*)'urfalloc: ipack16_,mrfn=',ipack16_,mrfn
 CMPIINSERT_ENDIF_RANK
       !endif
 
@@ -251,26 +252,26 @@ CMPIINSERT_ENDIF_RANK
       !if(urfb_version.eq.1)then ! 2 is the new version developed by YuP
         ! if 1, it will use the original version
         !-YuP 101121:  These are usually large arrays:
-        allocate(ilowp(ipack16,mrfn),STAT=istat)
+        allocate(ilowp(ipack16_,nrayn,mrfn),STAT=istat) ![2026-01-24]
         !BH,YuP[2020-12-18] Changed pack-->pack16(which uses integer*2),
         !and allocation - accordingly.
         istat_tot=istat_tot+istat
 CMPIINSERT_IF_RANK_EQ_0
         WRITE(*,*)'urfalloc  ilowp: istat=',istat
 CMPIINSERT_ENDIF_RANK
-        allocate(iupp(ipack16,mrfn),STAT=istat)
+        allocate(iupp(ipack16_,nrayn,mrfn),STAT=istat)
         !BH,YuP[2020-12-18] Changed pack-->pack16(which uses integer*2),
         !and allocation - accordingly.
         istat_tot=istat_tot+istat
 CMPIINSERT_IF_RANK_EQ_0
         WRITE(*,*)'urfalloc   iupp: istat=',istat
 CMPIINSERT_ENDIF_RANK
-        allocate(ifct1_(ipack16,mrfn),STAT=istat)
+        allocate(ifct1_(ipack16_,nrayn,mrfn),STAT=istat)
         istat_tot=istat_tot+istat
 CMPIINSERT_IF_RANK_EQ_0
         WRITE(*,*)'urfalloc  ifct1_: istat=',istat
 CMPIINSERT_ENDIF_RANK
-        allocate(ifct2_(ipack16,mrfn),STAT=istat)
+        allocate(ifct2_(ipack16_,nrayn,mrfn),STAT=istat)
         istat_tot=istat_tot+istat
 CMPIINSERT_IF_RANK_EQ_0
         WRITE(*,*)'urfalloc  ifct2_: istat=',istat
